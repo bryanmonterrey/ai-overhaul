@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 export function WalletConnection() {
   const { publicKey, connected, connecting, disconnect, wallet } = useWallet();
   const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('Wallet state:', {
@@ -25,45 +26,44 @@ export function WalletConnection() {
     }
     
     setIsValidating(true);
+    setValidationError(null);
+    
     try {
-      console.log('Validating tokens for wallet:', publicKey.toString());
+      const walletAddress = publicKey.toString();
+      console.log('Starting token validation for wallet:', walletAddress);
+      
       const response = await fetch('/api/token-validation', {
         method: 'POST',
-        credentials: 'include', // Include cookies
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          // Add CSRF token if you have one
-          ...(document.cookie.includes('csrf-token') && {
-            'X-CSRF-Token': document.cookie
-              .split('; ')
-              .find(row => row.startsWith('csrf-token'))
-              ?.split('=')[1] || ''
-          })
         },
-        body: JSON.stringify({
-          walletAddress: publicKey.toString(),
-        }),
+        body: JSON.stringify({ walletAddress }),
       });
 
-      if (response.status === 401) {
-        // Redirect to login if unauthorized
-        window.location.href = `/login?redirect=${encodeURIComponent('/chat')}`;
-        return;
-      }
-
+      console.log('API Response status:', response.status);
       const data = await response.json();
       console.log('Validation response:', data);
       
-      if (data.isEligible) {
-        window.location.href = '/chat';
-      } else if (response.ok) {
-        window.location.href = '/insufficient-tokens';
-      } else {
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.log('Unauthorized. Redirecting to login...');
+          window.location.href = `/login?redirect=${encodeURIComponent('/chat')}`;
+          return;
+        }
         throw new Error(data.error || 'Validation failed');
       }
-    } catch (error) {
-      console.error('Error validating tokens:', error);
-      // Show error to user
+
+      if (data.isEligible) {
+        console.log('Token validation successful. Redirecting to chat...');
+        window.location.href = '/chat';
+      } else {
+        console.log('Insufficient tokens. Redirecting...');
+        window.location.href = '/insufficient-tokens';
+      }
+    } catch (error: any) {
+      console.error('Error in token validation:', error);
+      setValidationError(error.message);
     } finally {
       setIsValidating(false);
     }
@@ -89,6 +89,9 @@ export function WalletConnection() {
           >
             {isValidating ? 'Validating...' : 'Verify Token Holdings'}
           </button>
+          {validationError && (
+            <p className="text-sm text-red-500">{validationError}</p>
+          )}
           <button
             onClick={() => disconnect()}
             className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors w-full"
