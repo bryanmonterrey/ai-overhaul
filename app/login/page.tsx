@@ -11,71 +11,90 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const { connected, publicKey } = useWallet();
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
+  // Check existing session
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log('User session found, redirecting to chat');
-        router.push('/chat');
-      } else {
-        console.log('No session found, showing login page');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          console.log('Existing session found, redirecting to chat');
+          router.push('/chat');
+        } else {
+          console.log('No session found, showing login page');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
         setLoading(false);
       }
     };
     checkSession();
   }, [supabase, router]);
 
-  // Handle wallet connection
+  // Handle wallet authentication
   useEffect(() => {
     const handleWalletLogin = async () => {
-      if (!connected || !publicKey) return;
+      // Only proceed if wallet is connected and not already authenticating
+      if (!connected || !publicKey || isAuthenticating) return;
 
       try {
-        console.log('Wallet connected, signing in with Supabase');
-        const message = `Login with wallet: ${publicKey.toString()}`;
-        
-        // Sign in with Supabase
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: `${publicKey.toString()}@wallet.local`, // Use wallet address as email
-          password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret' // You should set this in your env
+        setIsAuthenticating(true);
+        console.log('Starting wallet authentication for:', publicKey.toString());
+
+        // Try to sign up first
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: `${publicKey.toString()}@wallet.local`,
+          password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
+          options: {
+            data: {
+              wallet_address: publicKey.toString()
+            }
+          }
         });
 
-        if (error) {
-          // If user doesn't exist, sign them up
-          if (error.message.includes('Email not confirmed')) {
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        if (signUpError) {
+          console.log('Sign up attempt result:', signUpError.message);
+          
+          // If user already exists, try to sign in
+          if (signUpError.message.includes('User already registered')) {
+            console.log('User exists, attempting sign in');
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
               email: `${publicKey.toString()}@wallet.local`,
-              password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
-              options: {
-                data: {
-                  wallet_address: publicKey.toString()
-                }
-              }
+              password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret'
             });
 
-            if (signUpError) {
-              console.error('Error signing up:', signUpError);
+            if (signInError) {
+              console.error('Sign in error:', signInError);
               return;
             }
-          } else {
-            console.error('Error signing in:', error);
-            return;
-          }
-        }
 
-        console.log('Successfully authenticated with Supabase');
-        router.push('/chat');
+            if (signInData.session) {
+              console.log('Successfully signed in');
+              router.push('/chat');
+            }
+          } else {
+            console.error('Unexpected error during signup:', signUpError);
+          }
+        } else if (signUpData.session) {
+          console.log('Successfully signed up and authenticated');
+          router.push('/chat');
+        }
       } catch (error) {
-        console.error('Error during authentication:', error);
+        console.error('Authentication error:', error);
+      } finally {
+        setIsAuthenticating(false);
       }
     };
 
     handleWalletLogin();
-  }, [connected, publicKey, supabase, router]);
+  }, [connected, publicKey, supabase, router, isAuthenticating]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="h-full flex items-center justify-center">
+      <div className="text-white">Loading...</div>
+    </div>;
   }
 
   return (
@@ -93,6 +112,12 @@ export default function LoginPage() {
         <div className="mt-8">
           <WalletConnection />
         </div>
+
+        {isAuthenticating && (
+          <p className="text-center text-sm text-gray-400">
+            Authenticating...
+          </p>
+        )}
       </div>
     </div>
   );
