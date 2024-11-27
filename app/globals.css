@@ -83,17 +83,21 @@ body {
   margin: 0;
   padding-bottom: 24px;
   text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .wallet-adapter-modal-list {
   margin: 0;
-  padding: 0;
+  padding: 5px 2px;
   width: 100%;
   list-style: none;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .wallet-adapter-modal-list li {
   padding: 8px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 /* Add this to your globals.css */
