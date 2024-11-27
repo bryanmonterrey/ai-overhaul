@@ -1,6 +1,5 @@
-// src/lib/services/database.ts
-
-import { supabase } from '../supabase';
+// app/lib/services/database.ts
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { ChatSession, ChatMessage, QualityMetric, TrainingData } from '@/types/database';
 import { Message } from '@/app/core/types/chat';
 
@@ -15,6 +14,7 @@ interface TrainingDataRecord {
 export class DatabaseService {
   private static instance: DatabaseService;
   private currentSession: string | null = null;
+  private supabase = createClientComponentClient();
 
   private constructor() {}
 
@@ -26,26 +26,52 @@ export class DatabaseService {
   }
 
   async startSession(platform: 'chat' | 'twitter' | 'telegram' = 'chat'): Promise<string> {
-    const { data, error } = await supabase
-      .from('chat_sessions')
-      .insert({ platform })
-      .select()
-      .single();
+    try {
+      // Get current user session
+      const { data: { session } } = await this.supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
 
-    if (error) throw error;
-    this.currentSession = data.id;
-    return data.id;
+      const { data, error } = await this.supabase
+        .from('chat_sessions')
+        .insert({ 
+          platform,
+          user_id: session.user.id,
+          started_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      this.currentSession = data.id;
+      console.log('Chat session started:', data.id);
+      return data.id;
+    } catch (error) {
+      console.error('Failed to start session:', error);
+      throw error;
+    }
   }
 
   async endSession(sessionId: string) {
-    const { error } = await supabase
-      .from('chat_sessions')
-      .update({ ended_at: new Date().toISOString() })
-      .eq('id', sessionId);
+    try {
+      const { error } = await this.supabase
+        .from('chat_sessions')
+        .update({ 
+          ended_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
 
-    if (error) throw error;
-    if (sessionId === this.currentSession) {
-      this.currentSession = null;
+      if (error) throw error;
+      if (sessionId === this.currentSession) {
+        this.currentSession = null;
+      }
+      console.log('Chat session ended:', sessionId);
+    } catch (error) {
+      console.error('Failed to end session:', error);
+      throw error;
     }
   }
 
@@ -54,71 +80,87 @@ export class DatabaseService {
     qualityScore?: number;
     tokenCount?: number;
   }) {
-    const { error: messageError } = await supabase
-      .from('chat_messages')
-      .insert({
-        session_id: sessionId,
-        content: message.content,
-        role: message.sender,
-        emotion: message.emotionalState || 'neutral',
-        model_used: message.aiResponse?.model,
-        token_count: metrics.tokenCount || message.aiResponse?.tokenCount.total,
-        response_time: metrics.responseTime,
-        quality_score: metrics.qualityScore,
-        metadata: {
-          error: message.error,
-          retryable: message.retryable,
-          aiResponse: message.aiResponse
-        }
-      });
+    try {
+      const { error: messageError } = await this.supabase
+        .from('chat_messages')
+        .insert({
+          session_id: sessionId,
+          content: message.content,
+          role: message.sender,
+          emotion: message.emotionalState || 'neutral',
+          model_used: message.aiResponse?.model,
+          token_count: metrics.tokenCount || message.aiResponse?.tokenCount.total,
+          response_time: metrics.responseTime,
+          quality_score: metrics.qualityScore,
+          metadata: {
+            error: message.error,
+            retryable: message.retryable,
+            aiResponse: message.aiResponse
+          }
+        });
 
-    if (messageError) throw messageError;
+      if (messageError) throw messageError;
+      console.log('Message logged for session:', sessionId);
+    } catch (error) {
+      console.error('Failed to log message:', error);
+      throw error;
+    }
   }
 
   async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await this.supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Failed to get session messages:', error);
+      throw error;
+    }
   }
 
   async getHighQualityMessages(
     minQualityScore: number = 0.8,
     limit: number = 100
   ): Promise<ChatMessage[]> {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .gte('quality_score', minQualityScore)
-      .order('quality_score', { ascending: false })
-      .limit(limit);
+    try {
+      const { data, error } = await this.supabase
+        .from('chat_messages')
+        .select('*')
+        .gte('quality_score', minQualityScore)
+        .order('quality_score', { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Failed to get high quality messages:', error);
+      throw error;
+    }
   }
 
   async getSessionStats(sessionId: string) {
-    const { data, error } = await supabase
-      .from('chat_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single();
+    try {
+      const { data, error } = await this.supabase
+        .from('chat_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Failed to get session stats:', error);
+      throw error;
+    }
   }
 
   getCurrentSessionId(): string | null {
     return this.currentSession;
-  }
-
-  async saveTrainingData(data: TrainingDataRecord): Promise<void> {
-    // Implement your database save logic here
-    // Example: await this.db.collection('training_data').insert(data);
   }
 }
 

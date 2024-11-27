@@ -42,10 +42,29 @@ export default function Chat() {
 
   const initializeSession = async () => {
     try {
+      // Check authentication first
+      const response = await fetch('/api/auth/check', {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Authentication required');
+      }
+
       const newSessionId = await dbService.startSession('chat');
+      console.log('Chat session initialized:', newSessionId);
       setSessionId(newSessionId);
-    } catch (error) {
-      console.error('Failed to initialize session:', error);
+    } catch (error: any) {
+      console.error('Failed to initialize session:', error?.message || error);
+      // Redirect to login if not authenticated
+      if (error?.message === 'Authentication required') {
+        window.location.href = '/login';
+        return;
+      }
+      setError({
+        message: 'Failed to start chat session',
+        retryable: true
+      });
     }
   };
 
