@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { TokenChecker } from '@/app/lib/blockchain/token-checker';
 import { Database } from '@/supabase/functions/supabase.types';
 
-export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
@@ -21,14 +21,12 @@ export async function POST(req: Request) {
     const cookieStore = cookies();
     
     const supabase = createRouteHandlerClient<Database>({
-      cookies: () => cookieStore
+      cookies: () => Promise.resolve(cookieStore)
     });
 
-    // Check session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError || !session) {
-      console.error('Session error:', sessionError);
+    // Session check is now handled by middleware
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -51,7 +49,7 @@ export async function POST(req: Request) {
 
       const value = balance * price;
 
-      // Update the token_holders table
+      // Update token holdings
       const { error: upsertError } = await supabase
         .from('token_holders')
         .upsert({
@@ -66,14 +64,21 @@ export async function POST(req: Request) {
         console.error('Error updating token_holders:', upsertError);
       }
 
-      const isEligible = await tokenChecker.checkEligibility(walletAddress);
+      // Get admin settings for eligibility check
+      const { data: settings } = await supabase
+        .from('admin_settings')
+        .select('*');
+
+      const requiredValue = settings?.find(s => s.key === 'required_token_value')?.value || 0;
+      const isEligible = value >= requiredValue;
 
       return NextResponse.json({
         success: true,
         isEligible,
         balance,
         value,
-        price
+        price,
+        requiredValue
       });
     } catch (error: any) {
       if (error.message === 'Balance check timeout') {

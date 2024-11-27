@@ -1,10 +1,14 @@
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import type { Database } from '@/supabase/functions/supabase.types';
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
+  const supabase = createMiddlewareClient<Database>({ 
+    req, 
+    res 
+  });
 
   // Check authentication
   const {
@@ -60,9 +64,26 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Handle token validation and API routes
+  if (pathname.startsWith('/api/token-validation') || pathname.startsWith('/api/chat')) {
+    if (!session) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'content-type': 'application/json' } }
+      );
+    }
+  }
+
   return res;
 }
 
+// Update matcher to include token validation endpoint
 export const config = {
-  matcher: ['/admin/:path*', '/api/admin/:path*', '/chat/:path*'],
+  matcher: [
+    '/admin/:path*', 
+    '/api/admin/:path*', 
+    '/chat/:path*',
+    '/api/token-validation',
+    '/api/chat/:path*'
+  ],
 };
