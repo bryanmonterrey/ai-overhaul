@@ -28,10 +28,10 @@ export async function validateSession() {
 
 export async function getSupabaseCookies() {
   const cookieStore = await cookies();
-  const cookies = {
+  const supabaseCookies = {
     'sb-access-token': cookieStore.get('sb-dbavznzqcwnwxsgfbsxw-auth-token')?.value,
     'sb-refresh-token': cookieStore.get('sb-dbavznzqcwnwxsgfbsxw-auth-token.0')?.value,
   };
 
-  return cookies;
+  return supabaseCookies;
 }

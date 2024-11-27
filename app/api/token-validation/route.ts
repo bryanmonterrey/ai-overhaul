@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { TokenChecker } from '@/app/lib/blockchain/token-checker';
+import { Database } from '@/supabase/functions/supabase.types';
 
 export async function POST(req: Request) {
   try {
@@ -17,9 +18,12 @@ export async function POST(req: Request) {
     }
 
     // Initialize Supabase client and get session
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ 
-      cookies: () => cookieStore
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies: () => cookieStore,
+    }, {
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     });
 
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
