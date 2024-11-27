@@ -1,3 +1,4 @@
+// app/providers/WalletProvider.tsx
 'use client';
 
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
@@ -14,8 +15,8 @@ import {
 import { clusterApiUrl } from '@solana/web3.js';
 import { useMemo } from 'react';
 
-// Remove this line
-// require('@solana/wallet-adapter-react-ui/styles.css');
+// Remove the require statement
+// Instead, we'll import the styles in a separate CSS file
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const network = WalletAdapterNetwork.Mainnet;

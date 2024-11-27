@@ -1,3 +1,4 @@
+// app/components/WalletConnection.tsx
 'use client';
 
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -28,24 +29,41 @@ export function WalletConnection() {
       console.log('Validating tokens for wallet:', publicKey.toString());
       const response = await fetch('/api/token-validation', {
         method: 'POST',
+        credentials: 'include', // Include cookies
         headers: {
           'Content-Type': 'application/json',
+          // Add CSRF token if you have one
+          ...(document.cookie.includes('csrf-token') && {
+            'X-CSRF-Token': document.cookie
+              .split('; ')
+              .find(row => row.startsWith('csrf-token'))
+              ?.split('=')[1] || ''
+          })
         },
         body: JSON.stringify({
           walletAddress: publicKey.toString(),
         }),
       });
 
+      if (response.status === 401) {
+        // Redirect to login if unauthorized
+        window.location.href = `/login?redirect=${encodeURIComponent('/chat')}`;
+        return;
+      }
+
       const data = await response.json();
       console.log('Validation response:', data);
       
       if (data.isEligible) {
         window.location.href = '/chat';
-      } else {
+      } else if (response.ok) {
         window.location.href = '/insufficient-tokens';
+      } else {
+        throw new Error(data.error || 'Validation failed');
       }
     } catch (error) {
       console.error('Error validating tokens:', error);
+      // Show error to user
     } finally {
       setIsValidating(false);
     }

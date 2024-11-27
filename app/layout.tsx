@@ -1,19 +1,21 @@
-// src/app/layout.tsx
-
+// app/layout.tsx
 import React from "react";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Header from "./components/layout/Header";
 import Sidebar from "./components/layout/Sidebar";
 import Footer from "./components/layout/Footer";
+import { ClientProviders } from './providers/ClientProviders';
+
+// Import global styles
 import "./globals.css";
-import { WalletProvider } from './providers/WalletProvider';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
   weight: "100 900",
 });
+
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
@@ -27,15 +29,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white relative`}
       >
-        <WalletProvider>
+        <ClientProviders>
           <div className="flex flex-col min-h-screen">
             <Header />
             <div className="flex flex-1 pt-16 pb-12">
@@ -46,7 +49,7 @@ export default function RootLayout({
             </div>
             <Footer />
           </div>
-        </WalletProvider>
+        </ClientProviders>
       </body>
     </html>
   );
