@@ -1,8 +1,8 @@
+// app/api/token-validation/route.ts
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { TokenChecker } from '@/app/lib/blockchain/token-checker';
-import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
   try {
@@ -16,25 +16,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // Initialize Supabase client with environment variables
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    // Initialize Supabase client and get session
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ 
+      cookies: () => cookieStore
+    });
 
-    // Get the session using the cookie
-    const cookieStore = cookies();
-    const sessionCookie = cookieStore.get('sb-access-token')?.value;
-    
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Set the session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
     if (sessionError || !session) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const tokenChecker = new TokenChecker();
