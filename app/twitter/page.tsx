@@ -7,7 +7,7 @@ import TweetComposer from '@/app/interfaces/twitter/components/TweetComposer';
 import TweetStream from '@/app/interfaces/twitter/components/TweetStream';
 import TweetAnalytics from '@/app/interfaces/twitter/components/TweetAnalytics';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
-import { TweetStyle } from '@/core/types';
+import { TweetStyle } from '@/app/core/types';
 
 export default function TwitterPage() {
   const [tweets, setTweets] = useState<any[]>([]);

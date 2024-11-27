@@ -2,7 +2,7 @@
 
 import { TwitterApi, TweetV2, UserV2, TweetV2PostTweetResult } from 'twitter-api-v2';
 import { createClient } from '@supabase/supabase-js';
-import { EnvironmentalFactors } from '@/core/types';
+import { EnvironmentalFactors } from '@/app/core/types';
 import {
   TwitterMetrics,
   TweetMetrics,
@@ -12,7 +12,7 @@ import {
   TweetThread,
   TweetSearchResult
 } from './types/twitter';
-import { TwitterAuthError, TwitterRateLimitError, TwitterNetworkError, TwitterDataError, TwitterError } from '@/lib/errors/TwitterErrors';
+import { TwitterAuthError, TwitterRateLimitError, TwitterNetworkError, TwitterDataError, TwitterError } from '@/app/lib/errors/TwitterErrors';
 
 export class TwitterManager {
   private client: TwitterApi;

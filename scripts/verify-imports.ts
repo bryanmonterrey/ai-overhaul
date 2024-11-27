@@ -3,7 +3,7 @@
 import process from 'process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import type { AIConfig } from '@/core/types/ai';
+import type { AIConfig } from '@/app/core/types/ai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

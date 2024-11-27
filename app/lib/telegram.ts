@@ -3,7 +3,7 @@
 import { Telegraf } from 'telegraf';
 import { Message, Update } from 'telegraf/types';
 import { createClient } from '@supabase/supabase-js';
-import { EnvironmentalFactors } from '@/core/types';
+import { EnvironmentalFactors } from '@/app/core/types';
 
 export class TelegramManager {
   private bot: Telegraf;

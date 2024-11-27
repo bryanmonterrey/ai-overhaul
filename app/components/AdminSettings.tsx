@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAdminSettings, updateAdminSetting } from '@/lib/supabase/schema/auth-settings';
+import { getAdminSettings, updateAdminSetting } from '@/supabase/schema/auth-settings';
 
 export function AdminSettings() {
   const [settings, setSettings] = useState({
