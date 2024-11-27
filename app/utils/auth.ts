@@ -1,7 +1,20 @@
 // app/utils/auth.ts
 import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import type { Database } from '@/supabase/functions/supabase.types';
 
-export async function getAuthCookie() {
+export type AuthCookies = {
+  'auth-token': string | undefined;
+  'refresh-token': string | undefined;
+};
+
+export type SessionValidation = {
+  isValid: boolean;
+  error?: string;
+  token?: string;
+};
+
+export async function getAuthCookie(): Promise<AuthCookies> {
   const cookieStore = await cookies();
   return {
     'auth-token': cookieStore.get('sb-dbavznzqcwnwxsgfbsxw-auth-token')?.value,
@@ -9,7 +22,7 @@ export async function getAuthCookie() {
   };
 }
 
-export async function validateSession() {
+export async function validateSession(): Promise<SessionValidation> {
   const cookieStore = await cookies();
   const authToken = cookieStore.get('sb-dbavznzqcwnwxsgfbsxw-auth-token')?.value;
   
@@ -24,6 +37,13 @@ export async function validateSession() {
     isValid: true,
     token: authToken
   };
+}
+
+export async function getSupabaseClient() {
+  const cookieStore = await cookies();
+  return createRouteHandlerClient<Database>({
+    cookies: () => Promise.resolve(cookieStore)
+  });
 }
 
 export async function getSupabaseCookies() {

@@ -5,11 +5,12 @@ import { cookies } from 'next/headers';
 import { TokenChecker } from '@/app/lib/blockchain/token-checker';
 import { Database } from '@/supabase/functions/supabase.types';
 
+export const runtime = 'edge';
+
 export async function POST(req: Request) {
   try {
     const { walletAddress } = await req.json();
     
-    // Validate wallet address format
     if (!walletAddress || typeof walletAddress !== 'string' || walletAddress.length !== 44) {
       return NextResponse.json(
         { error: 'Invalid wallet address format' },
@@ -17,24 +18,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // Initialize Supabase client and get session
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient<Database>({ 
-      cookies: () => cookieStore,
-    }, {
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    const supabase = createRouteHandlerClient<Database>({
+      cookies: () => cookieStore
     });
 
+    // Check session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
     if (sessionError || !session) {
+      console.error('Session error:', sessionError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const tokenChecker = new TokenChecker();
     
     try {
-      // Get balance and price concurrently
       const [balance, price] = await Promise.all([
         Promise.race([
           tokenChecker.getTokenBalance(walletAddress),
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       ]);
 
       if (price === 0) {
-        console.warn('Token price returned as 0, might indicate an issue with price feed');
+        console.warn('Token price returned as 0');
       }
 
       const value = balance * price;
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
           { status: 408 }
         );
       }
-      throw error; // Re-throw other errors to be caught by outer try-catch
+      throw error;
     }
   } catch (error: any) {
     console.error('Error in token validation:', error);
