@@ -4,20 +4,34 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+
+// Dynamically import WalletMultiButton with no SSR
+const WalletMultiButtonDynamic = dynamic(
+  () => import('@solana/wallet-adapter-react-ui').then(mod => mod.WalletMultiButton),
+  { ssr: false }
+);
 
 export function WalletConnection() {
   const { publicKey, connected, connecting, disconnect, wallet } = useWallet();
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    console.log('Wallet state:', {
-      connected,
-      connecting,
-      publicKey: publicKey?.toString(),
-      walletName: wallet?.adapter?.name
-    });
-  }, [connected, connecting, publicKey, wallet]);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      console.log('Wallet state:', {
+        connected,
+        connecting,
+        publicKey: publicKey?.toString(),
+        walletName: wallet?.adapter?.name
+      });
+    }
+  }, [mounted, connected, connecting, publicKey, wallet]);
 
   const handleValidateTokens = async () => {
     if (!publicKey) {
@@ -69,9 +83,13 @@ export function WalletConnection() {
     }
   };
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col items-center space-y-4">
-      <WalletMultiButton className="!bg-blue-500 hover:!bg-blue-600" />
+      <WalletMultiButtonDynamic />
       
       {connecting && (
         <p className="text-sm text-gray-400">Connecting...</p>
