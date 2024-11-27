@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { TokenChecker } from '@/app/lib/blockchain/token-checker';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
   try {
@@ -15,62 +16,86 @@ export async function POST(req: Request) {
       );
     }
 
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    // Initialize Supabase client with environment variables
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    // Get the session using the cookie
+    const cookieStore = cookies();
+    const sessionCookie = cookieStore.get('sb-access-token')?.value;
+    
+    if (!sessionCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Set the session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
     const tokenChecker = new TokenChecker();
     
-    // Get balance with timeout
-    const balance = await Promise.race([
-      tokenChecker.getTokenBalance(walletAddress),
-      new Promise<number>((_, reject) => 
-        setTimeout(() => reject(new Error('Balance check timeout')), 10000)
-      )
-    ]);
+    try {
+      // Get balance and price concurrently
+      const [balance, price] = await Promise.all([
+        Promise.race([
+          tokenChecker.getTokenBalance(walletAddress),
+          new Promise<number>((_, reject) => 
+            setTimeout(() => reject(new Error('Balance check timeout')), 10000)
+          )
+        ]),
+        tokenChecker.getTokenPrice()
+      ]);
 
-    const price = await tokenChecker.getTokenPrice();
-    if (price === 0) {
-      console.warn('Token price returned as 0, might indicate an issue with price feed');
-    }
+      if (price === 0) {
+        console.warn('Token price returned as 0, might indicate an issue with price feed');
+      }
 
-    const value = balance * price;
+      const value = balance * price;
 
-    // Update the token_holders table
-    const { error: upsertError } = await supabase
-      .from('token_holders')
-      .upsert({
-        user_id: session.user.id,
-        wallet_address: walletAddress,
-        token_balance: balance,
-        dollar_value: value,
-        last_checked_at: new Date().toISOString()
+      // Update the token_holders table
+      const { error: upsertError } = await supabase
+        .from('token_holders')
+        .upsert({
+          user_id: session.user.id,
+          wallet_address: walletAddress,
+          token_balance: balance,
+          dollar_value: value,
+          last_checked_at: new Date().toISOString()
+        });
+
+      if (upsertError) {
+        console.error('Error updating token_holders:', upsertError);
+      }
+
+      const isEligible = await tokenChecker.checkEligibility(walletAddress);
+
+      return NextResponse.json({
+        success: true,
+        isEligible,
+        balance,
+        value,
+        price
       });
-
-    if (upsertError) {
-      console.error('Error updating token_holders:', upsertError);
-      // Continue execution but log the error
+    } catch (error: any) {
+      if (error.message === 'Balance check timeout') {
+        return NextResponse.json(
+          { error: 'Balance check timed out' },
+          { status: 408 }
+        );
+      }
+      throw error; // Re-throw other errors to be caught by outer try-catch
     }
-
-    const isEligible = await tokenChecker.checkEligibility(walletAddress);
-
-    return NextResponse.json({
-      success: true,
-      isEligible,
-      balance,
-      value,
-      price // Include price in response for debugging
-    });
   } catch (error: any) {
     console.error('Error in token validation:', error);
     return NextResponse.json(
       { 
         error: 'Internal server error',
-        details: error.message // Include error message for debugging
+        details: error.message
       },
       { status: 500 }
     );
