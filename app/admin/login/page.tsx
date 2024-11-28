@@ -2,7 +2,7 @@
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -11,51 +11,78 @@ export default function AdminLogin() {
   const router = useRouter();
   const supabase = createClientComponentClient();
 
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('count(*)')
+          .single();
+        
+        console.log('Connection test:', { data, error });
+      } catch (err) {
+        console.error('Connection test failed:', err);
+      }
+    };
+    
+    testConnection();
+  }, []);
   
   
-    const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null); // Clear any previous errors
+    setError(null);
     
     try {
-      // First attempt sign in
+      // 1. Sign in
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
   
-      if (signInError) throw signInError;
-      if (!signInData.user) throw new Error('No user returned from sign in');
+      if (signInError) {
+        throw new Error(`Sign in failed: ${signInError.message}`);
+      }
   
-      // Check admin role
+      if (!signInData.user) {
+        throw new Error('No user data returned');
+      }
+  
+      // 2. Get user role - with explicit error logging
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', signInData.user.id)
-        .maybeSingle();
+        .single();
+  
+      console.log('Role check response:', { roleData, roleError });
   
       if (roleError) {
-        console.error('Role check error:', roleError);
         await supabase.auth.signOut();
-        throw new Error('Error verifying admin status');
+        throw new Error(`Role check failed: ${roleError.message}`);
       }
   
-      if (!roleData || roleData.role !== 'admin') {
+      if (!roleData) {
+        await supabase.auth.signOut();
+        throw new Error('No role found for user');
+      }
+  
+      if (roleData.role !== 'admin') {
         await supabase.auth.signOut();
         throw new Error('Not authorized as admin');
       }
   
-      // Success - redirect to admin page
+      // 3. Success
       router.push('/admin');
   
     } catch (error: any) {
       console.error('Login error:', error);
-      setError(error.message);
+      setError(error.message || 'An unknown error occurred');
     }
   };
 
   return (
-    <div className="flex h-full flex-col items-center justify-center p-4 bg-black">
+    <div className="flex h-full flex-col items-center justify-center p-4 bg-[#11111A]">
       <div className="w-full max-w-md space-y-4">
         <h1 className="text-2xl font-bold text-center text-white">Admin Login</h1>
         {error && (
@@ -70,7 +97,7 @@ export default function AdminLogin() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2 border rounded bg-black text-white border-white"
+              className="w-full p-2 border rounded-none bg-[#11111A] text-white border-white"
               required
             />
           </div>
@@ -80,13 +107,13 @@ export default function AdminLogin() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 border rounded bg-black text-white border-white"
+              className="w-full p-2 border rounded-none bg-[#11111A] text-white border-white"
               required
             />
           </div>
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-black text-white rounded hover:bg-white/10 border border-white"
+            className="w-full px-4 py-2 bg-[#11111A] text-white rounded hover:bg-white/10 border border-white"
           >
             Login
           </button>
