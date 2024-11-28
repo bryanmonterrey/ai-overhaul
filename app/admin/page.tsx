@@ -168,17 +168,19 @@ export default function AdminPage() {
       </div>
 
       <div className="space-y-4">
+      
         <EmotionalStateDisplay
-          state={systemState.consciousness?.emotionalState}
-          intensity={systemState.emotionalProfile?.volatility}
-          narrativeMode={systemState.narrativeMode}
-          traits={systemState.traits}
+          state={systemState?.consciousness?.emotionalState}
+          intensity={systemState?.emotionalProfile?.volatility}
+          narrativeMode={systemState?.narrativeMode}
+          traits={systemState?.traits || {}}
         />
         
+        
         <PersonalityMonitor
-          traits={systemState.traits}
-          tweetStyle={systemState.tweetStyle}
-          activeThemes={systemState.currentContext?.activeNarratives || []}
+          traits={systemState?.traits}
+          tweetStyle={systemState?.tweetStyle}
+          activeThemes={systemState?.currentContext?.activeNarratives}
         />
         
         <MemoryViewer

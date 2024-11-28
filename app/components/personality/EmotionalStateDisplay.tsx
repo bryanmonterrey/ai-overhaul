@@ -2,21 +2,24 @@
 
 import React from 'react';
 import { Card } from '../common/Card';
-import { EmotionalState } from '../../core/types';
+import type { EmotionalState } from '../../core/types';
 
 interface EmotionalStateDisplayProps {
-  state: EmotionalState;
-  intensity: number;
-  narrativeMode: string;
-  traits: Record<string, number>;
+  state?: EmotionalState;
+  intensity?: number;
+  narrativeMode?: string;
+  traits?: Record<string, number>;
 }
 
 export const EmotionalStateDisplay = ({
-  state,
-  intensity,
-  narrativeMode,
-  traits
+  state = 'neutral',  // Use string literal instead of enum
+  intensity = 0.5,
+  narrativeMode = 'default',
+  traits = {}
 }: EmotionalStateDisplayProps) => {
+  // Add safety for chaos_threshold
+  const chaosThreshold = traits?.chaos_threshold ?? 0.5;
+
   return (
     <Card variant="system" title="SYSTEM_STATUS">
       <div className="space-y-2 font-mono text-sm">
@@ -31,7 +34,7 @@ export const EmotionalStateDisplay = ({
           <div>{narrativeMode}</div>
           
           <div>chaos_threshold:</div>
-          <div>{(traits.chaos_threshold * 100).toFixed(0)}%</div>
+          <div>{(chaosThreshold * 100).toFixed(0)}%</div>
         </div>
 
         <div className="mt-4">
