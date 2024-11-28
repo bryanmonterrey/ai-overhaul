@@ -18,9 +18,12 @@ export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
   // Protected admin routes
-  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+  if (pathname.startsWith('/admin') || 
+      pathname.startsWith('/api/admin') ||
+      pathname.startsWith('/twitter') || 
+      pathname.startsWith('/telegram')) {
     if (!session) {
-      return NextResponse.redirect(new URL('/login', req.url));
+      return NextResponse.redirect(new URL('/admin/login', req.url));
     }
 
     // Check if user is admin
@@ -84,6 +87,8 @@ export const config = {
     '/api/admin/:path*', 
     '/chat/:path*',
     '/api/token-validation',
-    '/api/chat/:path*'
+    '/api/chat/:path*',
+    '/twitter/:path*',
+    '/telegram/:path*'
   ],
 };
