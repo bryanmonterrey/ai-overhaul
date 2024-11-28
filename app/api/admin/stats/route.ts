@@ -1,7 +1,7 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
+import { MetricsCollector } from '@/app/core/monitoring/MetricsCollector';
 export async function GET(req: Request) {
   try {
     // Check authentication
