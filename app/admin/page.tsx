@@ -1,8 +1,7 @@
-// src/app/admin/page.tsx
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Pusher from 'pusher-js';
 import AdminControls from '@/app/components/personality/AdminControls';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
 import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
@@ -13,6 +12,7 @@ export default function AdminPage() {
   const [systemState, setSystemState] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('Initializing');
 
   const loadSystemState = async () => {
     try {
@@ -66,14 +66,49 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    // Initial load
     loadSystemState();
     loadStats();
     
+    // Initialize Pusher
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_APP_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    });
+
+    // Subscribe to channel
+    const channel = pusher.subscribe('admin-stats');
+
+    // Connection handling
+    pusher.connection.bind('connected', () => {
+      setConnectionStatus('ONLINE');
+      console.log('Realtime connection established');
+    });
+
+    pusher.connection.bind('disconnected', () => {
+      setConnectionStatus('OFFLINE');
+      console.log('Realtime connection lost');
+    });
+
+    // Listen for updates
+    channel.bind('stats-update', (data: any) => {
+      console.log('Received realtime update:', data);
+      setStats(data);
+    });
+
+    // Keep the polling as fallback
     const interval = setInterval(() => {
-      loadStats();
-    }, 30000); // Update stats every 30 seconds
+      if (pusher.connection.state !== 'connected') {
+        loadStats();
+      }
+    }, 30000);
     
-    return () => clearInterval(interval);
+    // Cleanup
+    return () => {
+      clearInterval(interval);
+      channel.unbind_all();
+      pusher.unsubscribe('admin-stats');
+      pusher.disconnect();
+    };
   }, []);
 
   if (!systemState) {
@@ -91,13 +126,14 @@ export default function AdminPage() {
       <div className="space-y-6">
         <Card variant="system" title="SYSTEM_OVERVIEW">
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>status: OPERATIONAL</div>
+            <div>status: {connectionStatus}</div>
             <div>uptime: {stats?.uptime || 0}s</div>
             <div>memory_usage: {stats?.memoryUsage || 0}mb</div>
             <div>active_connections: {stats?.activeConnections || 0}</div>
           </div>
         </Card>
 
+        {/* Rest of your components remain the same */}
         <div className="grid grid-cols-2 gap-6">
           <Card variant="system" title="INTERFACE_STATS">
             <div className="space-y-2 text-sm">
