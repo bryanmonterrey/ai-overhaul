@@ -40,7 +40,7 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-black">
+    <div className="flex h-full flex-col items-center justify-center p-4 bg-black">
       <div className="w-full max-w-md space-y-4">
         <h1 className="text-2xl font-bold text-center text-white">Admin Login</h1>
         {error && (

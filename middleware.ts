@@ -17,6 +17,10 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
+  if (pathname === '/admin/login') {
+    return res;
+  }
+
   // Protected admin routes
   if (pathname.startsWith('/admin') || 
       pathname.startsWith('/api/admin') ||
