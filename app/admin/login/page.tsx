@@ -12,42 +12,45 @@ export default function AdminLogin() {
   const supabase = createClientComponentClient();
 
   
+  
     const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null); // Clear any previous errors
+    
     try {
-      // First sign in
-      const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
+      // First attempt sign in
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
   
       if (signInError) throw signInError;
+      if (!signInData.user) throw new Error('No user returned from sign in');
   
-      // Then get the user ID
-      const userId = signInData.user?.id;
-      if (!userId) throw new Error('No user ID found');
-  
-      // Check admin role with proper error handling
+      // Check admin role
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .single();
+        .eq('user_id', signInData.user.id)
+        .maybeSingle();
   
       if (roleError) {
         console.error('Role check error:', roleError);
-        throw new Error('Error checking admin status');
+        await supabase.auth.signOut();
+        throw new Error('Error verifying admin status');
       }
   
-      if (roleData?.role !== 'admin') {
+      if (!roleData || roleData.role !== 'admin') {
         await supabase.auth.signOut();
         throw new Error('Not authorized as admin');
       }
   
+      // Success - redirect to admin page
       router.push('/admin');
+  
     } catch (error: any) {
-      setError(error.message);
       console.error('Login error:', error);
+      setError(error.message);
     }
   };
 
