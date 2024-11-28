@@ -17,6 +17,7 @@ export function WalletConnection() {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
     setMounted(true);
