@@ -15,7 +15,7 @@ interface SidebarProps {
 
 export default function Sidebar({ currentState }: SidebarProps) {
   return (
-    <aside className="fixed left-0 top-16 bottom-0 w-64 bg-black border-r border-white overflow-y-auto">
+    <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#11111A] border-r border-white overflow-y-auto">
       <div className="p-4 space-y-4">
         <Card variant="system" title="SYSTEM_INFO">
           <div className="text-xs space-y-1">

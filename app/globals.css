@@ -26,7 +26,7 @@ body {
 
 /* Wallet Adapter Styles */
 .wallet-adapter-button {
-  background-color: #000;
+  background-color: #11111A;
   border: 1px solid #ffffff;
   border-radius: 0px;
   color: #fff;
@@ -42,25 +42,25 @@ body {
 }
 
 .wallet-adapter-button:not([disabled]):hover {
-  background-color: #000;
+  background-color: #11111A;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .wallet-adapter-button[disabled] {
-  background: #000000;
+  background: #11111A;
   cursor: not-allowed;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .wallet-adapter-button-trigger {
-  background-color: #000000;
+  background-color: #11111A;
   border: 1px solid #ffffff;
   border-radius: 0px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .wallet-adapter-modal-wrapper {
-  background: #000000;
+  background: #11111A;
   border: 1px solid #ffffff;
   border-radius: 0px;
   position: relative;

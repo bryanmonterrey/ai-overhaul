@@ -106,7 +106,7 @@ export function WalletConnection() {
           <button
             onClick={handleValidateTokens}
             disabled={isValidating}
-            className="px-4 py-2 bg-black text-white rounded disabled:opacity-50 hover:bg-white/10 transition-colors border border-white w-full"
+            className="px-4 py-2 bg-[#11111A] text-white rounded disabled:opacity-50 hover:bg-white/10 transition-colors border border-white w-full"
           >
             {isValidating ? 'Validating...' : 'Verify Token Holdings'}
           </button>
@@ -115,7 +115,7 @@ export function WalletConnection() {
           )}
           <button
             onClick={() => disconnect()}
-            className="px-4 py-2 bg-black border border-white text-white rounded hover:bg-white/10 transition-colors w-full"
+            className="px-4 py-2 bg-[#11111A] border border-white text-white rounded hover:bg-white/10 transition-colors w-full"
           >
             Disconnect
           </button>

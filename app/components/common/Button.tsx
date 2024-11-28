@@ -21,9 +21,9 @@ export const Button = ({
 }: ButtonProps) => {
   const baseStyles = 'font-mono transition-colors duration-200';
   const variants = {
-    primary: 'bg-black text-white border border-white hover:bg-gray-800',
-    secondary: 'border border-black text-black hover:bg-gray-100',
-    system: 'bg-black text-white border border-white font-mono hover:bg-gray-800'
+    primary: 'bg-[#11111A] text-white border border-white hover:bg-gray-800',
+    secondary: 'border border-[#11111A] text-[#11111A] hover:bg-gray-100',
+    system: 'bg-[#11111A] text-white border border-white font-mono hover:bg-gray-800'
   };
   const sizes = {
     sm: 'px-3 py-1 text-sm',

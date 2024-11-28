@@ -16,8 +16,8 @@ export const Card = ({
   className = ''
 }: CardProps) => {
   const variants = {
-    default: 'bg-black border border-white',
-    system: 'bg-black border border-white text-white font-mono'
+    default: 'bg-[#11111A] border border-white',
+    system: 'bg-[#11111A] border border-white text-white font-mono'
   };
 
   return (

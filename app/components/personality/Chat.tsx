@@ -264,10 +264,10 @@ export default function Chat() {
               key={message.id}
               className={`p-4 rounded-none ${
                 message.sender === 'user'
-                  ? 'bg-black border border-white ml-auto'
+                  ? 'bg-[#11111A] border border-white ml-auto'
                   : message.error
-                  ? 'bg-black border border-white'
-                  : 'bg-black border border-white'
+                  ? 'bg-[#11111A] border border-white'
+                  : 'bg-[#11111A] border border-white'
               } max-w-[80%]`}
             >
               {message.sender === 'ai' && (
@@ -301,7 +301,7 @@ export default function Chat() {
           ))}
         </div>
 
-        <div className="border-t border-white p-4 bg-black">
+        <div className="border-t border-white p-4 bg-[#11111A]">
           <div className="text-xs text-white mb-2">
             TOKEN_COUNT: {tokenCount}
           </div>
@@ -311,14 +311,14 @@ export default function Chat() {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
-              className="flex-1 bg-black text-white border border-white rounded-none px-4 py-2 font-mono disabled:opacity-50"
+              className="flex-1 bg-[#11111A] text-white border border-white rounded-none px-4 py-2 font-mono disabled:opacity-50"
               placeholder={isLoading ? 'PROCESSING...' : 'ENTER_COMMAND...'}
               disabled={isLoading}
             />
             <button
               onClick={() => sendMessage()}
               disabled={isLoading || !inputText.trim()}
-              className="bg-black text-white px-4 py-2 rounded-none font-mono border border-white disabled:opacity-50 hover:bg-black transition-colors"
+              className="bg-[#11111A] text-white px-4 py-2 rounded-none font-mono border border-white disabled:opacity-50 hover:bg-[#11111A] transition-colors"
             >
               {isLoading ? 'PROCESSING...' : 'EXECUTE'}
             </button>

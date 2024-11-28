@@ -25,7 +25,7 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-white">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A] border-b border-white">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
@@ -63,13 +63,13 @@ export default function Header() {
                 </Card>
                 <button
                   onClick={handleSignOut}
-                  className="font-mono text-white border border-white py-2 px-3 hover:text-red-500 text-xs"
+                  className="font-mono bg-[#11111A] text-white border border-white py-2 px-3 hover:text-red-500 text-xs"
                 >
                   DISCONNECT
                 </button>
               </div>
             ) : (
-              <WalletMultiButton className="!bg-transparent !border !border-white !rounded-none !font-mono !text-sm !px-3 !py-1" />
+              <WalletMultiButton className="!bg-[#11111A] !border !border-white !rounded-none !font-mono !text-sm !px-3 !py-1" />
             )}
           </div>
         </div>

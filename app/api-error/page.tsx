@@ -8,7 +8,7 @@ export default function ApiError() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-black text-white rounded hover:bg-white/10 border border-white"
+            className="px-4 py-2 bg-[#11111A] text-white rounded hover:bg-white/10 border border-white"
           >
             Try Again
           </button>
