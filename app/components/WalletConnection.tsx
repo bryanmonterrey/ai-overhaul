@@ -41,6 +41,7 @@ export function WalletConnection() {
     }
     
     setIsValidating(true);
+    setIsChecking(true);  // Add this line
     setValidationError(null);
     
     try {
@@ -81,6 +82,7 @@ export function WalletConnection() {
       setValidationError(error.message);
     } finally {
       setIsValidating(false);
+      setIsChecking(false);
     }
   };
 

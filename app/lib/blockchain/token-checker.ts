@@ -94,6 +94,27 @@ export class TokenChecker {
     throw new Error('Could not fetch token price from any source');
   }
 
+  async checkPriceImpact(balance: number): Promise<boolean> {
+    try {
+      const poolInfo = await this.connection.getAccountInfo(
+        new PublicKey(this.DEX_POOL_ADDRESS)
+      );
+
+      if (!poolInfo) {
+        return false;
+      }
+
+      // Calculate price impact using pool data
+      const poolSize = poolInfo.lamports / 1e9;  // Convert lamports to SOL
+      const impact = (balance / poolSize) * 100;
+
+      return impact > 1; // 1% impact threshold
+    } catch (error) {
+      console.error('Error checking price impact:', error);
+      return false;
+    }
+  }
+
   async checkEligibility(walletAddress: string): Promise<{
     isEligible: boolean;
     balance: number;
