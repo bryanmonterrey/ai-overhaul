@@ -122,7 +122,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="grid grid-cols-[1fr_300px] gap-6 h-[calc(100vh-7rem)]">
+    <div className="grid grid-cols-[1fr_300px] mb-24 gap-6 h-[calc(100vh-7rem)]">
       <div className="space-y-6">
         <Card variant="system" title="SYSTEM_OVERVIEW">
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -167,7 +167,7 @@ export default function AdminPage() {
           />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 mb-24">
       
         <EmotionalStateDisplay
           state={systemState?.consciousness?.emotionalState}
