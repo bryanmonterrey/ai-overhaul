@@ -32,7 +32,7 @@ export default function Header() {
             <Link href="/" className="font-mono text-white text-lg">
               GOATSE SINGULARITY AI
             </Link>
-            
+             
             <nav className="hidden md:flex space-x-6">
               <Link href="/chat" className="font-mono text-white hover:text-white">
                 [CHAT]
