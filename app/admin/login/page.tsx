@@ -11,31 +11,43 @@ export default function AdminLogin() {
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  
+    const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // First sign in
+      const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-
-      if (error) throw error;
-
-      // Check if user is admin
-      const { data: roleData } = await supabase
+  
+      if (signInError) throw signInError;
+  
+      // Then get the user ID
+      const userId = signInData.user?.id;
+      if (!userId) throw new Error('No user ID found');
+  
+      // Check admin role with proper error handling
+      const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('user_id', userId)
         .single();
-
-      if (roleData?.role === 'admin') {
-        router.push('/admin');
-      } else {
-        setError('Not authorized as admin');
-        await supabase.auth.signOut();
+  
+      if (roleError) {
+        console.error('Role check error:', roleError);
+        throw new Error('Error checking admin status');
       }
+  
+      if (roleData?.role !== 'admin') {
+        await supabase.auth.signOut();
+        throw new Error('Not authorized as admin');
+      }
+  
+      router.push('/admin');
     } catch (error: any) {
       setError(error.message);
+      console.error('Login error:', error);
     }
   };
 
