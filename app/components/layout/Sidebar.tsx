@@ -20,11 +20,11 @@ interface SidebarProps {
 
 export default function Sidebar({ currentState }: SidebarProps) {
   return (
-    <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#11111A] border-r border-white overflow-y-auto">
+    <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#11111A] border-r border-[#DDDDDD] overflow-y-auto">
       <div className="p-4 space-y-4 text-xs">
 
         <nav className="space-y-1">
-          <div className="text-white text-sm mb-2">NAVIGATION:</div>
+          <div className="text-[#DDDDDD] text-sm mb-2">NAVIGATION:</div>
           {[
             { href: '/chat', label: 'Direct Interface' },
             { href: '/twitter', label: 'Twitter Module' },
@@ -34,7 +34,7 @@ export default function Sidebar({ currentState }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className="block font-ia text-white hover:bg-white/10 px-4 py-2"
+              className="block font-ia text-[#DDDDDD] hover:bg-[#DDDDDD]/10 px-4 py-2"
             >
               {'>'}  {item.label}
             </Link>

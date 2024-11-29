@@ -23,7 +23,7 @@ export const Card = ({
   return (
     <div className={`${variants[variant]} p-4 rounded-none ${className}`}>
       {title && (
-        <h3 className="text-lg font-ia mb-4">
+        <h3 className="text-base font-ia mb-4">
           {variant === 'system' ? `> ${title}` : title}
         </h3>
       )}

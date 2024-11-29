@@ -19,13 +19,13 @@ export const PersonalityMonitor = ({
 }: PersonalityMonitorProps) => {
   return (
     <Card variant="system" title="PERSONALITY_METRICS" className={className}>
-      <div className="space-y-4 font-mono text-sm">
+      <div className="space-y-4 font-mono text-xs">
         <div>
           <div className="mb-2">personality_matrix []:</div>
           {Object.entries(traits || {}).map(([trait, value]) => (
             <div key={trait} className="flex items-center space-x-2 mb-2">
               <div className="w-40">{trait}:</div>
-              <div className="flex-1 bg-gray-800 h-2">
+              <div className="flex-1 bg-[#11111A] h-2">
                 <div 
                   className="bg-green-500 h-full transition-all duration-500"
                   style={{ width: `${value * 100}%` }}

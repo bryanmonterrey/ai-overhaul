@@ -19,8 +19,8 @@ export function QualityMetricsDisplay({ metrics, className = '' }: Props) {
 
   return (
     <div className={`font-mono text-sm ${className}`}>
-      <div className="border border-white p-4 bg-black">
-        <h3 className="mb-2 text-white">[QUALITY_METRICS]</h3>
+      <div className="border border-[#DDDDDD] p-4 bg-[#11111A]">
+        <h3 className="mb-2 text-[#DDDDDD]">[QUALITY_METRICS]</h3>
         
         <div className="space-y-2">
           <div className="flex justify-between">

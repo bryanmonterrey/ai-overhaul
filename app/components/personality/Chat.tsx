@@ -282,15 +282,15 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
               key={message.id}
               className={`p-4 rounded-none ${
                 message.sender === 'user'
-                  ? 'bg-[#11111A] border border-white ml-auto'
+                  ? 'bg-[#11111A] border border-[#DDDDDD] ml-auto'
                   : message.error
-                  ? 'bg-[#11111A] border border-white'
-                  : 'bg-[#11111A] border border-white'
+                  ? 'bg-[#11111A] border border-[#DDDDDD]'
+                  : 'bg-[#11111A] border border-[#DDDDDD]'
               } max-w-[80%]`}
             >
               {message.sender === 'ai' && (
                 <div className={`text-xs mb-1 ${
-                  message.error ? 'text-white' : 'text-white'
+                  message.error ? 'text-[#DDDDDD]' : 'text-[#DDDDDD]'
                 }`}>
                   {`[${new Date(message.timestamp).toLocaleTimeString()}] ${
                     message.emotionalState ? `STATE: ${message.emotionalState}` : ''
@@ -310,7 +310,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
               {message.error && message.retryable && (
                 <button
                   onClick={() => retryMessage(message.id)}
-                  className="mt-2 text-xs text-white hover:text-white font-mono"
+                  className="mt-2 text-xs text-[#DDDDDD] hover:text-[#DDDDDD] font-mono"
                 >
                   [RETRY_MESSAGE]
                 </button>
@@ -319,8 +319,8 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
           ))}
         </div>
 
-        <div className="border-t border-white p-4 bg-[#11111A]">
-          <div className="text-xs text-white mb-2">
+        <div className="border-t border-[#DDDDDD] p-4 bg-[#11111A]">
+          <div className="text-xs text-[#DDDDDD] mb-2">
             TOKEN_COUNT: {tokenCount}
           </div>
           <div className="flex space-x-2">
@@ -329,14 +329,14 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
-              className="flex-1 bg-[#11111A] text-white border border-white rounded-none px-4 py-2 font-mono disabled:opacity-50"
+              className="flex-1 bg-[#11111A] text-base text-[#DDDDDD] border border-[##DDDDDD] rounded-none px-4 py-2 font-mono disabled:opacity-50"
               placeholder={isLoading ? 'PROCESSING...' : 'ENTER_COMMAND...'}
               disabled={isLoading}
             />
             <button
               onClick={() => sendMessage()}
               disabled={isLoading || !inputText.trim()}
-              className="bg-[#11111A] text-white px-4 py-2 rounded-none font-mono border border-white disabled:opacity-50 hover:bg-[#11111A] transition-colors"
+              className="bg-[#11111A] text-[#DDDDDD] text-base px-4 py-2 rounded-none font-mono border border-[#DDDDDD] disabled:opacity-50 hover:bg-[#11111A] transition-colors"
             >
               {isLoading ? 'PROCESSING...' : 'EXECUTE'}
             </button>
@@ -344,10 +344,10 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         </div>
       </div>
 
-      <div className="w-80 border-l border-white p-4 space-y-4">
+      <div className="w-80 border-l border-[##DDDDDD] p-4 space-y-4">
         <button
           onClick={() => setShowAnalytics(!showAnalytics)}
-          className="w-full text-white border border-white p-2 font-mono text-sm"
+          className="w-full text-[#DDDDDD] border border-[#DDDDDD] p-2 font-mono text-sm"
         >
           {showAnalytics ? '[HIDE_ANALYTICS]' : '[SHOW_ANALYTICS]'}
         </button>

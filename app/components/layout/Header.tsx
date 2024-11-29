@@ -25,25 +25,25 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A] border-b border-white">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A] border-b border-[#DDDDDD]">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-14">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="font-ia text-white text-lg">
+            <Link href="/" className="font-ia text-[#DDDDDD] text-base">
               GOATSE SINGULARITY AI
             </Link>
              
             <nav className="hidden md:flex space-x-6">
-              <Link href="/chat" className="font-ia text-white hover:text-white">
+              <Link href="/chat" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
                 [CHAT]
               </Link>
-              <Link href="/twitter" className="font-ia text-white hover:text-white">
+              <Link href="/twitter" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
                 [TWITTER]
               </Link>
-              <Link href="/telegram" className="font-ia text-white hover:text-white">
+              <Link href="/telegram" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
                 [TELEGRAM]
               </Link>
-              <Link href="/admin" className="font-ia text-white hover:text-white">
+              <Link href="/admin" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
                 [ADMIN]
               </Link>
             </nav>
@@ -63,13 +63,13 @@ export default function Header() {
                 </Card>
                 <button
                   onClick={handleSignOut}
-                  className="font-ia bg-[#11111A] text-white border border-white py-2 px-3 hover:text-red-500 text-xs"
+                  className="font-ia bg-[#11111A] text-[#DDDDDD] border border-[#DDDDDD] py-2 px-3 hover:text-red-500 text-xs"
                 >
                   DISCONNECT
                 </button>
               </div>
             ) : (
-              <WalletMultiButton className="!bg-[#11111A] !border !border-white !rounded-none !font-ia !text-sm !px-3 !py-1" />
+              <WalletMultiButton className="!bg-[#11111A] !border !border-[#DDDDDD] !rounded-none !font-ia !text-sm !px-3 !py-1" />
             )}
           </div>
         </div>
