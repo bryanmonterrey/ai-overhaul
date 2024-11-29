@@ -1,7 +1,8 @@
 // src/app/components/personality/Chat.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PersonalityState, EmotionalState, Message } from '@/app/core/types';
+import { PersonalityState } from '@/app/core/types';
+import { Message } from '@/app/core/types/chat';
 import { AIResponse } from '@/app/core/types/ai';
 import { TokenCounter } from '@/app/lib/utils/ai';
 import { AIError, AIRateLimitError } from '@/app/core/errors/AIError';
@@ -26,10 +27,11 @@ interface ChatProps {
   onPersonalityStateChange: (state: Partial<PersonalityState>) => void;
 }
 
+
 export default function Chat({ personalityState: externalState, onPersonalityStateChange }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [personalityState, setPersonalityState] = useState<ImportedPersonalityState>(externalState);
+  const [personalityState, setPersonalityState] = useState<PersonalityState>(externalState);
   const [isLoading, setIsLoading] = useState(false);
   const [tokenCount, setTokenCount] = useState<number>(0);
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
