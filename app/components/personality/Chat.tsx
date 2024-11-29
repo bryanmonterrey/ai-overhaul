@@ -111,11 +111,10 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     };
   };
 
-  const updatePersonalityState = (newState: ImportedPersonalityState) => {
+  const updatePersonalityState = (newState: PersonalityState) => {
     setPersonalityState(newState);
     onPersonalityStateChange(newState);
   };
-
   const sendMessage = async (retry = false, retryMessageId?: string) => {
     const startTime = performance.now();
     if (!inputText.trim() && !retry) return;
