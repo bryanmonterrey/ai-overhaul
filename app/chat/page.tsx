@@ -8,13 +8,14 @@ import { Card } from '@/app/components/common/Card';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
 import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
 import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
-import { EmotionalState, NarrativeMode, TweetStyle, PersonalityState } from '@/app/core/types';
+import { EmotionalState, NarrativeMode } from '@/app/core/personality/types';
+import type { PersonalityState as CorePersonalityState, PersonalityState } from '@/app/core/types';
 
 export default function ChatPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [systemState, setSystemState] = useState<PersonalityState>({
+  const [systemState, setSystemState] = useState<CorePersonalityState>({
     traits: {
       technical_depth: 0.8,
       provocative_tendency: 0.7,
@@ -24,7 +25,6 @@ export default function ChatPage() {
     },
     tweetStyle: 'shitpost',
     currentContext: {
-      activeNarratives: ['system_initialization', 'personality_calibration'],
       platform: 'chat',
       recentInteractions: [],
       environmentalFactors: {
@@ -32,10 +32,11 @@ export default function ChatPage() {
         platformActivity: 0,
         socialContext: [],
         platform: 'chat'
-      }
+      },
+      activeNarratives: ['system_initialization', 'personality_calibration']
     },
     consciousness: {
-      emotionalState: EmotionalState.Neutral,
+      emotionalState: 'neutral',
       currentThought: '',
       shortTermMemory: [],
       longTermMemory: [],
@@ -43,13 +44,13 @@ export default function ChatPage() {
       activeContexts: new Set()
     },
     emotionalProfile: {
-      baseState: EmotionalState.Neutral,
+      baseState: 'neutral',
       volatility: 0.5,
       triggers: new Map(),
       stateTransitions: new Map()
     },
-    narrativeMode: 'analytical',
-    memories: []  // This was missing and required by the type
+    memories: [],
+    narrativeMode: 'technical'
   });
 
   useEffect(() => {
