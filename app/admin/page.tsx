@@ -7,16 +7,18 @@ import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalSta
 import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
 import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
 import { Card } from '@/app/components/common/Card';
+import { EmotionalState } from '../core/types';
+import { NarrativeMode, TweetStyle } from '../core/types';
 
 interface SystemState {
   consciousness: {
-    emotionalState: string;
+    emotionalState: EmotionalState;
   };
   emotionalProfile?: {
     volatility: number;
   };
-  narrative_mode: string;
-  tweet_style: string;
+  narrative_mode: NarrativeMode;
+  tweet_style: TweetStyle;
   traits: Record<string, number>;
   memories?: any[];
   currentContext?: {
@@ -193,33 +195,33 @@ export default function AdminPage() {
         </div>
 
         <AdminControls
-      onUpdateState={handleUpdateState}
-      onReset={handleReset}
-      currentState={{
-        emotionalState: systemState?.consciousness?.emotionalState || 'neutral',
-        tweetStyle: systemState?.tweet_style || 'shitpost',    // Use snake_case
-        narrativeMode: systemState?.narrative_mode || 'philosophical',  // Use snake_case
-        traits: systemState?.traits || {}
-      }}
-      isLoading={isLoading}
-    />
+        onUpdateState={handleUpdateState}
+        onReset={handleReset}
+        currentState={{
+          emotionalState: systemState?.consciousness?.emotionalState || 'neutral' as EmotionalState,
+          tweetStyle: systemState?.tweet_style || 'shitpost' as TweetStyle,
+          narrativeMode: systemState?.narrative_mode || 'philosophical' as NarrativeMode,
+          traits: systemState?.traits || {}
+        }}
+        isLoading={isLoading}
+      />
       </div>
 
       <div className="space-y-4 mb-24">
       
       <EmotionalStateDisplay
-      state={systemState?.consciousness?.emotionalState}
-      intensity={systemState?.emotionalProfile?.volatility}
-      narrativeMode={systemState?.narrative_mode}  // Use snake_case
-      traits={systemState?.traits || {}}
-    />
+          state={systemState?.consciousness?.emotionalState}
+          intensity={systemState?.emotionalProfile?.volatility}
+          narrativeMode={systemState?.narrative_mode}
+          traits={systemState?.traits || {}}
+        />
         
         
         <PersonalityMonitor
-      traits={systemState?.traits}
-      tweetStyle={systemState?.tweet_style}  // Use snake_case
-      activeThemes={systemState?.currentContext?.activeNarratives}
-    />
+          traits={systemState?.traits}
+          tweetStyle={systemState?.tweet_style as TweetStyle}
+          activeThemes={systemState?.currentContext?.activeNarratives}
+        />
         
         <MemoryViewer
           memories={systemState.memories || []}
