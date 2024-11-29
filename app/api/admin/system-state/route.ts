@@ -1,35 +1,28 @@
+// app/api/admin/system-state/route.ts
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 
-const config = {
-  emotionalVolatility: 0.7,
-  baseTemperature: 0.5,
-  creativityBias: 0.3,
-  memoryRetention: 0.8,
-  responsePatterns: {
-    analytical: ['Analyzing system patterns...', 'Processing data structures...'],
-    chaotic: ['RUNTIME_ALERT: CHAOS DETECTED', 'SYSTEM_UNSTABLE'],
-    contemplative: ['Considering implications...', 'Reflecting on patterns...'],
-    creative: ['Generating new paradigms...', 'Synthesizing concepts...'],
-    excited: ['BREAKTHROUGH DETECTED!', 'NEW PATTERNS EMERGING!'],
-    neutral: ['Processing normally', 'Standard operations continuing']
-  }
-};
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  try {
-    // Check authentication
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    try {
+        // Create an async cookie store
+        const cookieStore = cookies();
+        // Initialize Supabase client with async cookies
+        const supabase = createRouteHandlerClient({
+          cookies: async () => cookieStore
+        });
+        
+        // Get session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+        if (sessionError || !session) {
+          return NextResponse.json(
+            { error: 'Unauthorized' },
+            { status: 401 }
+          );
+        }
 
     // Check if user is admin
     const { data: roleData } = await supabase
@@ -45,11 +38,45 @@ export async function GET(req: Request) {
       );
     }
 
-    // Use your actual PersonalitySystem
-    const system = new PersonalitySystem(config);
-    const state = system.getCurrentState();
+    // Get system state from database
+    const { data: systemState, error: stateError } = await supabase
+      .from('system_state')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .single();
 
-    return NextResponse.json(state);
+    if (stateError && stateError.code !== 'PGRST116') {
+      throw stateError;
+    }
+
+    // If no state exists, return default state
+    if (!systemState) {
+      const defaultState = {
+        consciousness: {
+          emotionalState: 'neutral'
+        },
+        emotionalProfile: {
+          volatility: 0.5
+        },
+        traits: {},
+        tweet_style: 'shitpost',
+        narrative_mode: 'philosophical',
+        currentContext: {},
+        memories: []
+      };
+
+      const { data: newState, error: insertError } = await supabase
+        .from('system_state')
+        .insert(defaultState)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      return NextResponse.json(newState);
+    }
+
+    return NextResponse.json(systemState);
   } catch (error) {
     console.error('System state error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -195,16 +195,16 @@ export default function AdminPage() {
         </div>
 
         <AdminControls
-        onUpdateState={handleUpdateState}
-        onReset={handleReset}
-        currentState={{
-          emotionalState: systemState?.consciousness?.emotionalState || 'neutral' as EmotionalState,
-          tweetStyle: systemState?.tweet_style || 'shitpost' as TweetStyle,
-          narrativeMode: systemState?.narrative_mode || 'philosophical' as NarrativeMode,
-          traits: systemState?.traits || {}
-        }}
-        isLoading={isLoading}
-      />
+  onUpdateState={handleUpdateState}
+  onReset={handleReset}
+  currentState={{
+    emotionalState: systemState?.consciousness?.emotionalState || 'neutral' as EmotionalState,
+    tweetStyle: systemState?.tweet_style || 'shitpost' as TweetStyle,
+    narrativeMode: systemState?.narrative_mode || 'philosophical' as NarrativeMode,
+    traits: systemState?.traits || {}
+  }}
+  isLoading={isLoading}
+/>
       </div>
 
       <div className="space-y-4 mb-24">
