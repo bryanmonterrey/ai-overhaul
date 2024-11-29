@@ -165,44 +165,35 @@ export class DatabaseService {
     platform?: string;
   }) {
     try {
-      // Get current user session
       const { data: { session } } = await this.supabase.auth.getSession();
+      console.log('Current session:', session); // Add this
       
       if (!session) {
         throw new Error('No active session found');
       }
   
-      // First check if we have permission
-      const { data: testData, error: testError } = await this.supabase
-        .from('memories')
-        .select('id')
-        .limit(1);
-  
-      if (testError) {
-        console.error('Error checking memories access:', testError);
-        return;  // Silently fail instead of throwing
-      }
+      const memoryData = {
+        ...memory,
+        id: crypto.randomUUID(),
+        user_id: session.user.id,
+        created_at: new Date().toISOString(),
+        last_accessed: new Date().toISOString(),
+        archive_status: 'active',
+        emotional_context: memory.emotional_context || 'neutral'
+      };
+      
+      console.log('Attempting to store memory:', memoryData); // Add this
   
       const { error } = await this.supabase
         .from('memories')
-        .insert({
-          ...memory,
-          id: crypto.randomUUID(), // Explicitly set UUID
-          user_id: session.user.id,
-          created_at: new Date().toISOString(),
-          last_accessed: new Date().toISOString(),
-          archive_status: 'active',
-          emotional_context: memory.emotional_context || 'neutral'
-        });
+        .insert(memoryData);
   
       if (error) {
-        console.error('Error storing memory in DB:', error);
-        // Don't throw the error, just log it
+        console.error('Error storing memory in DB:', error, 'Full error:', JSON.stringify(error, null, 2)); // Enhanced error logging
         return;
       }
     } catch (error) {
       console.error('Failed to store memory:', error);
-      // Don't throw the error, just log it
       return;
     }
   }
