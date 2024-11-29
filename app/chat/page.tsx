@@ -8,7 +8,7 @@ import { Card } from '@/app/components/common/Card';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
 import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
 import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
-import { EmotionalState, NarrativeMode, TweetStyle } from '@/app/core/types';
+import { EmotionalState, NarrativeMode, TweetStyle } from '@/app/core/personality/types';
 
 interface PersonalityState {
   traits: {
@@ -48,12 +48,12 @@ export default function ChatPage() {
       activeNarratives: ['system_initialization', 'personality_calibration']
     },
     consciousness: {
-      emotionalState: 'neutral'
+      emotionalState: EmotionalState.Neutral
     },
     emotionalProfile: {
       volatility: 0.5
     },
-    narrativeMode: 'default'
+    narrativeMode: 'analytical'
   });
 
   useEffect(() => {
@@ -122,7 +122,10 @@ export default function ChatPage() {
         </Card>
         
         <div className="flex-1 min-h-0">
-          <Chat onStateChange={handleStateUpdate} initialState={personalityState} />
+          <Chat 
+            state={personalityState} 
+            onStateChange={handleStateUpdate}
+          />
         </div>
       </div>
       
