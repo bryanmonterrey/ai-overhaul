@@ -207,6 +207,31 @@ export class DatabaseService {
     }
   }
 
+  async saveTrainingData(data: {
+    message_id: string;
+    prompt: string;
+    completion: string;
+    quality_score: number;
+    metadata: Record<string, any>;
+  }) {
+    try {
+      const { error } = await this.supabase
+        .from('training_data')
+        .insert({
+          ...data,
+          created_at: new Date().toISOString()
+        });
+  
+      if (error) {
+        console.error('Error saving training data:', error);
+        return; // Silently fail
+      }
+    } catch (error) {
+      console.error('Failed to save training data:', error);
+      return; // Silently fail
+    }
+  }
+
   async getSessionStats(sessionId: string) {
     try {
       const { data, error } = await this.supabase
