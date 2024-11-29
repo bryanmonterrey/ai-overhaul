@@ -40,33 +40,35 @@ export async function POST(req: Request) {
     let { data: currentState, error: stateError } = await supabase
       .from('system_state')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('timestamp', { ascending: false })  // Changed from created_at
       .limit(1)
       .single();
 
     console.log('Current state:', currentState);
 
     if (stateError) {
-      if (stateError.code === 'PGRST116') {
-        // No state exists yet, create initial state
-        const initialState = {
-          consciousness: {
-            emotionalState: 'neutral'
-          },
-          emotionalProfile: {
-            volatility: 0.5
-          },
-          traits: {},
-          tweetStyle: 'shitpost',
-          narrativeMode: 'philosophical',
-          currentContext: {}
-        };
+        if (stateError.code === 'PGRST116') {
+          // No state exists yet, create initial state
+          const initialState = {
+            consciousness: {
+              emotionalState: 'neutral'
+            },
+            emotional_profile: {
+              volatility: 0.5
+            },
+            traits: {},
+            tweet_style: 'shitpost',
+            narrative_mode: updates.narrativeMode || 'philosophical',
+            current_context: {},
+            timestamp: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
         
-        const { data: newState, error: insertError } = await supabase
+          const { data: newState, error: insertError } = await supabase
           .from('system_state')
           .insert(initialState)
-          .select()
-          .single();
+            .select()
+            .single();
 
         if (insertError) throw insertError;
         currentState = newState;
@@ -77,20 +79,18 @@ export async function POST(req: Request) {
 
     // Properly merge nested updates
     const newState = {
-      ...currentState,
-      ...(updates.narrativeMode ? { narrativeMode: updates.narrativeMode } : {}),
-      ...(updates.emotionalState ? { 
-        consciousness: {
-          ...currentState?.consciousness,
-          emotionalState: updates.emotionalState 
-        }
-      } : {}),
-      ...(updates.traits ? { traits: updates.traits } : {}),
-      ...(updates.tweetStyle ? { tweetStyle: updates.tweetStyle } : {}),
-      updated_at: new Date().toISOString()
-    };
-
-    console.log('New state to save:', newState);
+        ...currentState,
+        narrative_mode: updates.narrativeMode || currentState.narrative_mode,
+        consciousness: updates.emotionalState ? {
+          ...currentState.consciousness,
+          emotionalState: updates.emotionalState
+        } : currentState.consciousness,
+        traits: updates.traits || currentState.traits,
+        tweet_style: updates.tweetStyle || currentState.tweet_style,
+        updated_at: new Date().toISOString()
+      };
+  
+      console.log('New state to save:', newState);
 
     if (!currentState?.id) {
       // Insert new state if no id exists
@@ -111,7 +111,10 @@ export async function POST(req: Request) {
       .update(newState)
       .eq('id', currentState.id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Update error:', updateError);
+      throw updateError;
+    }
 
     // Fetch and return the updated state
     const { data: updatedState, error: fetchError } = await supabase
