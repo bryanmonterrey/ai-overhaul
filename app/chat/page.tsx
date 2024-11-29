@@ -8,35 +8,13 @@ import { Card } from '@/app/components/common/Card';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
 import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
 import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
-import { EmotionalState, NarrativeMode, TweetStyle } from '@/app/core/personality/types';
-
-interface PersonalityState {
-  traits: {
-    technical_depth: number;
-    provocative_tendency: number;
-    chaos_threshold: number;
-    philosophical_inclination: number;
-    meme_affinity: number;
-  };
-  tweetStyle: TweetStyle;
-  currentContext: {
-    activeNarratives: string[];
-  };
-  consciousness: {
-    emotionalState: EmotionalState;
-  };
-  emotionalProfile: {
-    volatility: number;
-  };
-  narrativeMode: NarrativeMode;
-}
-
+import { EmotionalState, NarrativeMode, TweetStyle, PersonalityState } from '@/app/core/types';
 
 export default function ChatPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [systemState, setSystemState] = useState<PersonalityState>({ // Changed variable name
+  const [systemState, setSystemState] = useState<PersonalityState>({
     traits: {
       technical_depth: 0.8,
       provocative_tendency: 0.7,
@@ -46,15 +24,32 @@ export default function ChatPage() {
     },
     tweetStyle: 'shitpost',
     currentContext: {
-      activeNarratives: ['system_initialization', 'personality_calibration']
+      activeNarratives: ['system_initialization', 'personality_calibration'],
+      platform: 'chat',
+      recentInteractions: [],
+      environmentalFactors: {
+        timeOfDay: 'day',
+        platformActivity: 0,
+        socialContext: [],
+        platform: 'chat'
+      }
     },
     consciousness: {
-      emotionalState: EmotionalState.Neutral
+      emotionalState: EmotionalState.Neutral,
+      currentThought: '',
+      shortTermMemory: [],
+      longTermMemory: [],
+      attentionFocus: [],
+      activeContexts: new Set()
     },
     emotionalProfile: {
-      volatility: 0.5
+      baseState: EmotionalState.Neutral,
+      volatility: 0.5,
+      triggers: new Map(),
+      stateTransitions: new Map()
     },
-    narrativeMode: 'analytical'
+    narrativeMode: 'analytical',
+    memories: []  // This was missing and required by the type
   });
 
   useEffect(() => {
@@ -123,7 +118,7 @@ export default function ChatPage() {
         </Card>
         
         <div className="flex-1 min-h-0">
-          <ChatComponent 
+            <ChatComponent 
             personalityState={systemState}
             onPersonalityStateChange={handleStateUpdate}
           />
@@ -146,7 +141,7 @@ export default function ChatPage() {
         />
         
         <MemoryViewer
-          memories={[]}
+          memories={systemState.memories} 
           className="flex-1 min-h-0"
         />
       </div>
