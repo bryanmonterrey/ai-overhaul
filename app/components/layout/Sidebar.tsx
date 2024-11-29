@@ -3,15 +3,22 @@
 import React from 'react';
 import Link from 'next/link';
 import { Card } from '../common/Card';
-import { EmotionalState } from '../../core/types';
+import { EmotionalState, NarrativeMode, TweetStyle } from '../../core/types';
+import { EmotionalStateDisplay } from '../personality/EmotionalStateDisplay';
 
 interface SidebarProps {
   currentState?: {
     emotionalState: EmotionalState;
-    narrativeMode: string;
-    activeThemes: string[];
+    narrativeMode: NarrativeMode;
+    activeThemes?: string[];
+    traits?: Record<string, number>;
+    emotionalProfile?: {
+      volatility: number;
+    };
   };
 }
+
+
 
 export default function Sidebar({ currentState }: SidebarProps) {
   return (
@@ -19,8 +26,12 @@ export default function Sidebar({ currentState }: SidebarProps) {
       <div className="p-4 space-y-4">
         <Card variant="system" title="SYSTEM_INFO">
           <div className="text-xs space-y-1">
-            <div>emotional_state: {currentState?.emotionalState || 'initializing'}</div>
-            <div>narrative_mode: {currentState?.narrativeMode || 'default'}</div>
+          <EmotionalStateDisplay
+            state={currentState?.emotionalState}
+            intensity={currentState?.emotionalProfile?.volatility}
+            narrativeMode={currentState?.narrativeMode}
+            traits={currentState?.traits || {}}
+          />
           </div>
         </Card>
 
