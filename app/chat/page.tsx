@@ -31,7 +31,12 @@ interface PersonalityState {
   narrativeMode: NarrativeMode;
 }
 
-export default function ChatPage() {
+interface ChatProps {
+  personalityState: PersonalityState;
+  onPersonalityStateChange: (state: Partial<PersonalityState>) => void;
+}
+
+export default function Chat({ personalityState, onPersonalityStateChange }: ChatProps) {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +48,7 @@ export default function ChatPage() {
       philosophical_inclination: 0.75,
       meme_affinity: 0.65
     },
-    tweetStyle: 'metacommentary',
+    tweetStyle: 'shitpost',
     currentContext: {
       activeNarratives: ['system_initialization', 'personality_calibration']
     },
@@ -123,8 +128,8 @@ export default function ChatPage() {
         
         <div className="flex-1 min-h-0">
           <Chat 
-            state={personalityState} 
-            onStateChange={handleStateUpdate}
+            personalityState={personalityState}
+            onPersonalityStateChange={handleStateUpdate}
           />
         </div>
       </div>
@@ -141,6 +146,7 @@ export default function ChatPage() {
           traits={personalityState.traits}
           tweetStyle={personalityState.tweetStyle}
           activeThemes={personalityState.currentContext.activeNarratives}
+          className=""
         />
         
         <MemoryViewer
