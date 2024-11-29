@@ -3,7 +3,7 @@
 'use client';
  
 import React, { useState, useEffect, useCallback } from 'react';
-import { PersonalityState as ImportedPersonalityState } from '../../core/types';
+import { PersonalityState as ImportedPersonalityState } from '../../core/personality/types';
 import { AIResponse } from '../../core/types/ai';
 import { TokenCounter } from '../../lib/utils/ai';
 import { AIError, AIRateLimitError } from '../../core/errors/AIError';
@@ -32,8 +32,7 @@ interface ChatProps {
 export default function Chat({ personalityState: externalState, onPersonalityStateChange }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [internalState, setInternalState] = useState<ImportedPersonalityState | null>(externalState);
-  const [personalityState, setPersonalityState] = useState<ImportedPersonalityState | null>(null);
+  const [personalityState, setPersonalityState] = useState<ImportedPersonalityState>(externalState);
   const [isLoading, setIsLoading] = useState(false);
   const [tokenCount, setTokenCount] = useState<number>(0);
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
@@ -41,6 +40,16 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [currentMetrics, setCurrentMetrics] = useState<ChatMetrics | null>(null);
+
+  // Update internal state when external state changes
+  useEffect(() => {
+    setPersonalityState(externalState);
+  }, [externalState]);
+
+  // When internal state changes, notify parent
+  useEffect(() => {
+    onPersonalityStateChange(personalityState);
+  }, [personalityState, onPersonalityStateChange]);
 
   useEffect(() => {
     initializeSession();
@@ -101,6 +110,11 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
       message: 'An unexpected error occurred',
       retryable: false
     };
+  };
+
+  const updatePersonalityState = (newState: ImportedPersonalityState) => {
+    setPersonalityState(newState);
+    onPersonalityStateChange(newState);
   };
 
   const sendMessage = async (retry = false, retryMessageId?: string) => {
@@ -205,7 +219,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         );
       }
 
-      setPersonalityState(data.personalityState);
+      updatePersonalityState(data.personalityState);
     } catch (error) {
       console.error('Error sending message:', error);
       const errorInfo = handleError(error);
