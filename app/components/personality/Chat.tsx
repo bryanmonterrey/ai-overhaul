@@ -40,16 +40,6 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [currentMetrics, setCurrentMetrics] = useState<ChatMetrics | null>(null);
 
-  // Update internal state when external state changes
-  useEffect(() => {
-    setPersonalityState(externalState);
-  }, [externalState]);
-
-  // When internal state changes, notify parent
-  useEffect(() => {
-    onPersonalityStateChange(personalityState);
-  }, [personalityState, onPersonalityStateChange]);
-
   useEffect(() => {
     initializeSession();
   }, []);
@@ -83,14 +73,14 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
   };
 
   const calculateMetrics = useCallback((message: Message) => {
-    if (!personalityState || messages.length === 0) return null;
+    if (!externalState || messages.length === 0) return null;
     
     return qualityMetricsService.calculateMetrics(
       message,
       messages,
-      personalityState
+      externalState
     );
-  }, [messages, personalityState]);
+  }, [messages, externalState]);
 
   const handleError = (error: unknown) => {
     if (error instanceof AIRateLimitError) {
