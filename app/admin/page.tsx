@@ -37,14 +37,25 @@ export default function AdminPage() {
   const handleUpdateState = async (updates: Partial<any>) => {
     setIsLoading(true);
     try {
+      console.log('Sending updates:', updates);
+      
       const response = await fetch('/api/admin/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
       
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('Received updated state:', data);
+      
       setSystemState(data);
+      
+      // Force refresh the system state to verify changes
+      await loadSystemState();
     } catch (error) {
       console.error('Error updating state:', error);
     } finally {
