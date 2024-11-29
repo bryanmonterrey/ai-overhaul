@@ -44,7 +44,7 @@ export default function Sidebar({ currentState }: SidebarProps) {
             >
               {'>'}  {item.label}
             </Link>
-          )))}
+          ))}
         </nav>
 
         {currentState?.activeThemes && (
