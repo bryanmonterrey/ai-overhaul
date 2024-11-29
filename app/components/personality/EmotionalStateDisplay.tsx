@@ -22,7 +22,7 @@ export const EmotionalStateDisplay = ({
 
   return (
     <Card variant="system" title="SYSTEM_STATUS">
-      <div className="space-y-2 font-mono text-sm">
+      <div className="space-y-2 font-mono text-xs">
         <div className="grid grid-cols-2 gap-2">
           <div>emotional_state:</div>
           <div>{state}</div>
