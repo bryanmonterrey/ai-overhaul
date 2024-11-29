@@ -8,11 +8,28 @@ import { PersonalityMonitor } from '@/app/components/personality/PersonalityMoni
 import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
 import { Card } from '@/app/components/common/Card';
 
+interface SystemState {
+  consciousness: {
+    emotionalState: string;
+  };
+  emotionalProfile?: {
+    volatility: number;
+  };
+  narrative_mode: string;
+  tweet_style: string;
+  traits: Record<string, number>;
+  memories?: any[];
+  currentContext?: {
+    activeNarratives?: string[];
+  };
+}
+
 export default function AdminPage() {
-  const [systemState, setSystemState] = useState<any>(null);
+  const [systemState, setSystemState] = useState<SystemState | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('Initializing');
+  
 
   const loadSystemState = async () => {
     try {
@@ -52,20 +69,20 @@ export default function AdminPage() {
       const data = await response.json();
       console.log('Received updated state:', data);
       
-      // Update the local state with the new data
-      setSystemState(prevState => ({
+      // Update the local state with the new data, using proper snake_case keys
+      setSystemState((prevState: SystemState | null) => ({
         ...prevState,
-        narrativeMode: data.narrative_mode || prevState?.narrativeMode,
+        narrative_mode: data.narrative_mode || prevState?.narrative_mode,
         consciousness: {
           ...prevState?.consciousness,
           emotionalState: data.consciousness?.emotionalState || prevState?.consciousness?.emotionalState
         },
-        traits: data.traits || prevState?.traits,
-        tweetStyle: data.tweet_style || prevState?.tweetStyle
+        traits: data.traits || prevState?.traits || {},
+        tweet_style: data.tweet_style || prevState?.tweet_style
       }));
-  
-      // Log the new system state
-      console.log('Updated system state:', systemState);
+
+      // Force a refresh of the system state
+      await loadSystemState();
     } catch (error) {
       console.error('Error updating state:', error);
     } finally {
@@ -176,33 +193,33 @@ export default function AdminPage() {
         </div>
 
         <AdminControls
-        onUpdateState={handleUpdateState}
-        onReset={handleReset}
-        currentState={{
-          emotionalState: systemState?.consciousness?.emotionalState || 'neutral',
-          tweetStyle: systemState?.tweetStyle || 'default',
-          narrativeMode: systemState?.narrativeMode || 'default',
-          traits: systemState?.traits || {} // Provide default empty object
-        }}
-        isLoading={isLoading}
-          />
+      onUpdateState={handleUpdateState}
+      onReset={handleReset}
+      currentState={{
+        emotionalState: systemState?.consciousness?.emotionalState || 'neutral',
+        tweetStyle: systemState?.tweet_style || 'shitpost',    // Use snake_case
+        narrativeMode: systemState?.narrative_mode || 'philosophical',  // Use snake_case
+        traits: systemState?.traits || {}
+      }}
+      isLoading={isLoading}
+    />
       </div>
 
       <div className="space-y-4 mb-24">
       
-        <EmotionalStateDisplay
-          state={systemState?.consciousness?.emotionalState}
-          intensity={systemState?.emotionalProfile?.volatility}
-          narrativeMode={systemState?.narrativeMode}
-          traits={systemState?.traits || {}}
-        />
+      <EmotionalStateDisplay
+      state={systemState?.consciousness?.emotionalState}
+      intensity={systemState?.emotionalProfile?.volatility}
+      narrativeMode={systemState?.narrative_mode}  // Use snake_case
+      traits={systemState?.traits || {}}
+    />
         
         
         <PersonalityMonitor
-          traits={systemState?.traits}
-          tweetStyle={systemState?.tweetStyle}
-          activeThemes={systemState?.currentContext?.activeNarratives}
-        />
+      traits={systemState?.traits}
+      tweetStyle={systemState?.tweet_style}  // Use snake_case
+      activeThemes={systemState?.currentContext?.activeNarratives}
+    />
         
         <MemoryViewer
           memories={systemState.memories || []}
