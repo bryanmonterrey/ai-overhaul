@@ -22,12 +22,6 @@ export default function Sidebar({ currentState }: SidebarProps) {
   return (
     <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#11111A] border-r border-white overflow-y-auto">
       <div className="p-4 space-y-4 text-xs">
-        <EmotionalStateDisplay
-          state={currentState?.emotionalState}
-          intensity={currentState?.emotionalProfile?.volatility}
-          narrativeMode={currentState?.narrativeMode}
-          traits={currentState?.traits || {}}
-        />
 
         <nav className="space-y-2">
           <div className="text-white text-sm mb-2">NAVIGATION:</div>
