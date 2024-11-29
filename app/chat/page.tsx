@@ -8,11 +8,58 @@ import { Card } from '@/app/components/common/Card';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
 import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
 import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
+import { EmotionalState, NarrativeMode, TweetStyle } from '@/app/core/types';
+
+interface PersonalityState {
+  traits: {
+    technical_depth: number;
+    provocative_tendency: number;
+    chaos_threshold: number;
+    philosophical_inclination: number;
+    meme_affinity: number;
+  };
+  tweetStyle: TweetStyle;
+  currentContext: {
+    activeNarratives: string[];
+  };
+  consciousness: {
+    emotionalState: EmotionalState;
+  };
+  emotionalProfile: {
+    volatility: number;
+  };
+  narrativeMode: NarrativeMode;
+}
+
+interface ChatProps {
+  onStateChange: (state: Partial<PersonalityState>) => void;
+  initialState: PersonalityState;
+}
 
 export default function ChatPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const [personalityState, setPersonalityState] = useState<PersonalityState>({
+    traits: {
+      technical_depth: 0.8,
+      provocative_tendency: 0.7,
+      chaos_threshold: 0.6,
+      philosophical_inclination: 0.75,
+      meme_affinity: 0.65
+    },
+    tweetStyle: 'metacommentary',
+    currentContext: {
+      activeNarratives: ['system_initialization', 'personality_calibration']
+    },
+    consciousness: {
+      emotionalState: 'neutral'
+    },
+    emotionalProfile: {
+      volatility: 0.5
+    },
+    narrativeMode: 'default'
+  });
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -61,6 +108,13 @@ export default function ChatPage() {
     return <div>Loading...</div>;
   }
 
+  const handleStateUpdate = (newState: Partial<PersonalityState>) => {
+    setPersonalityState(prev => ({
+      ...prev,
+      ...newState
+    }));
+  };
+
   return (
     <div className="grid grid-cols-[1fr_300px] gap-6 h-[calc(100vh-30rem)]">
       <div className="flex flex-col">
@@ -73,22 +127,22 @@ export default function ChatPage() {
         </Card>
         
         <div className="flex-1 min-h-0">
-          <Chat />
+        <Chat onStateChange={handleStateUpdate} initialState={personalityState} />
         </div>
       </div>
       
       <div className="space-y-4">
-        <EmotionalStateDisplay
-          state="neutral"
-          intensity={0.5}
-          narrativeMode="default"
-          traits={{}}
+      <EmotionalStateDisplay
+          state={personalityState.consciousness.emotionalState}
+          intensity={personalityState.emotionalProfile.volatility}
+          narrativeMode={personalityState.narrativeMode}
+          traits={personalityState.traits}
         />
         
         <PersonalityMonitor
-          traits={personalityState?.traits || {}}
-          tweetStyle={personalityState?.tweetStyle || 'metacommentary'}
-          activeThemes={personalityState?.currentContext?.activeNarratives || []}
+          traits={personalityState.traits}
+          tweetStyle={personalityState.tweetStyle}
+          activeThemes={personalityState.currentContext.activeNarratives}
         />
         
         <MemoryViewer
