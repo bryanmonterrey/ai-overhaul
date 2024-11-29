@@ -86,9 +86,9 @@ export default function ChatPage() {
         />
         
         <PersonalityMonitor
-          traits={{}}
-          tweetStyle="metacommentary"
-          activeThemes={[]}
+          traits={personalityState?.traits || {}}
+          tweetStyle={personalityState?.tweetStyle || 'metacommentary'}
+          activeThemes={personalityState?.currentContext?.activeNarratives || []}
         />
         
         <MemoryViewer

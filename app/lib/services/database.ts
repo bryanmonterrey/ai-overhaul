@@ -87,7 +87,7 @@ export class DatabaseService {
           session_id: sessionId,
           content: message.content,
           role: message.sender,
-          emotion: message.emotionalState || 'neutral',
+          emotional_state: message.emotionalState || 'neutral',
           model_used: message.aiResponse?.model,
           token_count: metrics.tokenCount || message.aiResponse?.tokenCount.total,
           response_time: metrics.responseTime,
