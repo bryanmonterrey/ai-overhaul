@@ -142,7 +142,7 @@ export class TrainingSequenceManager {
       status.state = 'failed';
       status.error = {
         step: status.currentStep,
-        message: error.message,
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
         timestamp: new Date()
       };
       await this.updateStatusInDB(status);
@@ -226,15 +226,18 @@ export class TrainingSequenceManager {
     resultingState: Partial<PersonalityState>
   ): Record<string, number> {
     const progress = { ...currentProgress };
-    const initialTraits = initialState.consciousness || {};
-    const resultingTraits = resultingState.consciousness || {};
-
-    Object.keys(resultingTraits).forEach(trait => {
-      const initial = initialTraits[trait] || 0;
-      const result = resultingTraits[trait] || 0;
-      progress[trait] = (progress[trait] || 0) + (result - initial);
-    });
-
+    const initialTraits = initialState.consciousness?.emotionalState || {};
+    const resultingTraits = resultingState.consciousness?.emotionalState || {};
+  
+    // Type guard to ensure traits are Record<string, number>
+    if (typeof initialTraits === 'object' && typeof resultingTraits === 'object') {
+      Object.keys(resultingTraits).forEach(trait => {
+        const initial = (initialTraits as Record<string, number>)[trait] || 0;
+        const result = (resultingTraits as Record<string, number>)[trait] || 0;
+        progress[trait] = (progress[trait] || 0) + (result - initial);
+      });
+    }
+  
     return progress;
   }
 
