@@ -185,7 +185,7 @@ import {
       EmotionalState.Neutral
     ],
     [EmotionalState.Contemplative]: [
-      EmotionalState.Philosophical,
+      EmotionalState.Creative,
       EmotionalState.Analytical,
       EmotionalState.Neutral
     ],
