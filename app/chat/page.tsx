@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import Chat from '@/app/components/personality/Chat';
+import ChatComponent from '@/app/components/personality/Chat'; // Changed import name
 import { Card } from '@/app/components/common/Card';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
 import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
@@ -31,16 +31,11 @@ interface PersonalityState {
   narrativeMode: NarrativeMode;
 }
 
-interface ChatProps {
-  personalityState: PersonalityState;
-  onPersonalityStateChange: (state: Partial<PersonalityState>) => void;
-}
-
-export default function Chat({ personalityState, onPersonalityStateChange }: ChatProps) {
+export default function ChatPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [personalityState, setPersonalityState] = useState<PersonalityState>({
+  const [systemState, setSystemState] = useState<PersonalityState>({ // Changed variable name
     traits: {
       technical_depth: 0.8,
       provocative_tendency: 0.7,
@@ -109,7 +104,7 @@ export default function Chat({ personalityState, onPersonalityStateChange }: Cha
   }
 
   const handleStateUpdate = (newState: Partial<PersonalityState>) => {
-    setPersonalityState(prev => ({
+    setSystemState(prev => ({
       ...prev,
       ...newState
     }));
@@ -127,8 +122,8 @@ export default function Chat({ personalityState, onPersonalityStateChange }: Cha
         </Card>
         
         <div className="flex-1 min-h-0">
-          <Chat 
-            personalityState={personalityState}
+          <ChatComponent 
+            personalityState={systemState}
             onPersonalityStateChange={handleStateUpdate}
           />
         </div>
@@ -136,16 +131,16 @@ export default function Chat({ personalityState, onPersonalityStateChange }: Cha
       
       <div className="space-y-4">
         <EmotionalStateDisplay
-          state={personalityState.consciousness.emotionalState}
-          intensity={personalityState.emotionalProfile.volatility}
-          narrativeMode={personalityState.narrativeMode}
-          traits={personalityState.traits}
+          state={systemState.consciousness.emotionalState}
+          intensity={systemState.emotionalProfile.volatility}
+          narrativeMode={systemState.narrativeMode}
+          traits={systemState.traits}
         />
         
         <PersonalityMonitor
-          traits={personalityState.traits}
-          tweetStyle={personalityState.tweetStyle}
-          activeThemes={personalityState.currentContext.activeNarratives}
+          traits={systemState.traits}
+          tweetStyle={systemState.tweetStyle}
+          activeThemes={systemState.currentContext.activeNarratives}
           className=""
         />
         
