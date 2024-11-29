@@ -81,13 +81,24 @@ export class DatabaseService {
     tokenCount?: number;
   }) {
     try {
+      let emotionalState = 'neutral';
+      
+      if (message.emotionalState) {
+        if (typeof message.emotionalState === 'object' && message.emotionalState !== null) {
+          // @ts-ignore - we know the object has a state property at runtime
+          emotionalState = message.emotionalState.state || 'neutral';
+        } else if (typeof message.emotionalState === 'string') {
+          emotionalState = message.emotionalState;
+        }
+      }
+  
       const { error: messageError } = await this.supabase
         .from('chat_messages')
         .insert({
           session_id: sessionId,
           content: message.content,
           role: message.sender,
-          emotional_state: message.emotionalState || 'neutral',
+          emotional_state: emotionalState,
           model_used: message.aiResponse?.model,
           token_count: metrics.tokenCount || message.aiResponse?.tokenCount.total,
           response_time: metrics.responseTime,
@@ -95,10 +106,11 @@ export class DatabaseService {
           metadata: {
             error: message.error,
             retryable: message.retryable,
-            aiResponse: message.aiResponse
+            aiResponse: message.aiResponse,
+            fullEmotionalState: message.emotionalState
           }
         });
-
+  
       if (messageError) throw messageError;
       console.log('Message logged for session:', sessionId);
     } catch (error) {
