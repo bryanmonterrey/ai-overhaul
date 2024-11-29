@@ -6,7 +6,7 @@ import { PersonalitySystem } from '../PersonalitySystem';
 import { EmotionalSystem } from '../EmotionalSystem';
 import { MemorySystem } from '../MemorySystem';
 import type { TrainingPattern, TrainingOutcome, TrainingConfig } from './types';
-import { EmotionalState } from '../types';
+import { EmotionalState, NarrativeMode, PersonalityState } from '../types';
 
 export class TrainingPatternManager {
   private patterns: Map<string, TrainingPattern> = new Map();
@@ -89,7 +89,7 @@ export class TrainingPatternManager {
     const matches: Array<{ pattern: TrainingPattern; confidence: number }> = [];
 
     // Check each pattern for matches
-    for (const pattern of this.patterns.values()) {
+    for (const pattern of Array.from(this.patterns.values())) {
       // Skip if in cooldown
       if (pattern.lastApplied && 
           now.getTime() - pattern.lastApplied.getTime() < pattern.cooldownPeriod) {
