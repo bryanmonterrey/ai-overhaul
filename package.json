@@ -24,7 +24,7 @@
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.95.5",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
-    "@supabase/supabase-js": "^2.46.1",
+    "@supabase/supabase-js": "^2.46.2",
     "axios": "^1.7.7",
     "deepmerge": "^4.3.1",
     "dotenv": "^16.4.5",

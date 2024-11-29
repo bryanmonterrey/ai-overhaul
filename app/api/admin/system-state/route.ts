@@ -7,23 +7,17 @@ export const runtime = 'edge';
 
 export async function GET(req: Request) {
   try {
-    // Create cookie store and get the auth cookie directly
     const cookieStore = cookies();
-    const authCookie = cookieStore.get('sb-dbavznzqcwnwxsgfbsxw-auth-token')?.value;
-
-    // Initialize Supabase client
-    const supabase = createRouteHandlerClient({ 
-      cookies: () => {
-        return new Map([
-          ['sb-dbavznzqcwnwxsgfbsxw-auth-token', authCookie || '']
-        ])
-      }
+    
+    const supabase = createRouteHandlerClient({
+      cookies: () => cookieStore
     });
     
     // Get session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !session) {
+      console.log('Session error:', sessionError);
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -31,20 +25,21 @@ export async function GET(req: Request) {
     }
 
     // Check if user is admin
-    const { data: roleData } = await supabase
+    const { data: roleData, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', session.user.id)
       .single();
 
-    if (roleData?.role !== 'admin') {
+    if (roleError || roleData?.role !== 'admin') {
+      console.log('Role error:', roleError);
       return NextResponse.json(
         { error: 'Not authorized' },
         { status: 403 }
       );
     }
 
-    // Get system state from database
+    // Get system state
     const { data: systemState, error: stateError } = await supabase
       .from('system_state')
       .select('*')
@@ -52,28 +47,46 @@ export async function GET(req: Request) {
       .limit(1)
       .single();
 
-    if (stateError && stateError.code !== 'PGRST116') {
+    // Return default state if no state exists
+    if (stateError && stateError.code === 'PGRST116') {
+      const defaultState = {
+        consciousness: {
+          emotionalState: 'neutral'
+        },
+        emotionalProfile: {
+          volatility: 0.5
+        },
+        traits: {},
+        tweet_style: 'shitpost',
+        narrative_mode: 'philosophical',
+        currentContext: {},
+        memories: []
+      };
+
+      // Insert default state
+      const { data: newState, error: insertError } = await supabase
+        .from('system_state')
+        .insert(defaultState)
+        .select()
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      return NextResponse.json(newState || defaultState);
+    }
+
+    if (stateError) {
       throw stateError;
     }
 
-    return NextResponse.json(systemState || {
-      consciousness: {
-        emotionalState: 'neutral'
-      },
-      emotionalProfile: {
-        volatility: 0.5
-      },
-      traits: {},
-      tweet_style: 'shitpost',
-      narrative_mode: 'philosophical',
-      currentContext: {},
-      memories: []
-    });
+    return NextResponse.json(systemState);
 
   } catch (error) {
     console.error('System state error:', error);
     return NextResponse.json(
-      { error: 'Internal Server Error' },
+      { error: 'Internal Server Error', details: error },
       { status: 500 }
     );
   }
