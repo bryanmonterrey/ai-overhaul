@@ -143,6 +143,43 @@ export class DatabaseService {
     }
   }
 
+  // In DatabaseService class, add this method:
+async storeMemory(memory: {
+  content: string;
+  type: string;
+  emotional_context: string;
+  importance: number;
+  associations: string[];
+  platform?: string;
+}) {
+  try {
+    // Get current user session
+    const { data: { session } } = await this.supabase.auth.getSession();
+    
+    if (!session) {
+      throw new Error('No active session found');
+    }
+
+    const { error } = await this.supabase
+      .from('memories')
+      .insert({
+        ...memory,
+        user_id: session.user.id,
+        created_at: new Date().toISOString(),
+        last_accessed: new Date().toISOString(),
+        archive_status: 'active'
+      });
+
+    if (error) {
+      console.error('Error storing memory in DB:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Failed to store memory:', error);
+    throw error;
+  }
+}
+
   async getSessionStats(sessionId: string) {
     try {
       const { data, error } = await this.supabase
