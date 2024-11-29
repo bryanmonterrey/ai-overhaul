@@ -98,13 +98,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-full flex items-center font-mono justify-center bg-[#11111A]">
+    <div className="h-full flex items-center font-ia justify-center bg-[#11111A]">
       <div className="max-w-md w-full space-y-8 p-8 bg-[#11111A] border border-white rounded-none shadow-none">
         <div>
-          <h2 className="text-center text-xl font-mono text-white">
+          <h2 className="text-center text-xl font-ia text-white">
             Connect Your Wallet
           </h2>
-          <p className="mt-2 text-center font-mono text-sm text-gray-300">
+          <p className="mt-2 text-center font-ia text-sm text-gray-300">
             To access the chat, you need to verify your $GOATSE tokens
           </p>
         </div>

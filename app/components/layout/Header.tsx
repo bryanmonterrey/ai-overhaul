@@ -29,21 +29,21 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="font-mono text-white text-lg">
+            <Link href="/" className="font-ia text-white text-lg">
               GOATSE SINGULARITY AI
             </Link>
              
             <nav className="hidden md:flex space-x-6">
-              <Link href="/chat" className="font-mono text-white hover:text-white">
+              <Link href="/chat" className="font-ia text-white hover:text-white">
                 [CHAT]
               </Link>
-              <Link href="/twitter" className="font-mono text-white hover:text-white">
+              <Link href="/twitter" className="font-ia text-white hover:text-white">
                 [TWITTER]
               </Link>
-              <Link href="/telegram" className="font-mono text-white hover:text-white">
+              <Link href="/telegram" className="font-ia text-white hover:text-white">
                 [TELEGRAM]
               </Link>
-              <Link href="/admin" className="font-mono text-white hover:text-white">
+              <Link href="/admin" className="font-ia text-white hover:text-white">
                 [ADMIN]
               </Link>
             </nav>
@@ -57,19 +57,19 @@ export default function Header() {
             {connected && publicKey ? (
               <div className="flex items-center space-x-4">
                 <Card variant="system" className="px-3 py-1">
-                  <span className="text-xs font-mono">
+                  <span className="text-xs font-ia">
                     {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
                   </span>
                 </Card>
                 <button
                   onClick={handleSignOut}
-                  className="font-mono bg-[#11111A] text-white border border-white py-2 px-3 hover:text-red-500 text-xs"
+                  className="font-ia bg-[#11111A] text-white border border-white py-2 px-3 hover:text-red-500 text-xs"
                 >
                   DISCONNECT
                 </button>
               </div>
             ) : (
-              <WalletMultiButton className="!bg-[#11111A] !border !border-white !rounded-none !font-mono !text-sm !px-3 !py-1" />
+              <WalletMultiButton className="!bg-[#11111A] !border !border-white !rounded-none !font-ia !text-sm !px-3 !py-1" />
             )}
           </div>
         </div>

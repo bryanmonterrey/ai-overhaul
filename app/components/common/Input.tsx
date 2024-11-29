@@ -18,8 +18,8 @@ export const Input = ({
 }: InputProps) => {
   const baseStyles = 'w-full px-4 py-2 focus:outline-none';
   const variants = {
-    default: 'font-mono border border-white focus:border-black focus:ring-1 focus:ring-black',
-    system: 'font-mono bg-black text-white border border-white focus:border-white placeholder-white'
+    default: 'font-ia border border-white focus:border-black focus:ring-1 focus:ring-black',
+    system: 'font-ia bg-black text-white border border-white focus:border-white placeholder-white'
   };
 
   return (

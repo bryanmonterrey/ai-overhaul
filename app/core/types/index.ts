@@ -38,6 +38,8 @@ export type MemoryType =
   | 'interaction'
   | 'narrative';
 
+export type ArchiveStatus = 'active' | 'archived';
+
 // Memory interfaces
 export interface Memory {
   id: string;

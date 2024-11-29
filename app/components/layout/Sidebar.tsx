@@ -35,7 +35,7 @@ export default function Sidebar({ currentState }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className="block font-mono text-white hover:bg-white/10 px-4 py-2"
+              className="block font-ia text-white hover:bg-white/10 px-4 py-2"
             >
               {'>'}  {item.label}
             </Link>

@@ -45,7 +45,7 @@ export const Alert = ({
   return (
     <div
       className={`
-        font-mono border rounded-lg p-4 relative
+        font-ia border rounded-lg p-4 relative
         ${styles.container}
         ${className}
       `}

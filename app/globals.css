@@ -6,6 +6,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "ia";
+  src: url("/iAWriter.otf"); 
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "ia-italic";
+  src: url("/iAWriterItalic.otf"); 
+  font-weight: 400;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -21,7 +33,7 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: ia;
 }
 
 /* Wallet Adapter Styles */
