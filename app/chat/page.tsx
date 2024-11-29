@@ -31,6 +31,7 @@ interface PersonalityState {
   narrativeMode: NarrativeMode;
 }
 
+
 export default function ChatPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();

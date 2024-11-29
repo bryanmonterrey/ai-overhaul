@@ -24,9 +24,15 @@ interface ChatMetrics {
   overall: number;
 }
 
-export default function Chat() {
+interface ChatProps {
+  personalityState: ImportedPersonalityState;
+  onPersonalityStateChange: (state: Partial<ImportedPersonalityState>) => void;
+}
+
+export default function Chat({ personalityState: externalState, onPersonalityStateChange }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [internalState, setInternalState] = useState<ImportedPersonalityState | null>(externalState);
   const [personalityState, setPersonalityState] = useState<ImportedPersonalityState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [tokenCount, setTokenCount] = useState<number>(0);

@@ -5,16 +5,16 @@ import { Card } from '../common/Card';
 import { TweetStyle } from '../../core/types';
 
 interface PersonalityMonitorProps {
-  traits?: Record<string, number>;
-  tweetStyle?: TweetStyle;
-  activeThemes?: string[];
+  traits: Record<string, number>; // Remove the optional
+  tweetStyle: TweetStyle; // Remove the optional
+  activeThemes: string[]; // Remove the optional
   className?: string;
 }
 
 export const PersonalityMonitor = ({
-  traits = {},
-  tweetStyle = 'shitpost',
-  activeThemes = [],
+  traits,
+  tweetStyle,
+  activeThemes,
   className = ''
 }: PersonalityMonitorProps) => {
   return (
