@@ -226,17 +226,14 @@ export class TrainingSequenceManager {
     resultingState: Partial<PersonalityState>
   ): Record<string, number> {
     const progress = { ...currentProgress };
-    const initialTraits = initialState.consciousness?.emotionalState || {};
-    const resultingTraits = resultingState.consciousness?.emotionalState || {};
+    const initialTraits = initialState.consciousness?.traits || {};
+    const resultingTraits = resultingState.consciousness?.traits || {};
   
-    // Type guard to ensure traits are Record<string, number>
-    if (typeof initialTraits === 'object' && typeof resultingTraits === 'object') {
-      Object.keys(resultingTraits).forEach(trait => {
-        const initial = (initialTraits as Record<string, number>)[trait] || 0;
-        const result = (resultingTraits as Record<string, number>)[trait] || 0;
-        progress[trait] = (progress[trait] || 0) + (result - initial);
-      });
-    }
+    Object.keys(resultingTraits).forEach(trait => {
+      const initial = initialTraits[trait] || 0;
+      const result = resultingTraits[trait] || 0;
+      progress[trait] = (progress[trait] || 0) + (result - initial);
+    });
   
     return progress;
   }

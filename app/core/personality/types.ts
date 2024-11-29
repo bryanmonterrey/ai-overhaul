@@ -35,6 +35,7 @@ export interface PersonalityState {
     longTermMemory: string[];
     attentionFocus: string[];
     activeContexts: Set<string>;
+    traits?: Record<string, number>; // Add this to properly type the traits
   };
   emotionalProfile: {
     baseState: EmotionalState;

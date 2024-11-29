@@ -6,6 +6,7 @@ import { PersonalitySystem } from '../PersonalitySystem';
 import { EmotionalSystem } from '../EmotionalSystem';
 import { MemorySystem } from '../MemorySystem';
 import type { TrainingPattern, TrainingOutcome, TrainingConfig } from './types';
+import { EmotionalState } from '../types';
 
 export class TrainingPatternManager {
   private patterns: Map<string, TrainingPattern> = new Map();
