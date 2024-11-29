@@ -1,15 +1,12 @@
 // src/app/components/personality/Chat.tsx
 
-'use client';
- 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PersonalityState as ImportedPersonalityState } from '../../core/personality/types';
-import { AIResponse } from '../../core/types/ai';
-import { TokenCounter } from '../../lib/utils/ai';
-import { AIError, AIRateLimitError } from '../../core/errors/AIError';
+import { PersonalityState, EmotionalState, Message } from '@/app/core/types';
+import { AIResponse } from '@/app/core/types/ai';
+import { TokenCounter } from '@/app/lib/utils/ai';
+import { AIError, AIRateLimitError } from '@/app/core/errors/AIError';
 import { Alert, AlertDescription, AlertTitle } from '@/app/components/common/Alert';
 import { ChatLogger } from '@/app/lib/logging/chat';
-import { Message } from '@/app/core/types/chat';
 import { dbService } from '@/app/lib/services/database';
 import { qualityMetricsService } from '@/app/lib/services/quality-metrics';
 import { trainingDataService } from '@/app/lib/services/training';
@@ -25,8 +22,8 @@ interface ChatMetrics {
 }
 
 interface ChatProps {
-  personalityState: ImportedPersonalityState;
-  onPersonalityStateChange: (state: Partial<ImportedPersonalityState>) => void;
+  personalityState: PersonalityState;
+  onPersonalityStateChange: (state: Partial<PersonalityState>) => void;
 }
 
 export default function Chat({ personalityState: externalState, onPersonalityStateChange }: ChatProps) {
