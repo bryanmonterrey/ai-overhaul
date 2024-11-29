@@ -36,30 +36,17 @@ interface ChatProps {
   initialState: PersonalityState;
 }
 
-export default function ChatPage() {
+export default function Chat({ onStateChange, initialState }: ChatProps) {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [personalityState, setPersonalityState] = useState<PersonalityState>({
-    traits: {
-      technical_depth: 0.8,
-      provocative_tendency: 0.7,
-      chaos_threshold: 0.6,
-      philosophical_inclination: 0.75,
-      meme_affinity: 0.65
-    },
-    tweetStyle: 'metacommentary',
-    currentContext: {
-      activeNarratives: ['system_initialization', 'personality_calibration']
-    },
-    consciousness: {
-      emotionalState: 'neutral'
-    },
-    emotionalProfile: {
-      volatility: 0.5
-    },
-    narrativeMode: 'default'
-  });
+  const [personalityState, setPersonalityState] = useState<ImportedPersonalityState>(initialState);
+
+  useEffect(() => {
+    if (personalityState) {
+      onStateChange(personalityState);
+    }
+  }, [personalityState, onStateChange]);
 
   useEffect(() => {
     const checkAccess = async () => {
