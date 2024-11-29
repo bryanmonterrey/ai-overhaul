@@ -220,7 +220,7 @@ export default function AdminPage() {
         <PersonalityMonitor
           traits={systemState?.traits}
           tweetStyle={systemState?.tweet_style as TweetStyle}
-          activeThemes={systemState?.currentContext?.activeNarratives}
+          activeThemes={systemState?.currentContext?.activeNarratives || []} 
         />
         
         <MemoryViewer

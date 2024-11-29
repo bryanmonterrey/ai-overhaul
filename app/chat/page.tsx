@@ -11,11 +11,22 @@ import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
 import { EmotionalState, NarrativeMode } from '@/app/core/personality/types';
 import type { PersonalityState as CorePersonalityState, PersonalityState } from '@/app/core/types';
 
+interface SystemState extends PersonalityState {
+  traits: {
+    technical_depth: number;
+    provocative_tendency: number;
+    chaos_threshold: number;
+    philosophical_inclination: number;
+    meme_affinity: number;
+  };
+}
+
+
 export default function ChatPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [systemState, setSystemState] = useState<CorePersonalityState>({
+  const [systemState, setSystemState] = useState<SystemState>({
     traits: {
       technical_depth: 0.8,
       provocative_tendency: 0.7,
