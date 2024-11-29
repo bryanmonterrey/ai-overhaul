@@ -52,10 +52,20 @@ export default function AdminPage() {
       const data = await response.json();
       console.log('Received updated state:', data);
       
-      setSystemState(data);
-      
-      // Force refresh the system state to verify changes
-      await loadSystemState();
+      // Update the local state with the new data
+      setSystemState(prevState => ({
+        ...prevState,
+        narrativeMode: data.narrative_mode || prevState?.narrativeMode,
+        consciousness: {
+          ...prevState?.consciousness,
+          emotionalState: data.consciousness?.emotionalState || prevState?.consciousness?.emotionalState
+        },
+        traits: data.traits || prevState?.traits,
+        tweetStyle: data.tweet_style || prevState?.tweetStyle
+      }));
+  
+      // Log the new system state
+      console.log('Updated system state:', systemState);
     } catch (error) {
       console.error('Error updating state:', error);
     } finally {
