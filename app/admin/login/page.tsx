@@ -82,11 +82,11 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="flex h-full flex-col items-center justify-center p-4 bg-[#11111A]">
+    <div className="flex h-full flex-col items-center justify-center p-2 bg-[#11111A]">
       <div className="w-full max-w-md space-y-4">
         <h1 className="text-2xl font-bold text-center text-white">Admin Login</h1>
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-none">
             {error}
           </div>
         )}
@@ -113,7 +113,7 @@ export default function AdminLogin() {
           </div>
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-[#11111A] text-white rounded hover:bg-white/10 border border-white"
+            className="w-full px-4 py-2 bg-[#11111A] text-white rounded-none hover:bg-white/10 border border-white"
           >
             Login
           </button>
