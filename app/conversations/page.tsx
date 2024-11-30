@@ -1,5 +1,5 @@
 // app/conversations/page.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 
 interface Conversation {
@@ -10,6 +10,8 @@ interface Conversation {
 }
 
 export default function ConversationsPage() {
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+
   return (
     <div className="min-h-screen bg-black text-green-500 p-4">
       {/* Search Bar */}

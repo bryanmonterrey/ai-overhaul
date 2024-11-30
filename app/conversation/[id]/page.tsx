@@ -1,6 +1,7 @@
 // app/conversation/[id]/page.tsx
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { useState } from 'react';
 
 interface Message {
   role: 'user' | 'assistant' | 'simulator';
@@ -19,6 +20,8 @@ export default async function ConversationPage({
 }: { 
   params: { id: string } 
 }) {
+    const [conversation, setConversation] = useState<ConversationData | null>(null);
+
   return (
     <div className="min-h-screen bg-black text-green-500 p-4">
       <div className="max-w-3xl mx-auto">

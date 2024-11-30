@@ -6,9 +6,9 @@ import {
   PromptTemplate 
 } from '@/app/core/personality/training/types';
 import { TROLL_PATTERNS } from '@/app/core/personality/training/constants';
-import { PromptTemplateForm } from '@/components/admin/PromptTemplateForm';
-import { ConversationList } from '@/components/admin/ConversationList';
-import { TrollTweetTester } from '@/components/admin/TrollTweetTester';     
+import { PromptTemplateForm } from '@/app/components/admin/PromptTemplateForm';
+import { ConversationList } from '@/app/components/admin/ConversationList';
+import { TrollTweetTester } from '@/app/components/admin/TrollTweetTester';     
 
 export const PromptTraining = () => {
     const [conversations, setConversations] = useState<TrainingConversation[]>([]);
