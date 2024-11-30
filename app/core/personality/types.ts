@@ -101,3 +101,21 @@ export interface MemoryPattern {
   triggers: string[];
   associations: string[];
 } 
+
+export interface EngagementTarget {
+  id: string;
+  username: string;
+  topics: string[];
+  replyProbability: number;
+  lastInteraction?: Date;
+  relationshipLevel: 'new' | 'familiar' | 'close';
+  preferredStyle: TweetStyle;
+}
+
+export interface EngagementMetrics {
+  likes: number;
+  retweets: number;
+  replies: number;
+  impressions: number;
+  engagementRate: number;
+}
