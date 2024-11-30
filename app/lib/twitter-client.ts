@@ -1,10 +1,19 @@
 // app/lib/twitter-client.ts
 
 import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '@/app/core/twitter/types';
-const { TwitterApi } = require('twitter-api-v2');
+
+// Use dynamic import for twitter-api-v2 to avoid initialization issues
+const TwitterApi = (() => {
+  try {
+    return require('twitter-api-v2');
+  } catch (e) {
+    console.error('Failed to load twitter-api-v2:', e);
+    throw e;
+  }
+})();
 
 export class TwitterApiClient implements TwitterClient {
-  private client: any; // Using any since we're using require for TwitterApi
+  private client: any;
 
   constructor(private credentials: {
     apiKey: string;
@@ -12,12 +21,17 @@ export class TwitterApiClient implements TwitterClient {
     accessToken: string;
     accessSecret: string;
   }) {
-    this.client = new TwitterApi({
-      appKey: credentials.apiKey,
-      appSecret: credentials.apiSecret,
-      accessToken: credentials.accessToken,
-      accessSecret: credentials.accessSecret,
-    });
+    try {
+      this.client = new TwitterApi.TwitterApi({
+        appKey: credentials.apiKey,
+        appSecret: credentials.apiSecret,
+        accessToken: credentials.accessToken,
+        accessSecret: credentials.accessSecret,
+      });
+    } catch (e) {
+      console.error('Failed to initialize Twitter client:', e);
+      throw e;
+    }
   }
 
   async tweet(content: string): Promise<TwitterResponse> {
@@ -112,17 +126,25 @@ export class TwitterApiClient implements TwitterClient {
   }
 }
 
-// Singleton instance
+// Singleton instance with better error handling
 let twitterClientInstance: TwitterApiClient | null = null;
 
 export function getTwitterClient(): TwitterApiClient {
   if (!twitterClientInstance) {
-    twitterClientInstance = new TwitterApiClient({
+    const credentials = {
       apiKey: process.env.TWITTER_API_KEY || '',
       apiSecret: process.env.TWITTER_API_SECRET || '',
       accessToken: process.env.TWITTER_ACCESS_TOKEN || '',
-      accessSecret: process.env.TWITTER_ACCESS_SECRET || '',
-    });
+      accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET || '',
+    };
+
+    // Validate credentials before creating instance
+    if (!credentials.apiKey || !credentials.apiSecret || 
+        !credentials.accessToken || !credentials.accessSecret) {
+      throw new Error('Missing Twitter API credentials');
+    }
+
+    twitterClientInstance = new TwitterApiClient(credentials);
   }
   return twitterClientInstance;
 }
