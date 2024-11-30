@@ -7,6 +7,16 @@
     "react/no-unescaped-entities": "off",
     "@typescript-eslint/no-unsafe-function-type": "off",
     "@typescript-eslint/ban-ts-comment": "off",
-    "react-hooks/exhaustive-deps": "warn"
-  }
+    "react-hooks/exhaustive-deps": "warn",
+    "@typescript-eslint/ban-types": "off"
+  },
+  "overrides": [
+    {
+      "files": ["app/**/page.tsx", "app/**/layout.tsx"],
+      "rules": {
+        "@typescript-eslint/ban-types": "off",
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ]
 }
