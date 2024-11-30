@@ -5,6 +5,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { WalletAuthManager } from '@/app/lib/auth/wallet-auth';
 
 // Dynamically import WalletMultiButton with no SSR
 const WalletMultiButtonDynamic = dynamic(
@@ -18,10 +19,38 @@ export function WalletConnection() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const walletAuthManager = new WalletAuthManager();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (publicKey && connected && !connecting) {
+      handleWalletAuth();
+    }
+  }, [publicKey, connected, connecting]);
+
+  const handleWalletAuth = async () => {
+    if (!publicKey) return;
+
+    try {
+      setAuthError(null);
+      const result = await walletAuthManager.authenticateWallet(publicKey.toString());
+      
+      if (!result.success) {
+        setAuthError(result.error || 'Authentication failed');
+        return;
+      }
+
+      // If authentication is successful, proceed with token validation
+      await handleValidateTokens();
+    } catch (error: any) {
+      console.error('Wallet auth error:', error);
+      setAuthError(error.message || 'Authentication failed');
+    }
+  };
 
   useEffect(() => {
     if (mounted) {
