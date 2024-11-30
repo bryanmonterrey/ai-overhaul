@@ -38,7 +38,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-14">
           <div className="flex items-center space-x-8">
             <Link href="/" className="font-ia text-[#DDDDDD] text-base">
-              GOATSE SINGULARITY AI
+              GOATSE SINGULARITY
             </Link>
              
             <nav className="hidden md:flex space-x-6">
