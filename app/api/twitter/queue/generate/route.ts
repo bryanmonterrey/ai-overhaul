@@ -5,12 +5,9 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase.types';
 import { TwitterManager } from '@/app/core/twitter/twitter-manager';
-import { getPersonalitySystem } from '@/app/lib/services/ai';
-import { getTwitterClient } from '@/app/lib/twitter-client';
-
-const twitterClient = getTwitterClient();
-const personalitySystem = getPersonalitySystem();
-const twitterManager = new TwitterManager(twitterClient, personalitySystem);
+import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
+import { TwitterApiClient } from '@/app/lib/twitter-client';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +17,16 @@ export async function POST(req: NextRequest) {
     if (!session.data.session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const twitterClient = new TwitterApiClient({
+      apiKey: process.env.TWITTER_API_KEY!,
+      apiSecret: process.env.TWITTER_API_SECRET!,
+      accessToken: process.env.TWITTER_ACCESS_TOKEN!,
+      accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET!,
+    });
+
+    const personalitySystem = new PersonalitySystem(DEFAULT_PERSONALITY);
+    const twitterManager = new TwitterManager(twitterClient, personalitySystem);
 
     await twitterManager.generateTweetBatch();
     return NextResponse.json({ success: true });
