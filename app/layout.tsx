@@ -1,6 +1,6 @@
-// app/layout.tsx
-import React from "react";
-import type { Metadata } from "next";
+'use client';
+
+import React, { useState, useEffect } from "react";
 import Header from "./components/layout/Header";
 import Sidebar from "./components/layout/Sidebar";
 import Footer from "./components/layout/Footer";
@@ -9,16 +9,28 @@ import { ClientProviders } from './providers/ClientProviders';
 // Import global styles
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "GOATSESINGULARITY.AI",
-  description: "Advanced AI Personality System",
-};
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+
+  useEffect(() => {
+    const checkWidth = () => {
+      setIsSidebarVisible(window.innerWidth >= 800);
+    };
+    
+    // Initial check
+    checkWidth();
+    
+    // Add event listener for resize
+    window.addEventListener('resize', checkWidth);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head />
@@ -30,7 +42,9 @@ export default function RootLayout({
             <Header />
             <div className="flex flex-1 pt-16 pb-12">
               <Sidebar />
-              <main className="flex-1 ml-64 p-6">
+              <main className={`flex-1 p-6 transition-all duration-300 ${
+                isSidebarVisible ? 'ml-64' : 'ml-0'
+              }`}>
                 {children}
               </main>
             </div>
