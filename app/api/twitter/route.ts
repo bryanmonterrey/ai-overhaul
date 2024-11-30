@@ -1,5 +1,3 @@
-// src/app/interfaces/twitter/api/route.ts
-
 import { NextResponse } from 'next/server';
 import { TwitterManager } from '@/app/lib/twitter';
 import { IntegrationManager } from '@/app/core/personality/IntegrationManager';
@@ -12,10 +10,11 @@ import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
 import { MemorySystem } from '@/app/core/personality/MemorySystem';
 import { LLMManager } from '@/app/core/llm/model_manager';
+import { TwitterApiClient } from '@/app/lib/twitter-client';
 
 const twitterInputSchema = z.object({
   type: z.string(),
-  content: z.string().min(1).max(280), // Twitter's character limit
+  content: z.string().min(1).max(280),
   context: z.object({
     environmentalFactors: z.object({
       timeOfDay: z.string().optional(),
@@ -32,6 +31,16 @@ const twitterInputSchema = z.object({
   }).optional()
 });
 
+// Initialize Twitter manager with credentials
+const twitterClient = new TwitterApiClient({
+  apiKey: process.env.TWITTER_API_KEY!,
+  apiSecret: process.env.TWITTER_API_SECRET!,
+  accessToken: process.env.TWITTER_ACCESS_TOKEN!,
+  accessSecret: process.env.TWITTER_ACCESS_SECRET!
+});
+
+const twitterManager = new TwitterManager();
+
 const config = configManager.getAll();
 const personalitySystem = new PersonalitySystem({
   baseTemperature: config.personality.baseTemperature,
@@ -47,6 +56,7 @@ const personalitySystem = new PersonalitySystem({
     analytical: config.personality.responsePatterns?.analytical ?? []
   }
 });
+
 const emotionalSystem = new EmotionalSystem();
 const memorySystem = new MemorySystem();
 const llmManager = new LLMManager();
@@ -57,7 +67,6 @@ const integrationManager = new IntegrationManager(
   memorySystem,
   llmManager
 );
-const twitterManager = new TwitterManager();
 
 export async function POST(request: Request) {
   try {
@@ -76,7 +85,7 @@ export async function POST(request: Request) {
                  new Date().getHours() >= 5 ? 'morning' : 'night',
       platformActivity: twitterEnvironment.platformActivity || 0,
       socialContext: twitterEnvironment.socialContext || [],
-      marketConditions: twitterEnvironment.marketConditions || {
+      marketConditions: {
         sentiment: 0.5,
         volatility: 0.5,
         momentum: 0.5,
@@ -86,7 +95,7 @@ export async function POST(request: Request) {
 
     // Process through integration manager with retry
     const result = await withRetry(async () => {
-      return integrationManager.processInput(
+      return await integrationManager.processInput(
         validatedInput.content,
         'twitter' as Platform
       );
@@ -94,7 +103,7 @@ export async function POST(request: Request) {
 
     // Post to Twitter with retry
     const tweet = await withRetry(async () => {
-      return twitterManager.postTweet(result.response);
+      return await twitterManager.postTweet(result.response);
     });
 
     return NextResponse.json({ 
@@ -103,17 +112,16 @@ export async function POST(request: Request) {
       state: result.state,
       emotion: result.emotion
     });
-  } catch (error) {
-    const handledError = handleAIError(error);
-    console.error('Twitter processing error:', handledError);
-    
+  } catch (error: any) {
+    console.error('Twitter API Error:', error);
     return NextResponse.json(
       { 
-        error: handledError.message,
-        code: handledError.code,
-        retryable: handledError.retryable
+        error: true,
+        message: error.message || 'Twitter API Error',
+        code: error.code || 500,
+        retryable: error.retryable || false
       },
-      { status: handledError.statusCode || 500 }
+      { status: error.statusCode || 500 }
     );
   }
 }
@@ -121,21 +129,24 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const status = await withRetry(async () => {
-      return await twitterManager.getStatus();
+      const environmentalFactors = await twitterManager.getEnvironmentalFactors();
+      return {
+        status: 'ok',
+        environmentalFactors
+      };
     });
     
     return NextResponse.json(status);
-  } catch (error) {
-    const handledError = handleAIError(error);
-    console.error('Error getting Twitter status:', handledError);
-    
+  } catch (error: any) {
+    console.error('Twitter Status Error:', error);
     return NextResponse.json(
       { 
-        error: handledError.message,
-        code: handledError.code,
-        retryable: handledError.retryable
+        error: true,
+        message: error.message || 'Failed to get Twitter status',
+        code: error.code || 500,
+        retryable: error.retryable || false
       },
-      { status: handledError.statusCode || 500 }
+      { status: error.statusCode || 500 }
     );
   }
 }
