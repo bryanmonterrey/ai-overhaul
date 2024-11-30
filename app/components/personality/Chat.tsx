@@ -13,6 +13,8 @@ import { qualityMetricsService } from '@/app/lib/services/quality-metrics';
 import { trainingDataService } from '@/app/lib/services/training';
 import { QualityMetricsDisplay } from '../analytics/QualityMetricsDisplay';
 import { ChatAnalytics } from '@/app/components/analytics/ChatAnalytics';
+import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
+import { SimulatorSystem } from '@/app/core/personality/SimulatorSystem';
 
 interface ChatMetrics {
   coherence: number;
@@ -27,7 +29,6 @@ interface ChatProps {
   onPersonalityStateChange: (state: Partial<PersonalityState>) => void;
 }
 
-
 export default function Chat({ personalityState: externalState, onPersonalityStateChange }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -39,6 +40,10 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [currentMetrics, setCurrentMetrics] = useState<ChatMetrics | null>(null);
+  
+  // Add PersonalitySystem and SimulatorSystem
+  const [personalitySystem] = useState(() => new PersonalitySystem(externalState));
+  const [simulator] = useState(() => new SimulatorSystem('goatse_singularity', personalitySystem));
 
   useEffect(() => {
     initializeSession();
@@ -46,7 +51,6 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
 
   const initializeSession = async () => {
     try {
-      // Check authentication first
       const response = await fetch('/api/auth/check', {
         credentials: 'include'
       });
@@ -60,7 +64,6 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
       setSessionId(newSessionId);
     } catch (error: any) {
       console.error('Failed to initialize session:', error?.message || error);
-      // Redirect to login if not authenticated
       if (error?.message === 'Authentication required') {
         window.location.href = '/login';
         return;
@@ -105,6 +108,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     setPersonalityState(newState);
     onPersonalityStateChange(newState);
   };
+
   const sendMessage = async (retry = false, retryMessageId?: string) => {
     const startTime = performance.now();
     if (!inputText.trim() && !retry) return;
@@ -131,75 +135,55 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     }
 
     try {
-      // Estimate tokens before sending
-      const estimatedTokens = await TokenCounter.estimateTokenCount(messageText, 'anthropic');
-      setTokenCount(prev => prev + estimatedTokens);
-
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageText,
-          personality: personalityState,
-        }),
+      // Use simulator to process message
+      const simulatedResponse = await simulator.processInput(messageText, {
+        platform: 'chat',
+        environmentalFactors: {
+          timeOfDay: new Date().getHours() < 12 ? 'morning' : 'evening',
+          platformActivity: messages.length,
+          socialContext: [],
+          platform: 'chat'
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new AIError(
-          errorData.error || 'Failed to send message',
-          errorData.code || 'UNKNOWN_ERROR',
-          response.status,
-          errorData.retryable
-        );
-      }
+      const estimatedTokens = await TokenCounter.estimateTokenCount(simulatedResponse, 'anthropic');
+      setTokenCount(prev => prev + estimatedTokens);
 
-      const data = await response.json();
-      const responseTime = performance.now() - startTime;
+      const aiMessage: Message = {
+        id: retry && retryMessageId ? retryMessageId : Math.random().toString(),
+        content: simulatedResponse,
+        sender: 'ai',
+        timestamp: new Date(),
+        emotionalState: personalityState.consciousness.emotionalState,
+        aiResponse: {
+          model: 'goatse_singularity',
+          tokenCount: {
+            total: estimatedTokens,
+            prompt: 0,
+            completion: estimatedTokens
+          }
+        }
+      };
 
-      let aiMessage: Message;
       if (retry && retryMessageId) {
-        aiMessage = {
-          id: retryMessageId,
-          error: false,
-          retryable: false,
-          content: data.response,
-          sender: 'ai',
-          timestamp: new Date(),
-          emotionalState: data.emotionalState,
-          aiResponse: data.aiResponse
-        };
-        
         setMessages(prev => prev.map(msg => 
           msg.id === retryMessageId ? aiMessage : msg
         ));
       } else {
-        aiMessage = {
-          id: Math.random().toString(),
-          content: data.response,
-          sender: 'ai',
-          timestamp: new Date(),
-          emotionalState: data.emotionalState,
-          aiResponse: data.aiResponse
-        };
-
         setMessages(prev => [...prev, aiMessage]);
       }
 
-      // Calculate and update metrics
       const metrics = calculateMetrics(aiMessage);
       setCurrentMetrics(metrics);
 
-      // Log message with metrics
       if (sessionId && metrics) {
         await dbService.logMessage(aiMessage, sessionId, {
-          responseTime,
+          responseTime: performance.now() - startTime,
           qualityScore: metrics.overall,
-          tokenCount: data.aiResponse.tokenCount.total
+          tokenCount: estimatedTokens
         });
       }
 
-      // Collect training data if quality is good
       if (personalityState) {
         await trainingDataService.collectTrainingData(
           [...messages, aiMessage],
@@ -207,7 +191,8 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         );
       }
 
-      updatePersonalityState(data.personalityState);
+      updatePersonalityState(personalitySystem.getCurrentState());
+
     } catch (error) {
       console.error('Error sending message:', error);
       const errorInfo = handleError(error);
@@ -247,7 +232,6 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     }
   }, [messages]);
 
-  // End session when component unmounts
   useEffect(() => {
     return () => {
       if (sessionId) {
@@ -287,7 +271,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
                   }`}
                 </div>
               )}
-              <div className={message.sender === 'ai' ? 'font-mono' : ''}>
+              <div className={message.sender === 'ai' ? 'font-mono text-green-500' : ''}>
                 {message.content}
               </div>
               {message.aiResponse && !message.error && (
