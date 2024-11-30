@@ -5,9 +5,6 @@ import { cookies } from 'next/headers';
 import { TokenChecker } from '@/app/lib/blockchain/token-checker';
 import { Database } from '@/supabase/functions/supabase.types';
 
-export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
-
 export async function POST(req: Request) {
  try {
    // Parse request body
