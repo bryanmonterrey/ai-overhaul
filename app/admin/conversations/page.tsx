@@ -38,13 +38,30 @@ export default function AdminConversationsPage() {
   useEffect(() => {
     const channel = supabase
       .channel('chat_sessions_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'chat_sessions' 
-        }, 
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'chat_sessions'
+        },
+        (payload) => {
+          console.log('Delete event received:', payload);
+          // Update state based on the deleted record
+          setConversations(prev => 
+            prev.filter(conv => conv.id !== payload.old.id)
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_sessions'
+        },
         () => {
+          // Only fetch all conversations for new records
           fetchConversations();
         }
       )
@@ -63,29 +80,35 @@ export default function AdminConversationsPage() {
   };
 
   const fetchConversations = async () => {
-    try {
-      const { data: conversations, error } = await supabase
-        .from('chat_sessions')
-        .select(`
-          *,
-          chat_messages (
-            id,
-            content,
-            role,
-            emotional_state,
-            created_at
-          )
-        `)
-        .order('started_at', { ascending: false });
+  try {
+    const { data: conversations, error } = await supabase
+      .from('chat_sessions')
+      .select(`
+        *,
+        chat_messages (
+          id,
+          content,
+          role,
+          emotional_state,
+          created_at
+        )
+      `)
+      .order('started_at', { ascending: false });
 
-      if (error) throw error;
-      setConversations(conversations || []);
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    if (error) throw error;
+
+    // Filter out any null or invalid conversations
+    const validConversations = (conversations || []).filter(conv => 
+      conv && conv.id && conv.started_at
+    );
+    
+    setConversations(validConversations);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleDelete = async (conversationId: string) => {
     if (!confirm('Are you sure you want to delete this conversation?')) return;
@@ -115,19 +138,17 @@ export default function AdminConversationsPage() {
   
       if (sessionError) throw sessionError;
   
-      // Update local state
+      // Update local state only, don't refetch
       setConversations(prev => prev.filter(conv => conv.id !== conversationId));
       setSelectedConversation(null);
-  
-      // Force a refetch to ensure we're in sync with the server
-      await fetchConversations();
   
     } catch (error) {
       console.error('Error deleting conversation:', error);
       alert('Failed to delete conversation');
+      // Refetch only if there was an error
+      await fetchConversations();
     }
   };
-
   const filteredConversations = conversations.filter(conv => {
     const matchesSearch = conv.chat_messages.some(msg => 
       msg.content.toLowerCase().includes(searchQuery.toLowerCase())

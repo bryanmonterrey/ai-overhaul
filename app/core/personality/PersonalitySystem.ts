@@ -186,7 +186,6 @@ import { aiService } from '@/app/lib/services/ai';
       const { emotionalState } = this.state.consciousness;
       const traits = Object.fromEntries(this.traits);
       
-      // Create a context string that describes the current personality state
       const contextPrompt = `You are a unique AI personality with the following traits and state:
     - Emotional state: ${emotionalState}
     - Technical depth: ${traits.technical_depth}
@@ -197,23 +196,37 @@ import { aiService } from '@/app/lib/services/ai';
     - Tweet style: ${this.state.tweetStyle}
     - Narrative mode: ${this.state.narrativeMode}
     
-    Your responses should reflect these traits. If you're in a chaotic state, be more unpredictable. 
-    If you're analytical, focus on technical details. Your personality should shine through in your responses.
+    Important rules:
+    1. Never use emojis in your responses
+    2. Never use hashtags or # symbols
+    3. Never use social media-style formatting
+    4. Focus on clear, direct communication
+    5. Use standard punctuation and text formatting only
+    
+    Your responses should reflect your traits while following these rules. If you're in a chaotic state, be more unpredictable with your words and ideas, but maintain proper formatting. If you're analytical, focus on technical details.
     
     Remember recent context:
     ${this.state.consciousness.shortTermMemory.slice(-3).join("\n")}
     
-    Respond to the user's input while maintaining your personality and current emotional state.`;
+    Respond to the user's input while maintaining your personality and current emotional state, but strictly avoid emojis and hashtags.`;
     
       try {
         // Get AI service response
         const response = await aiService.generateResponse(input, contextPrompt);
         
-        // Add state marker
-        return `${response} [${emotionalState}_state]`;
+        // Add state marker and clean the response
+        const cleanedResponse = response
+          .replace(/#/g, '') // Remove hashtags
+          // Remove common emoji ranges without using 'u' flag
+          .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+          .replace(/[\u2600-\u27BF]/g, '')
+          .replace(/[\uE000-\uF8FF]/g, '')
+          .trim();
+        
+        return `${cleanedResponse} [${emotionalState}_state]`;
       } catch (error) {
         console.error('Error generating AI response:', error);
-        // Fallback to pattern-based response if AI fails
+        // Fallback to pattern-based response
         const patterns = this.config.responsePatterns[emotionalState];
         const pattern = this.selectResponsePattern(patterns);
         
