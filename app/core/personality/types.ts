@@ -60,6 +60,7 @@ export interface Context {
   };
   activeNarratives: string[];
   style?: TweetStyle;  
+  additionalContext?: string;
 }
 
 export interface EmotionalResponse {

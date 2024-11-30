@@ -10,11 +10,15 @@ import {
 } from '@/app/core/types/ai';
 import { TokenCounter, RateLimiter, CacheManager } from '@/app/lib/utils/ai';
 
+console.log('API KEY:', process.env.ANTHROPIC_API_KEY?.slice(0, 8) + '...');
+
 export class AIService {
   private static instance: AIService;
   private anthropic: Anthropic;
   private openai: OpenAI;
   private provider: 'claude' | 'openai';
+
+  
 
   private constructor() {
     // Initialize AI clients
