@@ -191,106 +191,101 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         setMessages(prev => [...prev, newMessage]);
         setInputText('');
         
-        if (sessionId) {
-          await dbService.logMessage(newMessage, sessionId, {});
-        }
+        // Use currentSessionId instead of sessionId
+        await dbService.logMessage(newMessage, currentSessionId, {});
       }
 
-      try {
-        // Use simulator to process message
-        const simulatedResponse = await simulator.processInput(messageText, {
-          platform: 'chat',
-          environmentalFactors: {
-            timeOfDay: new Date().getHours() < 12 ? 'morning' : 'evening',
-            platformActivity: messages.length,
-            socialContext: [],
-            platform: 'chat'
-          }
-        });
+      // Use simulator to process message
+      const simulatedResponse = await simulator.processInput(messageText, {
+        platform: 'chat',
+        environmentalFactors: {
+          timeOfDay: new Date().getHours() < 12 ? 'morning' : 'evening',
+          platformActivity: messages.length,
+          socialContext: [],
+          platform: 'chat'
+        }
+      });
 
-        const estimatedTokens = await TokenCounter.estimateTokenCount(simulatedResponse, 'anthropic');
-        setTokenCount(prev => prev + estimatedTokens);
+      const estimatedTokens = await TokenCounter.estimateTokenCount(simulatedResponse, 'anthropic');
+      setTokenCount(prev => prev + estimatedTokens);
 
-        const aiMessage: Message = {
-          id: retry && retryMessageId ? retryMessageId : `ai_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      const aiMessage: Message = {
+        id: retry && retryMessageId ? retryMessageId : `ai_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        content: simulatedResponse,
+        sender: 'ai',
+        timestamp: new Date(),
+        emotionalState: personalityState.consciousness.emotionalState,
+        aiResponse: {
+          model: 'goatse_singularity',
           content: simulatedResponse,
-          sender: 'ai',
-          timestamp: new Date(),
-          emotionalState: personalityState.consciousness.emotionalState,
-          aiResponse: {
-            model: 'goatse_singularity',
-            content: simulatedResponse,
-            provider: 'anthropic',
-            cached: false,
-            duration: 0,
-            cost: 0,
-            tokenCount: {
-              total: estimatedTokens,
-              prompt: 0,
-              completion: estimatedTokens
-            }
+          provider: 'anthropic',
+          cached: false,
+          duration: 0,
+          cost: 0,
+          tokenCount: {
+            total: estimatedTokens,
+            prompt: 0,
+            completion: estimatedTokens
           }
-        };
-
-        // Calculate metrics before logging
-        const metrics = calculateMetrics(aiMessage);
-        setCurrentMetrics(metrics);
-
-        // Update UI first
-        if (retry && retryMessageId) {
-          setMessages(prev => prev.map(msg => 
-            msg.id === retryMessageId ? aiMessage : msg
-          ));
-        } else {
-          setMessages(prev => [...prev, aiMessage]);
         }
+      };
 
-        // Log message only once with all metrics
-        if (sessionId) {
-          await dbService.logMessage(aiMessage, sessionId, {
-            responseTime: performance.now() - startTime,
-            qualityScore: metrics?.overall || 0,
-            tokenCount: estimatedTokens
-          });
-        }
+      // Calculate metrics before logging
+      const metrics = calculateMetrics(aiMessage);
+      setCurrentMetrics(metrics);
 
-        if (personalityState) {
-          await trainingDataService.collectTrainingData(
-            [...messages, aiMessage],
-            personalityState
-          );
-        }
+      // Update UI first
+      if (retry && retryMessageId) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === retryMessageId ? aiMessage : msg
+        ));
+      } else {
+        setMessages(prev => [...prev, aiMessage]);
+      }
 
-        updatePersonalityState(mapSimulatorToCore(personalitySystem.getCurrentState()));
+      // Log message only once with all metrics using currentSessionId
+      await dbService.logMessage(aiMessage, currentSessionId, {
+        responseTime: performance.now() - startTime,
+        qualityScore: metrics?.overall || 0,
+        tokenCount: estimatedTokens
+      });
 
-      } catch (error) {
-        console.error('Error sending message:', error);
-        const errorInfo = handleError(error);
-        setError(errorInfo);
-        
-        const errorMessage: Message = {
-          id: Math.random().toString(),
-          content: errorInfo.message,
-          sender: 'ai',
-          timestamp: new Date(),
-          emotionalState: 'error',
-          error: true,
-          retryable: errorInfo.retryable
-        };
+      if (personalityState) {
+        await trainingDataService.collectTrainingData(
+          [...messages, aiMessage],
+          personalityState
+        );
+      }
 
-        setMessages(prev => [...prev, errorMessage]);
+      updatePersonalityState(mapSimulatorToCore(personalitySystem.getCurrentState()));
 
-        if (sessionId) {
-          await dbService.logMessage(errorMessage, sessionId, {
-            responseTime: performance.now() - startTime,
-            qualityScore: 0
-          });
-        }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorInfo = handleError(error);
+      setError(errorInfo);
+      
+      const errorMessage: Message = {
+        id: Math.random().toString(),
+        content: errorInfo.message,
+        sender: 'ai',
+        timestamp: new Date(),
+        emotionalState: 'error',
+        error: true,
+        retryable: errorInfo.retryable
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+
+      if (sessionId) {
+        await dbService.logMessage(errorMessage, sessionId, {
+          responseTime: performance.now() - startTime,
+          qualityScore: 0
+        });
       }
     } finally {
       setIsLoading(false);
     }
-  };
+};
 
   const retryMessage = (messageId: string) => {
     sendMessage(true, messageId);
