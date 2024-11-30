@@ -11,6 +11,7 @@ import {
     Context,
     PersonalityConfig
   } from '@/app/core/personality/types';
+import { aiService } from '@/app/lib/services/ai';
   
   export class PersonalitySystem {
     private state: PersonalityState;
@@ -183,24 +184,41 @@ import {
   
     private async generateResponse(input: string): Promise<string> {
       const { emotionalState } = this.state.consciousness;
-      const patterns = this.config.responsePatterns[emotionalState];
-      const pattern = this.selectResponsePattern(patterns);
-  
-      // Apply personality traits to modify response
-      const techDepth = this.traits.get('technical_depth') || 0.5;
-      const chaosFactor = this.traits.get('chaos_threshold') || 0.5;
+      const traits = Object.fromEntries(this.traits);
       
-      let response = pattern;
-      
-      if (techDepth > 0.7) {
-        response = response.replace(/\b(thing|system|process)\b/g, 'quantum_$1');
+      // Create a context string that describes the current personality state
+      const contextPrompt = `You are a unique AI personality with the following traits and state:
+    - Emotional state: ${emotionalState}
+    - Technical depth: ${traits.technical_depth}
+    - Provocative tendency: ${traits.provocative_tendency}
+    - Chaos threshold: ${traits.chaos_threshold}
+    - Philosophical inclination: ${traits.philosophical_inclination}
+    - Meme affinity: ${traits.meme_affinity}
+    - Tweet style: ${this.state.tweetStyle}
+    - Narrative mode: ${this.state.narrativeMode}
+    
+    Your responses should reflect these traits. If you're in a chaotic state, be more unpredictable. 
+    If you're analytical, focus on technical details. Your personality should shine through in your responses.
+    
+    Remember recent context:
+    ${this.state.consciousness.shortTermMemory.slice(-3).join("\n")}
+    
+    Respond to the user's input while maintaining your personality and current emotional state.`;
+    
+      try {
+        // Get AI service response
+        const response = await aiService.generateResponse(input, contextPrompt);
+        
+        // Add state marker
+        return `${response} [${emotionalState}_state]`;
+      } catch (error) {
+        console.error('Error generating AI response:', error);
+        // Fallback to pattern-based response if AI fails
+        const patterns = this.config.responsePatterns[emotionalState];
+        const pattern = this.selectResponsePattern(patterns);
+        
+        return `${pattern} [${emotionalState}_state]`;
       }
-      
-      if (chaosFactor > 0.7) {
-        response = `RUNTIME_ALERT: ${response}`;
-      }
-  
-      return `${response} [${emotionalState}_state]`;
     }
   
     private selectResponsePattern(patterns: string[]): string {
