@@ -25,14 +25,17 @@ interface ChatMessage {
     };
   }
 
+  type SearchParams = { [key: string]: string | string[] | undefined };
+
   interface PageProps {
-    params: {
-      id: string;
-    };
-    searchParams?: { [key: string]: string | string[] | undefined };
+    params: { id: string };
+    searchParams?: SearchParams;
   }
   
-  const ConversationPage: React.FC<PageProps> = ({ params }) => {
+  const ConversationPage: React.FC<{
+    params: { id: string };
+    searchParams?: SearchParams;
+  }> = ({ params, searchParams }) => {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [conversation, setConversation] = useState<ConversationData | null>(null);
