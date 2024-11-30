@@ -82,19 +82,39 @@ export default function ChatPage() {
           .single();
 
         if (settings?.value) {
-          // Check user's token holdings
-          const { data: tokenHoldings } = await supabase
-            .from('token_holders')
-            .select('*')
-            .eq('user_id', session.user.id)
+          // Create token checker instance
+          const tokenChecker = new TokenChecker();
+          
+          // Get user's wallet address from Supabase
+          const { data: userData } = await supabase
+            .from('users')
+            .select('wallet_address')
+            .eq('id', session.user.id)
             .single();
 
-          const requiredValue = settings.value.required_token_value || 0;
-
-          if (!tokenHoldings || tokenHoldings.dollar_value < requiredValue) {
+          if (!userData?.wallet_address) {
             router.push('/insufficient-tokens');
             return;
           }
+
+          // Check actual token holdings on-chain
+          const { isEligible, value } = await tokenChecker.checkEligibility(userData.wallet_address);
+
+          if (!isEligible) {
+            router.push('/insufficient-tokens');
+            return;
+          }
+
+          // Update token holdings in database
+          await supabase
+            .from('token_holders')
+            .upsert({
+              user_id: session.user.id,
+              dollar_value: value,
+              last_checked: new Date().toISOString()
+            }, {
+              onConflict: 'user_id'
+            });
         }
 
         setIsLoading(false);
