@@ -39,7 +39,7 @@ const twitterClient = new TwitterApiClient({
   accessSecret: process.env.TWITTER_ACCESS_SECRET!
 });
 
-const twitterManager = new TwitterManager();
+const twitterManager = new TwitterManager(twitterClient); 
 
 const config = configManager.getAll();
 const personalitySystem = new PersonalitySystem({
