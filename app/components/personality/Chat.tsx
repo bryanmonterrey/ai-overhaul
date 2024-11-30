@@ -1,7 +1,7 @@
 // src/app/components/personality/Chat.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { PersonalityState } from '@/app/core/types';
+import { MemoryType, PersonalityState, Platform } from '@/app/core/types';
 import { Message } from '@/app/core/types/chat';
 import { AIResponse } from '@/app/core/types/ai';
 import { TokenCounter } from '@/app/lib/utils/ai';
@@ -74,6 +74,25 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         retryable: true
       });
     }
+  };
+
+  const mapPersonalityState = (state: PersonalityState): PersonalityState => {
+    return {
+      ...state,
+      consciousness: {
+        ...state.consciousness,
+        longTermMemory: state.consciousness.longTermMemory.map(memory => ({
+          id: Math.random().toString(),
+          content: memory.content || memory.toString(),
+          type: 'interaction' as MemoryType,
+          timestamp: new Date(),
+          emotionalContext: state.consciousness.emotionalState,
+          associations: [],
+          importance: 0.5,
+          platform: 'chat' as Platform
+        }))
+      }
+    };
   };
 
   const calculateMetrics = useCallback((message: Message) => {
