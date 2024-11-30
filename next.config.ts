@@ -8,6 +8,11 @@ const nextConfig = {
     '@solana/wallet-adapter-react-ui',
     '@solana/wallet-adapter-wallets',
   ],
+  // Add environment variables
+  env: {
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  },
 }
 
 export default nextConfig;
