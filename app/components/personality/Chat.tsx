@@ -196,7 +196,25 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         );
       }
 
-      updatePersonalityState(personalitySystem.getCurrentState());
+      const mapPersonalityState = (state: PersonalityState): any => {
+        return {
+          ...state,
+          consciousness: {
+            ...state.consciousness,
+            longTermMemory: state.consciousness.longTermMemory.map(memory => ({
+              id: typeof memory === 'string' ? Math.random().toString() : memory.id,
+              content: typeof memory === 'string' ? memory : memory.content,
+              type: 'interaction',
+              timestamp: new Date(),
+              associations: [],
+              importance: 0.5
+            }))
+          }
+        };
+      };
+      
+
+      updatePersonalityState(mapPersonalityState(personalitySystem.getCurrentState()));
 
     } catch (error) {
       console.error('Error sending message:', error);
