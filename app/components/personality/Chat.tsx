@@ -212,6 +212,14 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         }
       };
 
+      if (sessionId) {
+        await dbService.logMessage(aiMessage, sessionId, {
+          responseTime: performance.now() - startTime,
+          tokenCount: estimatedTokens,
+          qualityScore: 0 // Default score
+        });
+      }
+
       if (retry && retryMessageId) {
         setMessages(prev => prev.map(msg => 
           msg.id === retryMessageId ? aiMessage : msg

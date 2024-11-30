@@ -35,6 +35,26 @@ export default function AdminConversationsPage() {
     fetchConversations();
   }, []);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('chat_sessions_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'chat_sessions' 
+        }, 
+        () => {
+          fetchConversations();
+        }
+      )
+      .subscribe();
+  
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -69,27 +89,39 @@ export default function AdminConversationsPage() {
 
   const handleDelete = async (conversationId: string) => {
     if (!confirm('Are you sure you want to delete this conversation?')) return;
-
+  
     try {
-      // First delete all messages
+      // First delete conversation upvotes
+      const { error: upvotesError } = await supabase
+        .from('conversation_upvotes')
+        .delete()
+        .eq('conversation_id', conversationId);
+  
+      if (upvotesError) throw upvotesError;
+  
+      // Then delete all messages
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
         .eq('session_id', conversationId);
-
+  
       if (messagesError) throw messagesError;
-
+  
       // Then delete the conversation
       const { error: sessionError } = await supabase
         .from('chat_sessions')
         .delete()
         .eq('id', conversationId);
-
+  
       if (sessionError) throw sessionError;
-
+  
       // Update local state
       setConversations(prev => prev.filter(conv => conv.id !== conversationId));
       setSelectedConversation(null);
+  
+      // Force a refetch to ensure we're in sync with the server
+      await fetchConversations();
+  
     } catch (error) {
       console.error('Error deleting conversation:', error);
       alert('Failed to delete conversation');
