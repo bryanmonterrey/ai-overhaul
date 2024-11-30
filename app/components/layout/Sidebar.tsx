@@ -45,7 +45,7 @@ export default function Sidebar({ currentState }: SidebarProps) {
     <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#11111A] border-r border-[#DDDDDD] overflow-y-auto">
       <div className="p-4 space-y-4 text-xs">
 
-        <nav className="space-y-1">
+        <nav className="space-y-1 border p-3 border-[#DDDDDD]">
           <div className="text-[#DDDDDD] text-sm mb-2">NAVIGATION:</div>
           {[
             { href: '/chat', label: 'Direct Interface' },
