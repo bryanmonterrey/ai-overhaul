@@ -2,6 +2,7 @@ import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkEr
 import type { TwitterClient, TwitterData } from './types';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
+import { TweetStyle } from '../personality/types';
 
 interface QueuedTweet {
   id: string;
@@ -186,11 +187,12 @@ export class TwitterManager {
   // Engagement-related methods
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
-      const timeline = await this.client.userTimeline(target.username);
+      const timelineResponse = await this.client.userTimeline();
+      const timeline = timelineResponse.data.data; // Access the tweets array
       const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
-
+  
       for (const tweet of timeline) {
-        const tweetDate = new Date(tweet.created_at);
+        const tweetDate = new Date(tweet.created_at || '');
         if (tweetDate > lastCheck && this.shouldReplyToTweet(tweet, target)) {
           await this.generateAndSendReply(tweet, target);
         }
@@ -209,7 +211,7 @@ export class TwitterManager {
     return hasTopic && Math.random() < target.reply_probability;
   }
 
-  private async generateAndSendReply(tweet: any, target: EngagementTargetRow): Promise<void> {
+  private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
     try {
       const context = {
         platform: 'twitter' as const,
@@ -219,10 +221,10 @@ export class TwitterManager {
           socialContext: [target.relationship_level],
           platform: 'twitter'
         },
-        style: target.preferred_style,
+        style: target.preferred_style as TweetStyle, // Cast the style
         additionalContext: `Replying to @${target.username}'s tweet: ${tweet.text}`
       };
-
+  
       const reply = await this.personality.processInput(tweet.text, context);
       
       if (reply) {
@@ -232,6 +234,7 @@ export class TwitterManager {
       console.error(`Error generating reply for ${target.username}:`, error);
     }
   }
+  
 
   private getTimeOfDay(): string {
     const hour = new Date().getHours();

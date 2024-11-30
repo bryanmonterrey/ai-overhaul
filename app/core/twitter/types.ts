@@ -1,6 +1,6 @@
 export interface TwitterClient {
   tweet: (content: string) => Promise<TwitterResponse>;
-  userTimeline: () => Promise<TwitterTimelineResponse>;
+  userTimeline: () => Promise<TwitterTimelineResponse>; // Remove username parameter since it's not expected
   userMentionTimeline: () => Promise<TwitterTimelineResponse>;
 }
 

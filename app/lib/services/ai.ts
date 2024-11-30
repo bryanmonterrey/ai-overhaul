@@ -6,6 +6,12 @@ import {
     ProviderType 
 } from '@/app/core/types/ai';
 import { TokenCounter, RateLimiter, CacheManager } from '@/app/lib/utils/ai';
+import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '@/app/core/personality/types';
+
+export function getPersonalitySystem(): PersonalitySystem {
+  return new PersonalitySystem(DEFAULT_PERSONALITY);
+}
 
 export class AIService {
   private static instance: AIService;
@@ -21,6 +27,8 @@ export class AIService {
       throw error;
     }
   }
+
+  
 
   public static getInstance(): AIService {
     if (!AIService.instance) {
