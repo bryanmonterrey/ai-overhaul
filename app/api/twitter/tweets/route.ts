@@ -5,10 +5,11 @@ const twitterManager = new TwitterManager();
 
 export async function GET() {
   try {
+    // Get an array of recent tweets from your map
     const status = await twitterManager.getStatus();
-    const recentTweets = status.activity?.recentTweets || [];
+    const tweets = Array.from(twitterManager['recentTweets'].values()) || [];
     
-    return NextResponse.json(recentTweets);
+    return NextResponse.json(tweets);
   } catch (error: any) {
     console.error('Error fetching tweets:', error);
     return NextResponse.json(
