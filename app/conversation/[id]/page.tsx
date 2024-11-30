@@ -30,9 +30,17 @@ type ConversationPageProps = {
       id: string;
     };
   };
+
+  interface PageProps {
+    params: {
+      id: string;
+    };
+    searchParams?: { [key: string]: string | string[] | undefined };
+  }
   
 
-const ConversationPage = ({ params }: ConversationPageProps) => {
+
+  const ConversationPage: React.FC<PageProps> = ({ params }) => {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [conversation, setConversation] = useState<ConversationData | null>(null);
