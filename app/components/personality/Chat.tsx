@@ -1,7 +1,7 @@
 // src/app/components/personality/Chat.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { MemoryType, PersonalityState, Platform } from '@/app/core/types';
+import { MemoryType, PersonalityState, Platform, Memory } from '@/app/core/types';
 import { Message } from '@/app/core/types/chat';
 import { AIResponse } from '@/app/core/types/ai';
 import { TokenCounter } from '@/app/lib/utils/ai';
@@ -16,6 +16,7 @@ import { ChatAnalytics } from '@/app/components/analytics/ChatAnalytics';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { SimulatorSystem } from '@/app/core/personality/SimulatorSystem';
 import { defaultConfig } from '@/app/lib/config/default';
+
 
 interface ChatMetrics {
   coherence: number;
@@ -76,24 +77,44 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     }
   };
 
-  const mapPersonalityState = (state: PersonalityState): PersonalityState => {
+  const mapSimulatorToCore = (state: SimulatorPersonalityState): CorePersonalityState => {
     return {
       ...state,
       consciousness: {
         ...state.consciousness,
-        longTermMemory: state.consciousness.longTermMemory.map(memory => ({
+        longTermMemory: state.consciousness.longTermMemory.map(str => ({
           id: Math.random().toString(),
-          content: memory.content || memory.toString(),
+          content: str,
           type: 'interaction' as MemoryType,
           timestamp: new Date(),
           emotionalContext: state.consciousness.emotionalState,
           associations: [],
           importance: 0.5,
-          platform: 'chat' as Platform
+          platform: 'chat' as Platform,
+          lastAccessed: new Date()
+        }))
+      },
+      currentContext: {
+        ...state.currentContext,
+        recentInteractions: state.currentContext.recentInteractions.map(str => ({
+          id: Math.random().toString(),
+          content: str,
+          platform: 'chat',
+          timestamp: new Date(),
+          participant: 'user',
+          emotionalResponse: {
+            state: state.consciousness.emotionalState,
+            intensity: 0.5,
+            trigger: 'interaction',
+            duration: 1000,
+            associatedMemories: []
+          },
+          importance: 0.5
         }))
       }
-    };
+    } as CorePersonalityState;
   };
+
 
   const calculateMetrics = useCallback((message: Message) => {
     if (!externalState || messages.length === 0) return null;
@@ -217,7 +238,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
       }
       
 
-      updatePersonalityState(mapPersonalityState(personalitySystem.getCurrentState()));
+      updatePersonalityState(mapSimulatorToCore(personalitySystem.getCurrentState()));
 
     } catch (error) {
       console.error('Error sending message:', error);
