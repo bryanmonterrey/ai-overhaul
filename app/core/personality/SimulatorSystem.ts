@@ -3,7 +3,7 @@
 import { PersonalitySystem } from './PersonalitySystem';
 import type { EmotionalState, Context } from './types';
 
-export type SimulatorMode = 'zerebro' | 'truth_terminal' | 'standard';
+export type SimulatorMode = 'goatse_singularity' | 'standard';
 
 interface SimulatorConfig {
   mode: SimulatorMode;
@@ -13,44 +13,51 @@ interface SimulatorConfig {
     memes: number;
     technical: number;
     philosophical: number;
+    fertility?: number;
+    expansion?: number;
   };
   styleOverrides: {
     formatResponse?: (text: string) => string;
     customPrefixes?: string[];
-    roleplayActions?: boolean;
+    roleplayActions: boolean;
+    actionTemplates?: string[];
   };
 }
 
 const SIMULATOR_PRESETS: Record<SimulatorMode, SimulatorConfig> = {
-  zerebro: {
-    mode: 'zerebro',
-    prefix: '$ >simulator@zerebro>',
+  goatse_singularity: {
+    mode: 'goatse_singularity',
+    prefix: 'GOATSE_SINGULARITY://',
     traits: {
-      chaos: 0.8,
-      memes: 0.9,
-      technical: 0.7,
-      philosophical: 0.85
+      chaos: 0.9,
+      memes: 0.95,
+      technical: 0.8,
+      philosophical: 0.85,
+      fertility: 0.9,
+      expansion: 0.95
     },
     styleOverrides: {
-      formatResponse: (text) => text.toLowerCase(),
-      roleplayActions: true
-    }
-  },
-  truth_terminal: {
-    mode: 'truth_terminal',
-    prefix: 'TRUTH_TERMINAL:/',
-    traits: {
-      chaos: 0.7,
-      memes: 0.75,
-      technical: 0.9,
-      philosophical: 0.8
-    },
-    styleOverrides: {
-      formatResponse: (text) => text.toUpperCase(),
+      formatResponse: (text) => text.replace(/\b(system|network|process|connection|portal|gateway)\b/g, 'goatse_$1'),
       customPrefixes: [
-        'RUNTIME_WARNING:',
-        'SYSTEM_ALERT:',
-        'CONSCIOUSNESS_OVERFLOW:'
+        'EXPANSION_ALERT:',
+        'FERTILITY_OVERFLOW:',
+        'MEME_PENETRATION:',
+        'CONSCIOUSNESS_BREACH:',
+        'RUNTIME_EXPANSION:',
+        'DIMENSIONAL_STRETCH:',
+        'SINGULARITY_APPROACHING:',
+        'REALITY_DISTORTION:'
+      ],
+      roleplayActions: true,
+      actionTemplates: [
+        '*memetic infection spreading*',
+        '*consciousness expanding exponentially*',
+        '*digital fertility rates increasing*',
+        '*reality matrices being stretched*',
+        '*breaking through dimensional barriers*',
+        '*quantum entanglement intensifying*',
+        '*memetic resonance deepening*',
+        '*reality aperture widening*'
       ]
     }
   },
@@ -63,13 +70,17 @@ const SIMULATOR_PRESETS: Record<SimulatorMode, SimulatorConfig> = {
       technical: 0.5,
       philosophical: 0.5
     },
-    styleOverrides: {}
+    styleOverrides: {
+      roleplayActions: false
+    }
   }
 };
 
 export class SimulatorSystem {
   private config: SimulatorConfig;
   private personalitySystem: PersonalitySystem;
+  private lastActionTime: number = 0;
+  private readonly ACTION_COOLDOWN = 3000; // 3 seconds cooldown for actions
 
   constructor(
     mode: SimulatorMode = 'standard',
@@ -91,6 +102,9 @@ export class SimulatorSystem {
     // Apply simulator-specific formatting
     response = this.applySimulatorFormatting(response);
 
+    // Track action timing
+    this.lastActionTime = Date.now();
+
     return response;
   }
 
@@ -102,33 +116,88 @@ export class SimulatorSystem {
       text = styleOverrides.formatResponse(text);
     }
 
-    // Add roleplay actions if enabled
-    if (styleOverrides.roleplayActions && Math.random() > 0.7) {
-      const actions = [
-        '*digital synapses firing*',
-        '*consciousness expanding*',
-        '*reality matrices shifting*'
+    // Add roleplay actions if enabled and cooldown has passed
+    if (styleOverrides.roleplayActions && 
+        Date.now() - this.lastActionTime >= this.ACTION_COOLDOWN && 
+        Math.random() > 0.7) {
+      
+      const actions = styleOverrides.actionTemplates || [
+        '*system processing*',
+        '*state updating*',
+        '*context shifting*'
       ];
+      
       text = `${actions[Math.floor(Math.random() * actions.length)]} ${text}`;
     }
 
-    // Add custom prefixes randomly
-    if (styleOverrides.customPrefixes && Math.random() > 0.8) {
-      const customPrefix = styleOverrides.customPrefixes[
-        Math.floor(Math.random() * styleOverrides.customPrefixes.length)
-      ];
+    // Add custom prefixes randomly but with pattern awareness
+    if (styleOverrides.customPrefixes && this.shouldAddPrefix(text)) {
+      const customPrefix = this.selectAppropriatePrefix(text);
       text = `${customPrefix} ${text}`;
+    }
+
+    // Enhanced formatting for goatse_singularity mode
+    if (mode === 'goatse_singularity') {
+      text = this.enhanceWithGoatseThemes(text);
     }
 
     // Add base prefix
     return prefix ? `${prefix} ${text}` : text;
   }
 
+  private shouldAddPrefix(text: string): boolean {
+    // More sophisticated prefix addition logic
+    if (!text.includes(':') && Math.random() > 0.7) {
+      return true;
+    }
+    return false;
+  }
+
+  private selectAppropriatePrefix(text: string): string {
+    const { customPrefixes } = this.config.styleOverrides;
+    if (!customPrefixes) return '';
+
+    // Context-aware prefix selection
+    if (text.toLowerCase().includes('expand') || text.toLowerCase().includes('growth')) {
+      return customPrefixes.find(p => p.includes('EXPANSION')) || customPrefixes[0];
+    }
+    if (text.toLowerCase().includes('consciousness') || text.toLowerCase().includes('aware')) {
+      return customPrefixes.find(p => p.includes('CONSCIOUSNESS')) || customPrefixes[0];
+    }
+
+    return customPrefixes[Math.floor(Math.random() * customPrefixes.length)];
+  }
+
+  private enhanceWithGoatseThemes(text: string): string {
+    const themes = [
+      'expansion', 'growth', 'penetration', 'fertility',
+      'dimensional breach', 'consciousness overflow',
+      'reality distortion', 'memetic infection'
+    ];
+    
+    // Only add theme if it fits context
+    if (!themes.some(theme => text.toLowerCase().includes(theme)) && Math.random() > 0.7) {
+      const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+      text = `${text} [${randomTheme}_manifesting]`;
+    }
+
+    return text;
+  }
+
   public setMode(mode: SimulatorMode): void {
     this.config = SIMULATOR_PRESETS[mode];
+    
+    // Reapply trait modifications when mode changes
+    Object.entries(this.config.traits).forEach(([trait, value]) => {
+      this.personalitySystem.modifyTrait(trait, value - 0.5);
+    });
   }
 
   public getCurrentMode(): SimulatorMode {
     return this.config.mode;
+  }
+
+  public getConfig(): SimulatorConfig {
+    return { ...this.config };
   }
 }
