@@ -64,18 +64,34 @@ export default function TwitterPage() {
           fetch('/api/twitter/analytics')
         ]);
         
+        if (!tweetsRes.ok) {
+          throw new Error(`Tweets API error: ${tweetsRes.status} ${await tweetsRes.text()}`);
+        }
+        if (!analyticsRes.ok) {
+          throw new Error(`Analytics API error: ${analyticsRes.status} ${await analyticsRes.text()}`);
+        }
+  
         const [tweetsData, analyticsData] = await Promise.all([
           tweetsRes.json(),
           analyticsRes.json()
         ]);
-
+  
+        if (tweetsData.error) {
+          throw new Error(tweetsData.message || 'Error fetching tweets');
+        }
+        if (analyticsData.error) {
+          throw new Error(analyticsData.message || 'Error fetching analytics');
+        }
+  
         setTweets(tweetsData);
         setAnalytics(analyticsData);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading initial data:', error);
+        // Optionally show error to user
+        // setError(error.message);
       }
     };
-
+  
     loadInitialData();
   }, []);
 
