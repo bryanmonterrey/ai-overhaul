@@ -1,8 +1,11 @@
 // app/components/admin/PromptTraining.tsx
 import { useState } from 'react';
 import { supabase } from '@/lib/services/database';
-import { TrainingConversation, PromptTemplate } from '@/core/personality/training/types';
-import { TROLL_PATTERNS } from '@/core/personality/training/TrainingPatternManager';
+import { 
+  TrainingConversation, 
+  PromptTemplate 
+} from '@/app/core/personality/training/types';
+import { TROLL_PATTERNS } from '@/app/core/personality/training/constants';
 import { PromptTemplateForm } from '@/components/admin/PromptTemplateForm';
 import { ConversationList } from '@/components/admin/ConversationList';
 import { TrollTweetTester } from '@/components/admin/TrollTweetTester';     
@@ -18,9 +21,19 @@ export const PromptTraining = () => {
         .select('*')
         .eq('is_approved', true)
         .order('votes', { ascending: false });
-      setConversations(data);
+      setConversations(data || []);
     };
   
+    // Handle approval
+    const handleApprove = async (conversationId: string) => {
+      await supabase
+        .from('training_conversations')
+        .update({ is_approved: true })
+        .eq('id', conversationId);
+      
+      await loadApprovedConversations();
+    };
+
     // Add prompt template
     const addTemplate = async (template: PromptTemplate) => {
       // Add TrollTweets patterns here
@@ -31,6 +44,8 @@ export const PromptTraining = () => {
       }
       
       await supabase.from('prompt_templates').insert(template);
+      const { data } = await supabase.from('prompt_templates').select('*');
+      setTemplates(data || []);
     };
   
     return (
@@ -40,7 +55,7 @@ export const PromptTraining = () => {
           conversations={conversations}
           onApprove={handleApprove}
         />
-        <TrollTweetTester /> {/* Integration of your test script */}
+        <TrollTweetTester />
       </div>
     );
   };

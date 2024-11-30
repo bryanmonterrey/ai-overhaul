@@ -7,6 +7,7 @@ import {
     PersonalityState,
     Context
   } from '../types';
+
   
   /**
    * Represents a single training pattern that can be applied to modify personality traits
