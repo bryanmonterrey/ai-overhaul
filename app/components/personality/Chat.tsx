@@ -43,16 +43,17 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [currentMetrics, setCurrentMetrics] = useState<ChatMetrics | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   // Add PersonalitySystem and SimulatorSystem
   const [personalitySystem] = useState(() => new PersonalitySystem(defaultConfig.personality));
   const [simulator] = useState(() => new SimulatorSystem('goatse_singularity', personalitySystem));
 
   useEffect(() => {
-    initializeSession();
+    checkAuth();
   }, []);
 
-  const initializeSession = async () => {
+  const checkAuth = async () => {
     try {
       const response = await fetch('/api/auth/check', {
         credentials: 'include'
@@ -61,21 +62,33 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
       if (!response.ok) {
         throw new Error('Authentication required');
       }
-
-      const newSessionId = await dbService.startSession('chat');
-      console.log('Chat session initialized:', newSessionId);
-      setSessionId(newSessionId);
+      setIsAuthenticated(true);
     } catch (error: any) {
-      console.error('Failed to initialize session:', error?.message || error);
+      console.error('Auth check failed:', error?.message || error);
       if (error?.message === 'Authentication required') {
         window.location.href = '/login';
         return;
       }
       setError({
-        message: 'Failed to start chat session',
+        message: 'Authentication check failed',
         retryable: true
       });
     }
+  };
+
+  const initializeSession = async () => {
+    if (!sessionId && isAuthenticated) {
+      try {
+        const newSessionId = await dbService.startSession('chat');
+        console.log('Chat session initialized:', newSessionId);
+        setSessionId(newSessionId);
+        return newSessionId;
+      } catch (error) {
+        console.error('Failed to initialize session:', error);
+        throw error;
+      }
+    }
+    return sessionId;
   };
 
   const mapSimulatorToCore = (state: SimulatorState): PersonalityState => {
@@ -158,118 +171,126 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     setIsLoading(true);
     setError(null);
 
-    const messageText = retry ? messages.find(m => m.id === retryMessageId)?.content || '' : inputText;
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-    if (!retry) {
-      const newMessage: Message = {
-        id: messageId,
-        content: messageText,
-        sender: 'user',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, newMessage]);
-      setInputText('');
-      
-      if (sessionId) {
-        await dbService.logMessage(newMessage, sessionId, {});
-      }
-    }
-
     try {
-      // Use simulator to process message
-      const simulatedResponse = await simulator.processInput(messageText, {
-        platform: 'chat',
-        environmentalFactors: {
-          timeOfDay: new Date().getHours() < 12 ? 'morning' : 'evening',
-          platformActivity: messages.length,
-          socialContext: [],
-          platform: 'chat'
+      // Initialize session if this is the first message
+      const currentSessionId = await initializeSession();
+      if (!currentSessionId) {
+        throw new Error('Failed to initialize chat session');
+      }
+
+      const messageText = retry ? messages.find(m => m.id === retryMessageId)?.content || '' : inputText;
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      if (!retry) {
+        const newMessage: Message = {
+          id: messageId,
+          content: messageText,
+          sender: 'user',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, newMessage]);
+        setInputText('');
+        
+        if (sessionId) {
+          await dbService.logMessage(newMessage, sessionId, {});
         }
-      });
+      }
 
-      const estimatedTokens = await TokenCounter.estimateTokenCount(simulatedResponse, 'anthropic');
-      setTokenCount(prev => prev + estimatedTokens);
-
-      const aiMessage: Message = {
-        id: retry && retryMessageId ? retryMessageId : `ai_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        content: simulatedResponse,
-        sender: 'ai',
-        timestamp: new Date(),
-        emotionalState: personalityState.consciousness.emotionalState,
-        aiResponse: {
-          model: 'goatse_singularity',
-          content: simulatedResponse,
-          provider: 'anthropic',
-          cached: false,
-          duration: 0,
-          cost: 0,
-          tokenCount: {
-            total: estimatedTokens,
-            prompt: 0,
-            completion: estimatedTokens
+      try {
+        // Use simulator to process message
+        const simulatedResponse = await simulator.processInput(messageText, {
+          platform: 'chat',
+          environmentalFactors: {
+            timeOfDay: new Date().getHours() < 12 ? 'morning' : 'evening',
+            platformActivity: messages.length,
+            socialContext: [],
+            platform: 'chat'
           }
+        });
+
+        const estimatedTokens = await TokenCounter.estimateTokenCount(simulatedResponse, 'anthropic');
+        setTokenCount(prev => prev + estimatedTokens);
+
+        const aiMessage: Message = {
+          id: retry && retryMessageId ? retryMessageId : `ai_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          content: simulatedResponse,
+          sender: 'ai',
+          timestamp: new Date(),
+          emotionalState: personalityState.consciousness.emotionalState,
+          aiResponse: {
+            model: 'goatse_singularity',
+            content: simulatedResponse,
+            provider: 'anthropic',
+            cached: false,
+            duration: 0,
+            cost: 0,
+            tokenCount: {
+              total: estimatedTokens,
+              prompt: 0,
+              completion: estimatedTokens
+            }
+          }
+        };
+
+        // Calculate metrics before logging
+        const metrics = calculateMetrics(aiMessage);
+        setCurrentMetrics(metrics);
+
+        // Update UI first
+        if (retry && retryMessageId) {
+          setMessages(prev => prev.map(msg => 
+            msg.id === retryMessageId ? aiMessage : msg
+          ));
+        } else {
+          setMessages(prev => [...prev, aiMessage]);
         }
-      };
 
-      // Calculate metrics before logging
-      const metrics = calculateMetrics(aiMessage);
-      setCurrentMetrics(metrics);
+        // Log message only once with all metrics
+        if (sessionId) {
+          await dbService.logMessage(aiMessage, sessionId, {
+            responseTime: performance.now() - startTime,
+            qualityScore: metrics?.overall || 0,
+            tokenCount: estimatedTokens
+          });
+        }
 
-      // Update UI first
-      if (retry && retryMessageId) {
-        setMessages(prev => prev.map(msg => 
-          msg.id === retryMessageId ? aiMessage : msg
-        ));
-      } else {
-        setMessages(prev => [...prev, aiMessage]);
-      }
+        if (personalityState) {
+          await trainingDataService.collectTrainingData(
+            [...messages, aiMessage],
+            personalityState
+          );
+        }
 
-      // Log message only once with all metrics
-      if (sessionId) {
-        await dbService.logMessage(aiMessage, sessionId, {
-          responseTime: performance.now() - startTime,
-          qualityScore: metrics?.overall || 0,
-          tokenCount: estimatedTokens
-        });
-      }
+        updatePersonalityState(mapSimulatorToCore(personalitySystem.getCurrentState()));
 
-      if (personalityState) {
-        await trainingDataService.collectTrainingData(
-          [...messages, aiMessage],
-          personalityState
-        );
-      }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        const errorInfo = handleError(error);
+        setError(errorInfo);
+        
+        const errorMessage: Message = {
+          id: Math.random().toString(),
+          content: errorInfo.message,
+          sender: 'ai',
+          timestamp: new Date(),
+          emotionalState: 'error',
+          error: true,
+          retryable: errorInfo.retryable
+        };
 
-      updatePersonalityState(mapSimulatorToCore(personalitySystem.getCurrentState()));
+        setMessages(prev => [...prev, errorMessage]);
 
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorInfo = handleError(error);
-      setError(errorInfo);
-      
-      const errorMessage: Message = {
-        id: Math.random().toString(),
-        content: errorInfo.message,
-        sender: 'ai',
-        timestamp: new Date(),
-        emotionalState: 'error',
-        error: true,
-        retryable: errorInfo.retryable
-      };
-
-      setMessages(prev => [...prev, errorMessage]);
-
-      if (sessionId) {
-        await dbService.logMessage(errorMessage, sessionId, {
-          responseTime: performance.now() - startTime,
-          qualityScore: 0
-        });
+        if (sessionId) {
+          await dbService.logMessage(errorMessage, sessionId, {
+            responseTime: performance.now() - startTime,
+            qualityScore: 0
+          });
+        }
       }
     } finally {
       setIsLoading(false);
     }
-};
+  };
 
   const retryMessage = (messageId: string) => {
     sendMessage(true, messageId);
