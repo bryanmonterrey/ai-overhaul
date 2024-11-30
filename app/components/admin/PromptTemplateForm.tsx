@@ -20,8 +20,8 @@ export const PromptTemplateForm: React.FC<PromptTemplateFormProps> = ({ onSubmit
     }
     
     await onSubmit({
+      ...template as PromptTemplate,
       id: crypto.randomUUID(), // Generate a unique ID
-      ...template as PromptTemplate
     });
     
     // Reset form

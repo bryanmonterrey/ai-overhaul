@@ -6,6 +6,26 @@ import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { ConversationData } from '@/app/core/types/conversation';
 
+interface ChatMessage {
+    id: string;
+    content: string;
+    role: string;
+    emotional_state: string;
+    created_at: string;
+    metadata?: {
+      error?: boolean;
+      retryable?: boolean;
+      aiResponse?: {
+        model: string;
+        tokenCount: {
+          total: number;
+        };
+        cached?: boolean;
+      };
+    };
+  }
+  
+
 export default function ConversationPage({ 
   params 
 }: { 
@@ -57,18 +77,18 @@ export default function ConversationPage({
       const conversationData: ConversationData = {
         id: session.id,
         timestamp: session.started_at,
-        messages: session.chat_messages.map(msg => ({
-          id: msg.id,
-          content: msg.content,
-          sender: msg.role,
-          timestamp: new Date(msg.created_at),
-          emotionalState: msg.emotional_state,
-          ...(msg.metadata && {
-            error: msg.metadata.error,
-            retryable: msg.metadata.retryable,
-            aiResponse: msg.metadata.aiResponse
-          })
-        })),
+        messages: session.chat_messages.map((msg: ChatMessage) => ({
+            id: msg.id,
+            content: msg.content,
+            sender: msg.role,
+            timestamp: new Date(msg.created_at),
+            emotionalState: msg.emotional_state,
+            ...(msg.metadata && {
+              error: msg.metadata.error,
+              retryable: msg.metadata.retryable,
+              aiResponse: msg.metadata.aiResponse
+            })
+          })),
         upvotes: session.upvotes || 0,
         userId: session.user_id
       };

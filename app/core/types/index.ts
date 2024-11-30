@@ -110,6 +110,7 @@ export interface Context {
   recentInteractions: Interaction[];
   environmentalFactors: EnvironmentalFactors;
   activeNarratives: string[];
+  style?: TweetStyle; 
 }
 
 export interface Interaction {
