@@ -8,6 +8,13 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 
+const CustomWalletButton = () => {
+  return (
+    <WalletMultiButton className="!bg-[#11111A] !border !border-[#DDDDDD] !rounded-none !font-ia !text-sm !px-3 !py-1">
+      SELECT&nbsp;WALLET
+    </WalletMultiButton>
+  );
+};
 
 export default function Header() {
   const { connected, publicKey, disconnect } = useWallet();
@@ -56,7 +63,7 @@ export default function Header() {
           <div className="flex items-center space-x-4">
             {/* Status card - hidden on small screens */}
             <Card variant="system" className="hidden sm:block px-3 py-1">
-              <span className="text-xs">STATUS: ONLINE</span>
+              <span className="text-xs">STATUS:&nbsp;ONLINE</span>
             </Card>
 
             {/* Menu button - shown only on small screens */}
@@ -82,7 +89,7 @@ export default function Header() {
                 </button>
               </div>
             ) : (
-              <WalletMultiButton className="!bg-[#11111A] !border !border-[#DDDDDD] !rounded-none !font-ia !text-sm !px-3 !py-1 !min-w-[120px] !text-center" />
+              <CustomWalletButton />
             )}
           </div>
         </div>
