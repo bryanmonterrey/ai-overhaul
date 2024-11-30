@@ -1,7 +1,8 @@
 // src/app/components/personality/Chat.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { MemoryType, PersonalityState, Platform, Memory } from '@/app/core/types';
+import { MemoryType, PersonalityState, Platform, Memory, EmotionalState } from '@/app/core/types';
+import { PersonalityState as SimulatorState } from '@/app/core/personality/types';
 import { Message } from '@/app/core/types/chat';
 import { AIResponse } from '@/app/core/types/ai';
 import { TokenCounter } from '@/app/lib/utils/ai';
@@ -77,12 +78,12 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     }
   };
 
-  const mapSimulatorToCore = (state: SimulatorPersonalityState): CorePersonalityState => {
+  const mapSimulatorToCore = (state: SimulatorState): PersonalityState => {
     return {
       ...state,
       consciousness: {
         ...state.consciousness,
-        longTermMemory: state.consciousness.longTermMemory.map(str => ({
+        longTermMemory: state.consciousness.longTermMemory.map((str: string) => ({
           id: Math.random().toString(),
           content: str,
           type: 'interaction' as MemoryType,
@@ -96,10 +97,10 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
       },
       currentContext: {
         ...state.currentContext,
-        recentInteractions: state.currentContext.recentInteractions.map(str => ({
+        recentInteractions: state.currentContext.recentInteractions.map((str: string) => ({
           id: Math.random().toString(),
           content: str,
-          platform: 'chat',
+          platform: 'chat' as Platform,
           timestamp: new Date(),
           participant: 'user',
           emotionalResponse: {
@@ -112,7 +113,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
           importance: 0.5
         }))
       }
-    } as CorePersonalityState;
+    } as PersonalityState;
   };
 
 
