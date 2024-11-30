@@ -46,7 +46,7 @@ export default function Sidebar({ currentState }: SidebarProps) {
       <div className="p-4 space-y-4 text-xs">
 
         <nav className="space-y-1 border p-3 border-[#DDDDDD]">
-          <div className="text-[#DDDDDD] text-sm mb-2">NAVIGATION:</div>
+          <div className="text-[#DDDDDD] text-sm mb-2">NAVIGATION ~</div>
           {[
             { href: '/chat', label: 'Direct Interface' },
             { href: '/conversations', label: 'Conversations' },
