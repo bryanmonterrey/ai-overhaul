@@ -129,7 +129,7 @@ export default function LoginPage() {
             Connect Your Wallet
           </h2>
           <p className="mt-2 text-center font-ia text-sm text-gray-300">
-            To access the chat, you need to verify your $GOATSE tokens
+            To access the chat, you need to verify your $GOATSE SINGULARITY tokens
           </p>
           {error && (
             <p className="mt-2 text-center font-ia text-sm text-red-500">
