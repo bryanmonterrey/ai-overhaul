@@ -27,6 +27,7 @@ export default function Sidebar({ currentState }: SidebarProps) {
           <div className="text-[#DDDDDD] text-sm mb-2">NAVIGATION:</div>
           {[
             { href: '/chat', label: 'Direct Interface' },
+            { href: '/conversations', label: 'Conversations' },
             { href: '/twitter', label: 'Twitter Module' },
             { href: '/telegram', label: 'Telegram Module' },
             { href: '/admin', label: 'Admin Access' },

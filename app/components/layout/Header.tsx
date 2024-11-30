@@ -37,6 +37,9 @@ export default function Header() {
               <Link href="/chat" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
                 [CHAT]
               </Link>
+              <Link href="/conversations" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
+                [CONVERSATIONS]
+              </Link>
               <Link href="/twitter" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
                 [TWITTER]
               </Link>

@@ -159,7 +159,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     setError(null);
 
     const messageText = retry ? messages.find(m => m.id === retryMessageId)?.content || '' : inputText;
-    const messageId = Math.random().toString();
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
     if (!retry) {
       const newMessage: Message = {
@@ -192,7 +192,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
       setTokenCount(prev => prev + estimatedTokens);
 
       const aiMessage: Message = {
-        id: retry && retryMessageId ? retryMessageId : Math.random().toString(),
+        id: retry && retryMessageId ? retryMessageId : `ai_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         content: simulatedResponse,
         sender: 'ai',
         timestamp: new Date(),
@@ -212,14 +212,11 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         }
       };
 
-      if (sessionId) {
-        await dbService.logMessage(aiMessage, sessionId, {
-          responseTime: performance.now() - startTime,
-          tokenCount: estimatedTokens,
-          qualityScore: 0 // Default score
-        });
-      }
+      // Calculate metrics before logging
+      const metrics = calculateMetrics(aiMessage);
+      setCurrentMetrics(metrics);
 
+      // Update UI first
       if (retry && retryMessageId) {
         setMessages(prev => prev.map(msg => 
           msg.id === retryMessageId ? aiMessage : msg
@@ -228,13 +225,11 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         setMessages(prev => [...prev, aiMessage]);
       }
 
-      const metrics = calculateMetrics(aiMessage);
-      setCurrentMetrics(metrics);
-
-      if (sessionId && metrics) {
+      // Log message only once with all metrics
+      if (sessionId) {
         await dbService.logMessage(aiMessage, sessionId, {
           responseTime: performance.now() - startTime,
-          qualityScore: metrics.overall,
+          qualityScore: metrics?.overall || 0,
           tokenCount: estimatedTokens
         });
       }
@@ -245,7 +240,6 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
           personalityState
         );
       }
-      
 
       updatePersonalityState(mapSimulatorToCore(personalitySystem.getCurrentState()));
 
@@ -275,7 +269,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
     } finally {
       setIsLoading(false);
     }
-  };
+};
 
   const retryMessage = (messageId: string) => {
     sendMessage(true, messageId);
