@@ -8,6 +8,9 @@ import TweetStream from '@/app/interfaces/twitter/components/TweetStream';
 import TweetAnalytics from '@/app/interfaces/twitter/components/TweetAnalytics';
 import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
 import { TweetStyle } from '@/app/core/types';
+import EngagementTargets from '../interfaces/twitter/components/EngagementTargets';
+import AutoTweetManager from '../interfaces/twitter/components/AutoTweetManager';
+
 
 export default function TwitterPage() {
   const [tweets, setTweets] = useState<any[]>([]);
@@ -116,6 +119,8 @@ export default function TwitterPage() {
         
         {analytics && <TweetAnalytics data={analytics} />}
       </div>
+      <AutoTweetManager />
+      <EngagementTargets />
     </div>
   );
 }

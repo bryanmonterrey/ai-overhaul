@@ -1,13 +1,31 @@
 import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkError, TwitterDataError } from './twitter-errors';
 import type { TwitterClient, TwitterData } from './types';
+import type { EngagementTargetRow } from '@/app/types/supabase';
+import { PersonalitySystem } from '../personality/PersonalitySystem';
+
+interface QueuedTweet {
+  id: string;
+  content: string;
+  style: string;
+  status: 'pending' | 'approved' | 'rejected';
+  generatedAt: Date;
+  scheduledFor?: Date;
+}
 
 export class TwitterManager {
   private client: TwitterClient;
+  private queuedTweets: QueuedTweet[] = [];
+  private isAutoMode: boolean = false;
+  private nextTweetTimeout?: NodeJS.Timeout;
 
-  constructor(client: TwitterClient) {
+  constructor(
+    client: TwitterClient,
+    private personality: PersonalitySystem
+  ) {
     this.client = client;
   }
 
+  // Your existing methods
   async postTweet(content: string): Promise<TwitterData> {
     try {
       if (content.length > 280) {
@@ -36,6 +54,103 @@ export class TwitterManager {
       }
       throw new TwitterNetworkError('Network error occurred');
     }
+  }
+
+  // Auto-tweeter methods
+  public async generateTweetBatch(count: number = 10): Promise<void> {
+    const newTweets: QueuedTweet[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      const style = this.personality.getCurrentTweetStyle();
+      const content = await this.personality.processInput(
+        'Generate a tweet', 
+        { platform: 'twitter', style }
+      );
+
+      newTweets.push({
+        id: crypto.randomUUID(),
+        content: this.cleanTweet(content),
+        style,
+        status: 'pending',
+        generatedAt: new Date()
+      });
+    }
+
+    this.queuedTweets = [...this.queuedTweets, ...newTweets];
+  }
+
+  private cleanTweet(tweet: string): string {
+    return tweet
+      .replace(/\[(\w+)_state\]$/, '')
+      .trim();
+  }
+
+  public updateTweetStatus(id: string, status: 'approved' | 'rejected'): void {
+    this.queuedTweets = this.queuedTweets.map(tweet => 
+      tweet.id === id ? { ...tweet, status } : tweet
+    );
+
+    if (status === 'approved' && this.isAutoMode) {
+      this.scheduleNextTweet();
+    }
+  }
+
+  public toggleAutoMode(enabled: boolean): void {
+    this.isAutoMode = enabled;
+    if (enabled) {
+      this.scheduleNextTweet();
+    } else {
+      if (this.nextTweetTimeout) {
+        clearTimeout(this.nextTweetTimeout);
+      }
+    }
+  }
+
+  private getOptimalTweetTime(): Date {
+    const now = new Date();
+    const hour = now.getHours();
+    
+    if (hour >= 23 || hour < 6) {
+      now.setHours(7, 0, 0, 0);
+      if (hour >= 23) now.setDate(now.getDate() + 1);
+    }
+    
+    return now;
+  }
+
+  private async scheduleNextTweet(): Promise<void> {
+    if (!this.isAutoMode) return;
+
+    const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
+    if (approvedTweets.length === 0) return;
+
+    const nextTweet = approvedTweets[0];
+    const optimalTime = this.getOptimalTweetTime();
+    const delay = Math.max(
+      optimalTime.getTime() - Date.now(),
+      30 * 60 * 1000 // Min 30 minutes between tweets
+    );
+
+    nextTweet.scheduledFor = new Date(Date.now() + delay);
+
+    this.nextTweetTimeout = setTimeout(async () => {
+      try {
+        await this.postTweet(nextTweet.content);
+        this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
+        this.scheduleNextTweet();
+      } catch (error) {
+        console.error('Error posting tweet:', error);
+        setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+      }
+    }, delay);
+  }
+
+  public getQueuedTweets(): QueuedTweet[] {
+    return this.queuedTweets;
+  }
+
+  public clearRejectedTweets(): void {
+    this.queuedTweets = this.queuedTweets.filter(t => t.status !== 'rejected');
   }
 
   async createThread(tweets: string[]): Promise<TwitterData[]> {
@@ -67,4 +182,62 @@ export class TwitterManager {
       throw new TwitterNetworkError('Failed to fetch environmental factors');
     }
   }
-} 
+
+  // Engagement-related methods
+  async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
+    try {
+      const timeline = await this.client.userTimeline(target.username);
+      const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
+
+      for (const tweet of timeline) {
+        const tweetDate = new Date(tweet.created_at);
+        if (tweetDate > lastCheck && this.shouldReplyToTweet(tweet, target)) {
+          await this.generateAndSendReply(tweet, target);
+        }
+      }
+    } catch (error) {
+      console.error(`Error monitoring tweets for ${target.username}:`, error);
+    }
+  }
+
+  private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
+    // Check if tweet contains relevant topics
+    const hasTopic = target.topics.some(topic => 
+      tweet.text.toLowerCase().includes(topic.toLowerCase())
+    );
+
+    return hasTopic && Math.random() < target.reply_probability;
+  }
+
+  private async generateAndSendReply(tweet: any, target: EngagementTargetRow): Promise<void> {
+    try {
+      const context = {
+        platform: 'twitter' as const,
+        environmentalFactors: {
+          timeOfDay: this.getTimeOfDay(),
+          platformActivity: 0.5,
+          socialContext: [target.relationship_level],
+          platform: 'twitter'
+        },
+        style: target.preferred_style,
+        additionalContext: `Replying to @${target.username}'s tweet: ${tweet.text}`
+      };
+
+      const reply = await this.personality.processInput(tweet.text, context);
+      
+      if (reply) {
+        await this.postTweet(reply);
+      }
+    } catch (error) {
+      console.error(`Error generating reply for ${target.username}:`, error);
+    }
+  }
+
+  private getTimeOfDay(): string {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 17) return 'afternoon';
+    if (hour >= 17 && hour < 22) return 'evening';
+    return 'night';
+  }
+}
