@@ -240,7 +240,7 @@ export default function ConversationPage({
         </div>
 
         {/* Upvote Section */}
-        <div className="mt-8 mb-8 flex items-center space-x-4 font-mono">
+        <div className="mt-8 mb-8 flex items-center space-x-4 font-ia">
           <button
             onClick={handleUpvote}
             className="bg-[#11111A] text-[#DDDDDD] px-4 py-2 border border-[#DDDDDD] hover:bg-[#DDDDDD]/10"
