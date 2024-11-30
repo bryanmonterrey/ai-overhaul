@@ -157,6 +157,11 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         emotionalState: personalityState.consciousness.emotionalState,
         aiResponse: {
           model: 'goatse_singularity',
+          content: simulatedResponse,
+          provider: 'anthropic',
+          cached: false,
+          duration: 0,
+          cost: 0,
           tokenCount: {
             total: estimatedTokens,
             prompt: 0,
