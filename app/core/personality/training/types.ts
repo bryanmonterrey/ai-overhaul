@@ -33,6 +33,9 @@ import {
     content: string;
     type: string;
     is_active: boolean;
+    style: string;         // Add this
+    patterns: string[];    // Add this
+    themes: string[];      // Add this
   }
 
   export interface TrainingConversation {

@@ -1,6 +1,6 @@
 // app/components/admin/PromptTraining.tsx
 import { useState } from 'react';
-import { supabase } from '@/lib/services/database';
+import { dbService } from '@/app/lib/services/database';
 import { 
   TrainingConversation, 
   PromptTemplate 
@@ -36,17 +36,23 @@ export const PromptTraining = () => {
 
     // Add prompt template
     const addTemplate = async (template: PromptTemplate) => {
-      // Add TrollTweets patterns here
-      const trollStyle = TROLL_PATTERNS[template.style];
-      if (trollStyle) {
-        template.patterns = [...template.patterns, ...trollStyle.patterns];
-        template.themes = [...template.themes, ...trollStyle.themes];
-      }
-      
-      await supabase.from('prompt_templates').insert(template);
-      const { data } = await supabase.from('prompt_templates').select('*');
-      setTemplates(data || []);
-    };
+        // Add TrollTweets patterns here
+        const trollStyle = TROLL_PATTERNS[template.style];
+        if (trollStyle) {
+          template.patterns = [
+            ...(template.patterns || []), 
+            ...(trollStyle.patterns || [])
+          ];
+          template.themes = [
+            ...(template.themes || []), 
+            ...(trollStyle.themes || [])
+          ];
+        }
+        
+        await dbService.from('prompt_templates').insert(template);
+        const { data } = await dbService.from('prompt_templates').select('*');
+        setTemplates(data || []);
+      };
   
     return (
       <div>
