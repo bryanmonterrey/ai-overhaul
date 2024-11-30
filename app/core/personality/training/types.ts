@@ -18,6 +18,7 @@ import {
     description: string;
     triggers: string[];
     themes?: string[]; 
+    patterns?: string[];  
     responseStyle: TweetStyle;
     emotionalShift: EmotionalState;
     narrativePreference: NarrativeMode;

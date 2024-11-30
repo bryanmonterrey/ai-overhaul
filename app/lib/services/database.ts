@@ -2,6 +2,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { ChatSession, ChatMessage, QualityMetric, TrainingData } from '@/types/database';
 import { Message } from '@/app/core/types/chat';
+import { PromptTemplate } from '@/app/core/personality/training/types';
 
 interface TrainingDataRecord {
   message_id: string;
@@ -195,6 +196,33 @@ export class DatabaseService {
     } catch (error) {
       console.error('Failed to store memory:', error);
       return;
+    }
+  }
+
+  async addPromptTemplate(template: PromptTemplate) {
+    try {
+      const { error } = await this.supabase
+        .from('prompt_templates')
+        .insert(template);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to add prompt template:', error);
+      throw error;
+    }
+  }
+
+  async getPromptTemplates() {
+    try {
+      const { data, error } = await this.supabase
+        .from('prompt_templates')
+        .select('*');
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Failed to get prompt templates:', error);
+      throw error;
     }
   }
 

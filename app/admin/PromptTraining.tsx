@@ -41,7 +41,7 @@ export const PromptTraining = () => {
         if (trollStyle) {
           template.patterns = [
             ...(template.patterns || []), 
-            ...(trollStyle.patterns || [])
+            ...(trollStyle.triggers || []) // Use triggers instead of patterns
           ];
           template.themes = [
             ...(template.themes || []), 
@@ -49,8 +49,8 @@ export const PromptTraining = () => {
           ];
         }
         
-        await dbService.from('prompt_templates').insert(template);
-        const { data } = await dbService.from('prompt_templates').select('*');
+        await dbService.addPromptTemplate(template);
+        const data = await dbService.getPromptTemplates();
         setTemplates(data || []);
       };
   
