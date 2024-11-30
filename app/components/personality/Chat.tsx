@@ -15,6 +15,7 @@ import { QualityMetricsDisplay } from '../analytics/QualityMetricsDisplay';
 import { ChatAnalytics } from '@/app/components/analytics/ChatAnalytics';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { SimulatorSystem } from '@/app/core/personality/SimulatorSystem';
+import { defaultConfig } from '@/app/lib/config/default';
 
 interface ChatMetrics {
   coherence: number;
@@ -42,7 +43,7 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
   const [currentMetrics, setCurrentMetrics] = useState<ChatMetrics | null>(null);
   
   // Add PersonalitySystem and SimulatorSystem
-  const [personalitySystem] = useState(() => new PersonalitySystem(externalState));
+  const [personalitySystem] = useState(() => new PersonalitySystem(defaultConfig.personality));
   const [simulator] = useState(() => new SimulatorSystem('goatse_singularity', personalitySystem));
 
   useEffect(() => {
@@ -195,23 +196,6 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
           personalityState
         );
       }
-
-      const mapPersonalityState = (state: PersonalityState): any => {
-        return {
-          ...state,
-          consciousness: {
-            ...state.consciousness,
-            longTermMemory: state.consciousness.longTermMemory.map(memory => ({
-              id: typeof memory === 'string' ? Math.random().toString() : memory.id,
-              content: typeof memory === 'string' ? memory : memory.content,
-              type: 'interaction',
-              timestamp: new Date(),
-              associations: [],
-              importance: 0.5
-            }))
-          }
-        };
-      };
       
 
       updatePersonalityState(mapPersonalityState(personalitySystem.getCurrentState()));
