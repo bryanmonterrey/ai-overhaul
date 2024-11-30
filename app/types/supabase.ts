@@ -1,47 +1,97 @@
-// types/supabase.ts
+// app/types/supabase.ts
 
-export type EngagementTarget = Database['public']['Tables']['engagement_targets']['Row']
-export type EngagementHistory = Database['public']['Tables']['engagement_history']['Row']
+import type { Database as BaseDatabase } from '@/types/supabase.types';
+import { supabase } from '@/types/supabase';
 
-// Add to your existing Database interface:
-export interface Database {
+export interface EngagementTargetRow {
+  id: string;
+  username: string;
+  topics: string[];
+  reply_probability: number;
+  last_interaction: string | null;
+  relationship_level: 'new' | 'familiar' | 'close';
+  preferred_style: string;
+  created_at: string;
+}
+
+export interface EngagementHistoryRow {
+  id: string;
+  target_id: string;
+  tweet_id: string;
+  reply_id: string;
+  engagement_type: string;
+  timestamp: string;
+  metrics: {
+    likes: number;
+    retweets: number;
+    replies: number;
+    impressions: number;
+    engagement_rate: number;
+  } | null;
+  created_at: string;
+}
+
+// Fixed Database interface
+export type Database = BaseDatabase & {
   public: {
     Tables: {
       engagement_targets: {
-        Row: {
-          id: string
-          username: string
-          topics: string[]
-          reply_probability: number
-          last_interaction: string | null
-          relationship_level: 'new' | 'familiar' | 'close'
-          preferred_style: string
-          created_at: string
-        }
-        Insert: Omit<EngagementTarget, 'id' | 'created_at'>
-        Update: Partial<Omit<EngagementTarget, 'id' | 'created_at'>>
+        Row: EngagementTargetRow
+        Insert: Omit<EngagementTargetRow, 'id' | 'created_at'>
+        Update: Partial<Omit<EngagementTargetRow, 'id' | 'created_at'>>
       }
       engagement_history: {
-        Row: {
-          id: string
-          target_id: string
-          tweet_id: string
-          reply_id: string
-          engagement_type: string
-          timestamp: string
-          metrics: {
-            likes: number
-            retweets: number
-            replies: number
-            impressions: number
-            engagement_rate: number
-          } | null
-          created_at: string
-        }
-        Insert: Omit<EngagementHistory, 'id' | 'created_at'>
-        Update: Partial<Omit<EngagementHistory, 'id' | 'created_at'>>
+        Row: EngagementHistoryRow
+        Insert: Omit<EngagementHistoryRow, 'id' | 'created_at'>
+        Update: Partial<Omit<EngagementHistoryRow, 'id' | 'created_at'>>
       }
-      // ... your existing tables
-    }
+    } & BaseDatabase['public']['Tables']
+    Views: BaseDatabase['public']['Views']
+    Functions: BaseDatabase['public']['Functions']
+    Enums: BaseDatabase['public']['Enums']
+    CompositeTypes: BaseDatabase['public']['CompositeTypes']
   }
+}
+
+// Helper functions for engagement targets
+export async function getEngagementTargets() {
+  const { data, error } = await supabase
+    .from('engagement_targets')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function addEngagementTarget(target: Omit<EngagementTargetRow, 'id' | 'created_at'>) {
+  const { data, error } = await supabase
+    .from('engagement_targets')
+    .insert([target])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateEngagementTarget(id: string, updates: Partial<EngagementTargetRow>) {
+  const { data, error } = await supabase
+    .from('engagement_targets')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteEngagementTarget(id: string) {
+  const { error } = await supabase
+    .from('engagement_targets')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
 }

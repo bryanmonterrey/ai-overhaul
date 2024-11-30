@@ -6,11 +6,11 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/app/components/common/Card';
 import { Button } from '@/app/components/common/Button';
 import { Input } from '@/app/components/common/Input';
-import { TweetStyle } from '@/app/core/personality/types';
-import type { EngagementTarget } from '@/app/types/supabase';
+import type { EngagementTargetRow } from '@/app/types/supabase';
+import type { TweetStyle } from '@/app/core/personality/types';
 
 export default function EngagementTargets() {
-  const [targets, setTargets] = useState<EngagementTarget[]>([]);
+  const [targets, setTargets] = useState<EngagementTargetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTarget, setNewTarget] = useState({
     username: '',
@@ -64,9 +64,7 @@ export default function EngagementTargets() {
 
   const removeTarget = async (id: string) => {
     try {
-      await fetch(`/api/twitter/targets/${id}`, {
-        method: 'DELETE'
-      });
+      await fetch(`/api/twitter/targets/${id}`, { method: 'DELETE' });
       await fetchTargets();
     } catch (error) {
       console.error('Error removing target:', error);
@@ -78,36 +76,42 @@ export default function EngagementTargets() {
       <div className="space-y-4">
         <div className="space-y-2">
           <Input
-            placeholder="Twitter Username"
+            placeholder="TWITTER_USERNAME"
             value={newTarget.username}
             onChange={(e) => setNewTarget(prev => ({ ...prev, username: e.target.value }))}
           />
           <Input
-            placeholder="Topics (comma separated)"
+            placeholder="TOPICS [COMMA_SEPARATED]"
             value={newTarget.topics}
             onChange={(e) => setNewTarget(prev => ({ ...prev, topics: e.target.value }))}
           />
-          <div className="flex items-center gap-2">
-            <span className="text-xs">Reply Rate: {newTarget.replyProbability}%</span>
+          <div className="flex items-center gap-2 font-mono text-xs">
+            <span>REPLY_RATE: {newTarget.replyProbability}%</span>
             <input
               type="range"
               min="0"
               max="100"
               value={newTarget.replyProbability}
-              onChange={(e) => setNewTarget(prev => ({ ...prev, replyProbability: parseInt(e.target.value) }))}
-              className="flex-1"
+              onChange={(e) => setNewTarget(prev => ({ 
+                ...prev, 
+                replyProbability: parseInt(e.target.value) 
+              }))}
+              className="flex-1 accent-white"
             />
           </div>
           <select
             value={newTarget.preferredStyle}
-            onChange={(e) => setNewTarget(prev => ({ ...prev, preferredStyle: e.target.value as TweetStyle }))}
-            className="w-full bg-black text-white border border-white p-2 font-mono text-sm"
+            onChange={(e) => setNewTarget(prev => ({ 
+              ...prev, 
+              preferredStyle: e.target.value as TweetStyle 
+            }))}
+            className="w-full bg-black text-white border border-white p-2 font-mono text-xs"
           >
-            <option value="casual">CASUAL</option>
-            <option value="shitpost">SHITPOST</option>
-            <option value="metacommentary">METACOMMENTARY</option>
-            <option value="rant">RANT</option>
-            <option value="hornypost">HORNYPOST</option>
+            <option value="casual">CASUAL_MODE</option>
+            <option value="shitpost">SHITPOST_MODE</option>
+            <option value="metacommentary">META_MODE</option>
+            <option value="rant">RANT_MODE</option>
+            <option value="hornypost">HORNY_MODE</option>
           </select>
           <Button
             variant="system"
@@ -120,18 +124,18 @@ export default function EngagementTargets() {
 
         <div className="space-y-2">
           {targets.map(target => (
-            <div key={target.id} className="flex items-center justify-between p-2 border border-white">
+            <div key={target.id} className="flex items-center justify-between p-2 border border-white font-mono text-xs">
               <div>
-                <div className="font-medium">@{target.username}</div>
-                <div className="text-xs opacity-70">
-                  Topics: {target.topics.join(', ')}
+                <div>@{target.username}</div>
+                <div className="opacity-70">
+                  TOPICS: {target.topics.join(', ')}
                 </div>
-                <div className="text-xs opacity-70">
-                  Style: {target.preferred_style} | Rate: {Math.round(target.reply_probability * 100)}%
+                <div className="opacity-70">
+                  MODE: {target.preferred_style} | RATE: {Math.round(target.reply_probability * 100)}%
                 </div>
                 {target.last_interaction && (
-                  <div className="text-xs opacity-70">
-                    Last: {new Date(target.last_interaction).toLocaleDateString()}
+                  <div className="opacity-70">
+                    LAST_INTERACTION: {new Date(target.last_interaction).toLocaleDateString()}
                   </div>
                 )}
               </div>
