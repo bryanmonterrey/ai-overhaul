@@ -7,7 +7,7 @@ import {
 } from '@/app/core/types/ai';
 import { TokenCounter, RateLimiter, CacheManager } from '@/app/lib/utils/ai';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '@/app/core/personality/types';
+import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
 
 export function getPersonalitySystem(): PersonalitySystem {
   return new PersonalitySystem(DEFAULT_PERSONALITY);

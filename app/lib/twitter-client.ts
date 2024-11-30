@@ -1,6 +1,17 @@
 import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '@/app/core/twitter/types';
 import { TwitterApi } from 'twitter-api-v2';
 
+export function getTwitterClient(): TwitterApiClient {
+    const credentials = {
+      apiKey: process.env.TWITTER_API_KEY || '',
+      apiSecret: process.env.TWITTER_API_SECRET || '',
+      accessToken: process.env.TWITTER_ACCESS_TOKEN || '',
+      accessSecret: process.env.TWITTER_ACCESS_SECRET || '',
+    };
+  
+    return new TwitterApiClient(credentials);
+  }
+
 export class TwitterApiClient implements TwitterClient {
   private client: TwitterApi;
 
@@ -108,4 +119,6 @@ export class TwitterApiClient implements TwitterClient {
     const me = await this.client.v2.me();
     return me.data.id;
   }
+
+  
 }
