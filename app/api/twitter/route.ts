@@ -31,15 +31,8 @@ const twitterInputSchema = z.object({
   }).optional()
 });
 
-// Initialize Twitter manager with credentials
-const twitterClient = new TwitterApiClient({
-  apiKey: process.env.TWITTER_API_KEY!,
-  apiSecret: process.env.TWITTER_API_SECRET!,
-  accessToken: process.env.TWITTER_ACCESS_TOKEN!,
-  accessSecret: process.env.TWITTER_ACCESS_SECRET!
-});
 
-const twitterManager = new TwitterManager(twitterClient); 
+const twitterManager = new TwitterManager();
 
 const config = configManager.getAll();
 const personalitySystem = new PersonalitySystem({
