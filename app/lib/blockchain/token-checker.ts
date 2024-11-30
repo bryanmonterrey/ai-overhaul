@@ -42,57 +42,9 @@ export class TokenChecker {
   }
 
   async getTokenPrice(): Promise<number> {
-    let prices: number[] = [];
-    
-    for (let attempt = 0; attempt < this.PRICE_RETRY_ATTEMPTS; attempt++) {
-      try {
-        // Try Jupiter
-        const jupiterResponse = await fetch(
-          `${this.JUPITER_API_URL}?ids=${this.tokenAddress}`
-        );
-        
-        if (jupiterResponse.ok) {
-          const jupiterData = await jupiterResponse.json();
-          const price = jupiterData.data[this.tokenAddress]?.price;
-          if (price && price > 0) prices.push(price);
-        }
-
-        // Try Birdeye
-        if (process.env.BIRDEYE_API_KEY) {
-          const birdeyeResponse = await fetch(
-            `${this.BIRDEYE_API_URL}?address=${this.tokenAddress}`,
-            {
-              headers: {
-                'X-API-KEY': process.env.BIRDEYE_API_KEY
-              }
-            }
-          );
-
-          if (birdeyeResponse.ok) {
-            const birdeyeData = await birdeyeResponse.json();
-            const price = birdeyeData.data?.value;
-            if (price && price > 0) prices.push(price);
-          }
-        }
-
-        // If we have prices, take the median to avoid manipulation
-        if (prices.length > 0) {
-          prices.sort((a, b) => a - b);
-          return prices[Math.floor(prices.length / 2)];
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        console.error(`Price fetch attempt ${attempt + 1} failed:`, error);
-        if (attempt === this.PRICE_RETRY_ATTEMPTS - 1) {
-          throw error;
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-
-    throw new Error('Could not fetch token price from any source');
-  }
+    // Return a default price instead of fetching
+    return 1; // Or any default value you want to use
+}
 
   async checkPriceImpact(balance: number): Promise<boolean> {
     try {

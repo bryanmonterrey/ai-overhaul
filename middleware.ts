@@ -2,6 +2,7 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { Database } from '@/supabase/functions/supabase.types';
+import { TokenChecker } from '@/app/lib/blockchain/token-checker';
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
@@ -18,7 +19,8 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
-  if (pathname === '/admin/login') {
+  // Allow access to login pages
+  if (pathname === '/admin/login' || pathname === '/login' || pathname === '/insufficient-tokens') {
     return res;
   }
 
@@ -43,32 +45,67 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Protected chat route
-  if (pathname.startsWith('/chat')) {
+  // Protected chat routes
+  if (pathname.startsWith('/chat') || 
+      pathname.startsWith('/conversation') || 
+      pathname.startsWith('/conversations')) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    // Get admin settings
-    const { data: settings } = await supabase
-      .from('admin_settings')
-      .select('*');
+    try {
+      // Get admin settings
+      const { data: settings } = await supabase
+        .from('admin_settings')
+        .select('*');
 
-    const tokenGateEnabled = settings?.find(s => s.key === 'token_gate_enabled')?.value;
-    
-    if (tokenGateEnabled) {
-      const requiredValue = settings?.find(s => s.key === 'required_token_value')?.value || 0;
+      const tokenGateEnabled = settings?.find(s => s.key === 'token_gate_enabled')?.value;
       
-      // Check user's token holdings
-      const { data: tokenHoldings } = await supabase
-        .from('token_holders')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
+      if (tokenGateEnabled) {
+        // Get user's wallet address
+        const { data: userData } = await supabase
+          .from('users')
+          .select('wallet_address')
+          .eq('id', session.user.id)
+          .single();
 
-      if (!tokenHoldings || tokenHoldings.dollar_value < requiredValue) {
-        return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
+        if (!userData?.wallet_address) {
+          return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
+        }
+
+        // Check actual token holdings
+        const tokenChecker = new TokenChecker();
+        const { isEligible, value } = await tokenChecker.checkEligibility(userData.wallet_address);
+
+        if (!isEligible) {
+          // Update token holdings in database
+          await supabase
+            .from('token_holders')
+            .upsert({
+              user_id: session.user.id,
+              wallet_address: userData.wallet_address,
+              dollar_value: value,
+              last_checked: new Date().toISOString()
+            });
+
+          // Clear session for ineligible users
+          await supabase.auth.signOut();
+          return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
+        }
+
+        // Update token holdings for eligible users
+        await supabase
+          .from('token_holders')
+          .upsert({
+            user_id: session.user.id,
+            wallet_address: userData.wallet_address,
+            dollar_value: value,
+            last_checked: new Date().toISOString()
+          });
       }
+    } catch (error) {
+      console.error('Token check error:', error);
+      return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
     }
   }
 
@@ -85,15 +122,17 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
-// Update matcher to include token validation endpoint
 export const config = {
   matcher: [
     '/admin/:path*', 
     '/api/admin/:path*', 
     '/chat/:path*',
+    '/conversation/:path*',
+    '/conversations/:path*',
     '/api/token-validation',
     '/api/chat/:path*',
     '/twitter/:path*',
-    '/telegram/:path*'
+    '/telegram/:path*',
+    '/((?!insufficient-tokens|login|api/auth).*)' // Exclude specific public routes
   ],
 };
