@@ -371,7 +371,7 @@ useEffect(() => {
           ))}
         </div>
 
-        <div className="border-t border-[#DDDDDD] p-4 bg-[#11111A]">
+        <div className="border-t border-[#DDDDDD] p-4 pb-8 md:pb-4 bg-[#11111A]">
           <div className="text-xs text-[#DDDDDD] mb-2">
             TOKEN_COUNT: {tokenCount}
           </div>
