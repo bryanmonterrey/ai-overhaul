@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { notFound, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -36,11 +36,18 @@ export default function ConversationPage({
   const [conversation, setConversation] = useState<ConversationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const conversationId = use(Promise.resolve(params.id));
 
   useEffect(() => {
-    checkAuth();
-    fetchConversation();
-  }, [params.id]);
+    if (!conversationId) return;
+
+    const initialize = async () => {
+      await checkAuth();
+      await fetchConversation();
+    };
+
+    initialize();
+  }, [conversationId]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -50,6 +57,8 @@ export default function ConversationPage({
   };
 
   const fetchConversation = async () => {
+    if (!conversationId) return;
+
     try {
       // Fetch the chat session
       const { data: session, error: sessionError } = await supabase
@@ -65,7 +74,7 @@ export default function ConversationPage({
             metadata
           )
         `)
-        .eq('id', params.id)
+        .eq('id', conversationId)
         .single();
 
       if (sessionError) throw sessionError;
