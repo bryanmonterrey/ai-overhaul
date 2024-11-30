@@ -24,13 +24,15 @@ interface ChatMessage {
       };
     };
   }
+
+type ConversationPageProps = {
+    params: {
+      id: string;
+    };
+  };
   
 
-export default function ConversationPage({ 
-  params 
-}: { 
-  params: { id: string } 
-}) {
+const ConversationPage = ({ params }: ConversationPageProps) => {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [conversation, setConversation] = useState<ConversationData | null>(null);
@@ -258,3 +260,5 @@ export default function ConversationPage({
     </div>
   );
 }
+
+export default ConversationPage;
