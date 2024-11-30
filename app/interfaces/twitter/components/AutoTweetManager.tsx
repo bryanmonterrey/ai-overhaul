@@ -20,6 +20,7 @@ export default function AutoTweetManager() {
   const [isAutoMode, setIsAutoMode] = useState(false);
   const [queuedTweets, setQueuedTweets] = useState<QueuedTweet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQueuedTweets();
@@ -27,21 +28,35 @@ export default function AutoTweetManager() {
 
   const fetchQueuedTweets = async () => {
     try {
+      setError(null);
       const response = await fetch('/api/twitter/queue');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
-      setQueuedTweets(data);
+      if (data.error) {
+        throw new Error(data.message || 'Failed to fetch tweets');
+      }
+      setQueuedTweets(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching queued tweets:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch tweets');
+      setQueuedTweets([]); // Reset to empty array on error
     }
   };
 
   const generateTweetBatch = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      await fetch('/api/twitter/queue/generate', { method: 'POST' });
+      const response = await fetch('/api/twitter/queue/generate', { method: 'POST' });
+      if (!response.ok) {
+        throw new Error(`Failed to generate tweets: ${response.statusText}`);
+      }
       await fetchQueuedTweets();
     } catch (error) {
       console.error('Error generating tweets:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate tweets');
     } finally {
       setIsLoading(false);
     }
@@ -49,33 +64,49 @@ export default function AutoTweetManager() {
 
   const updateTweetStatus = async (id: string, status: 'approved' | 'rejected') => {
     try {
-      await fetch(`/api/twitter/queue/${id}`, {
+      setError(null);
+      const response = await fetch(`/api/twitter/queue/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
+      if (!response.ok) {
+        throw new Error(`Failed to update tweet status: ${response.statusText}`);
+      }
       await fetchQueuedTweets();
     } catch (error) {
       console.error('Error updating tweet status:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update status');
     }
   };
 
   const toggleAutoMode = async () => {
     try {
-      await fetch('/api/twitter/queue/auto', {
+      setError(null);
+      const response = await fetch('/api/twitter/queue/auto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !isAutoMode })
       });
+      if (!response.ok) {
+        throw new Error(`Failed to toggle auto mode: ${response.statusText}`);
+      }
       setIsAutoMode(!isAutoMode);
     } catch (error) {
       console.error('Error toggling auto mode:', error);
+      setError(error instanceof Error ? error.message : 'Failed to toggle auto mode');
     }
   };
 
   return (
     <Card variant="system" title="AUTO_TWEET_MANAGER">
       <div className="space-y-4">
+        {error && (
+          <div className="text-red-500 text-xs font-mono p-2 border border-red-500 bg-red-500/10">
+            ERROR: {error}
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div className="font-mono text-xs">
             MODE: {isAutoMode ? 'AUTOMATIC' : 'MANUAL'}
