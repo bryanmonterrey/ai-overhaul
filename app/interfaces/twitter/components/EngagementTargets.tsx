@@ -10,8 +10,9 @@ import type { EngagementTargetRow } from '@/app/types/supabase';
 import type { TweetStyle } from '@/app/core/personality/types';
 
 export default function EngagementTargets() {
-  const [targets, setTargets] = useState<EngagementTargetRow[]>([]);
+ const [targets, setTargets] = useState<EngagementTargetRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [newTarget, setNewTarget] = useState({
     username: '',
     topics: '',
@@ -25,11 +26,15 @@ export default function EngagementTargets() {
 
   const fetchTargets = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/twitter/targets');
+      if (!response.ok) throw new Error('Failed to fetch targets');
       const data = await response.json();
-      setTargets(data);
+      setTargets(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error fetching targets:', error);
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch targets');
+      setTargets([]);
     } finally {
       setLoading(false);
     }
@@ -70,6 +75,9 @@ export default function EngagementTargets() {
       console.error('Error removing target:', error);
     }
   };
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <Card variant="system" title="ENGAGEMENT_TARGETS">
@@ -123,7 +131,7 @@ export default function EngagementTargets() {
         </div>
 
         <div className="space-y-2">
-          {targets.map(target => (
+          {Array.isArray(targets) && targets.map(target => (
             <div key={target.id} className="flex items-center justify-between p-2 border border-white font-mono text-xs">
               <div>
                 <div>@{target.username}</div>
