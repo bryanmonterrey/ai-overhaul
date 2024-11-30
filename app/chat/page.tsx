@@ -10,6 +10,7 @@ import { PersonalityMonitor } from '@/app/components/personality/PersonalityMoni
 import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
 import { EmotionalState, NarrativeMode } from '@/app/core/personality/types';
 import type { PersonalityState as CorePersonalityState, PersonalityState } from '@/app/core/types';
+import { TokenChecker } from '../lib/blockchain/token-checker';
 
 interface SystemState extends PersonalityState {
   traits: {
