@@ -1,19 +1,10 @@
-import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '@/app/core/twitter/types';
-import { TwitterApi } from 'twitter-api-v2';
+// app/lib/twitter-client.ts
 
-export function getTwitterClient(): TwitterApiClient {
-    const credentials = {
-      apiKey: process.env.TWITTER_API_KEY || '',
-      apiSecret: process.env.TWITTER_API_SECRET || '',
-      accessToken: process.env.TWITTER_ACCESS_TOKEN || '',
-      accessSecret: process.env.TWITTER_ACCESS_SECRET || '',
-    };
-  
-    return new TwitterApiClient(credentials);
-  }
+import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '@/app/core/twitter/types';
+const { TwitterApi } = require('twitter-api-v2');
 
 export class TwitterApiClient implements TwitterClient {
-  private client: TwitterApi;
+  private client: any; // Using any since we're using require for TwitterApi
 
   constructor(private credentials: {
     apiKey: string;
@@ -65,7 +56,7 @@ export class TwitterApiClient implements TwitterClient {
 
       return {
         data: {
-          data: tweets.map(tweet => ({
+          data: tweets.map((tweet: any) => ({
             id: tweet.id,
             text: tweet.text,
             created_at: tweet.created_at,
@@ -97,7 +88,7 @@ export class TwitterApiClient implements TwitterClient {
 
       return {
         data: {
-          data: tweets.map(tweet => ({
+          data: tweets.map((tweet: any) => ({
             id: tweet.id,
             text: tweet.text,
             created_at: tweet.created_at,
@@ -119,6 +110,19 @@ export class TwitterApiClient implements TwitterClient {
     const me = await this.client.v2.me();
     return me.data.id;
   }
+}
 
-  
+// Singleton instance
+let twitterClientInstance: TwitterApiClient | null = null;
+
+export function getTwitterClient(): TwitterApiClient {
+  if (!twitterClientInstance) {
+    twitterClientInstance = new TwitterApiClient({
+      apiKey: process.env.TWITTER_API_KEY || '',
+      apiSecret: process.env.TWITTER_API_SECRET || '',
+      accessToken: process.env.TWITTER_ACCESS_TOKEN || '',
+      accessSecret: process.env.TWITTER_ACCESS_SECRET || '',
+    });
+  }
+  return twitterClientInstance;
 }
