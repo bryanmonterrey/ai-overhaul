@@ -9,6 +9,8 @@ import { TokenCounter, RateLimiter, CacheManager } from '@/app/lib/utils/ai';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 export function getPersonalitySystem(): PersonalitySystem {
   return new PersonalitySystem(DEFAULT_PERSONALITY);
 }
@@ -28,8 +30,6 @@ export class AIService {
     }
   }
 
-  
-
   public static getInstance(): AIService {
     if (!AIService.instance) {
       AIService.instance = new AIService();
@@ -39,7 +39,7 @@ export class AIService {
 
   async generateResponse(prompt: string, context?: string) {
     try {
-      const response = await fetch('/api/ai', {
+      const response = await fetch(`${API_BASE_URL}/api/ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ export class AIService {
     const fallbackConfig = configManager.get('ai', 'fallback');
     
     try {
-      const response = await fetch('/api/ai', {
+      const response = await fetch(`${API_BASE_URL}/api/ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

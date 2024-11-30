@@ -1,6 +1,7 @@
 // next.config.ts
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: [
     '@solana/wallet-adapter-base',
@@ -8,6 +9,15 @@ const nextConfig = {
     '@solana/wallet-adapter-react-ui',
     '@solana/wallet-adapter-wallets',
   ],
+  experimental: {
+    serverComponentsExternalPackages: ['twitter-api-v2']
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push('twitter-api-v2')
+    }
+    return config
+  },
   // Add environment variables
   env: {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
@@ -25,4 +35,4 @@ const nextConfig = {
   }
 }
 
-export default nextConfig;
+export default nextConfig

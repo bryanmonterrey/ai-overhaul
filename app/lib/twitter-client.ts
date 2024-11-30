@@ -1,19 +1,19 @@
 // app/lib/twitter-client.ts
 
 import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '@/app/core/twitter/types';
+import type { TwitterApi as TwitterApiType } from 'twitter-api-v2';
 
-// Use dynamic import for twitter-api-v2 to avoid initialization issues
-const TwitterApi = (() => {
-  try {
-    return require('twitter-api-v2');
-  } catch (e) {
-    console.error('Failed to load twitter-api-v2:', e);
-    throw e;
-  }
-})();
+// Import twitter-api-v2 dynamically to avoid initialization issues
+let TwitterApi: typeof TwitterApiType;
+try {
+  TwitterApi = require('twitter-api-v2').TwitterApi;
+} catch (e) {
+  console.error('Failed to load twitter-api-v2:', e);
+  throw e;
+}
 
 export class TwitterApiClient implements TwitterClient {
-  private client: any;
+  private client: TwitterApiType;
 
   constructor(private credentials: {
     apiKey: string;
@@ -22,7 +22,7 @@ export class TwitterApiClient implements TwitterClient {
     accessSecret: string;
   }) {
     try {
-      this.client = new TwitterApi.TwitterApi({
+      this.client = new TwitterApi({
         appKey: credentials.apiKey,
         appSecret: credentials.apiSecret,
         accessToken: credentials.accessToken,

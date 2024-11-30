@@ -18,6 +18,9 @@ export class TwitterManager {
   private queuedTweets: QueuedTweet[] = [];
   private isAutoMode: boolean = false;
   private nextTweetTimeout?: NodeJS.Timeout;
+  private lastTweetTime?: Date;
+  private isReady: boolean = true;
+  private recentTweets = new Map<string, any>();
 
   constructor(
     client: TwitterClient,
@@ -137,6 +140,7 @@ export class TwitterManager {
     this.nextTweetTimeout = setTimeout(async () => {
       try {
         await this.postTweet(nextTweet.content);
+        this.lastTweetTime = new Date();
         this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
         this.scheduleNextTweet();
       } catch (error) {
@@ -242,5 +246,17 @@ export class TwitterManager {
     if (hour >= 12 && hour < 17) return 'afternoon';
     if (hour >= 17 && hour < 22) return 'evening';
     return 'night';
+  }
+
+  async getStatus(): Promise<any> {  // Define return type based on your needs
+    return {
+      lastTweetTime: this.lastTweetTime,
+      isReady: this.isReady,  // Assuming these properties exist
+      // Add other status properties as needed
+    };
+  }
+
+  getRecentTweets() {
+    return this.recentTweets;
   }
 }
