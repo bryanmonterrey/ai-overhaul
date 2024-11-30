@@ -151,23 +151,23 @@ export default function ConversationPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black text-green-500 p-4 flex items-center justify-center">
-        <div className="text-xl font-mono">Loading conversation...</div>
+      <div className="min-h-screen bg-[#11111A] text-[#DDDDDD] p-2 flex items-center justify-center">
+        <div className="text-xl font-ia">Loading conversation...</div>
       </div>
     );
   }
 
   if (error || !conversation) {
     return (
-      <div className="min-h-screen bg-black text-green-500 p-4">
+      <div className="min-h-screen bg-[#11111A] text-[#DDDDDD] p-2">
         <div className="max-w-3xl mx-auto">
           <Link 
             href="/conversations"
-            className="text-green-500 hover:text-green-400 font-mono"
+            className="text-[#DDDDDD] hover:text-white font-ia"
           >
             ← Back to conversations
           </Link>
-          <div className="mt-8 text-center font-mono">
+          <div className="mt-8 text-center font-ia">
             {error || 'Conversation not found'}
           </div>
         </div>
@@ -176,20 +176,20 @@ export default function ConversationPage({
   }
 
   return (
-    <div className="min-h-screen bg-black text-green-500 p-4">
+    <div className="min-h-screen bg-[#11111A] text-[#DDDDDD] p-2">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <Link 
             href="/conversations"
-            className="text-green-500 hover:text-green-400 font-mono"
+            className="text-[#DDDDDD] hover:text-white font-ia"
           >
             ← Back to conversations
           </Link>
-          <h1 className="text-xl mt-4 font-mono">
+          <h1 className="text-base mt-4 font-ia">
             Conversation {conversation.id.slice(0, 8)}
           </h1>
-          <p className="text-sm font-mono opacity-75">
+          <p className="text-sm font-ia opacity-75">
             {new Date(conversation.timestamp).toLocaleString()}
           </p>
         </div>
@@ -199,13 +199,13 @@ export default function ConversationPage({
           {conversation.messages.map((msg) => (
             <div 
               key={msg.id} 
-              className={`p-4 border ${
+              className={`p-3 border ${
                 msg.sender === 'user'
-                  ? 'border-green-500/20 ml-auto'
+                  ? 'border-[#DDDDDD]/30 ml-auto'
                   : msg.error
                   ? 'border-red-500/20'
-                  : 'border-green-500/20'
-              } max-w-[80%] font-mono`}
+                  : 'border-[#DDDDDD]/30'
+              } max-w-[80%] font-ia`}
             >
               <div className="text-xs mb-2 opacity-75">
                 {msg.sender === 'ai' && (
@@ -216,7 +216,7 @@ export default function ConversationPage({
                 )}
               </div>
               
-              <div className={msg.sender === 'ai' ? 'text-green-500' : ''}>
+              <div className={msg.sender === 'ai' ? 'text-[#DDDDDD]' : ''}>
                 {msg.content}
               </div>
 
@@ -243,7 +243,7 @@ export default function ConversationPage({
         <div className="mt-8 mb-8 flex items-center space-x-4 font-mono">
           <button
             onClick={handleUpvote}
-            className="bg-black text-green-500 px-4 py-2 border border-green-500 hover:bg-green-500/10"
+            className="bg-[#11111A] text-[#DDDDDD] px-4 py-2 border border-[#DDDDDD] hover:bg-[#DDDDDD]/10"
           >
             ↑ {conversation.upvotes} Upvotes
           </button>

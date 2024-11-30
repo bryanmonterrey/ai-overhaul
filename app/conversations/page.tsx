@@ -122,14 +122,14 @@ export default function ConversationsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black text-green-500 p-4 flex items-center justify-center">
+      <div className="min-h-screen bg-[#11111A] text-[#DDDDDD] p-4 flex items-center justify-center">
         <div className="text-xl font-mono">Loading conversations...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-green-500 p-4">
+    <div className="min-h-screen bg-[#11111A] text-[#DDDDDD] p-4">
       {/* Search Bar */}
       <div className="max-w-3xl mx-auto mb-8">
         <div className="flex gap-2">
@@ -138,7 +138,7 @@ export default function ConversationsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search conversations..."
-            className="flex-1 bg-black border border-green-500 p-2 text-green-500 font-mono"
+            className="flex-1 bg-[#11111A] border border-[#DDDDDD] p-2 text-[#DDDDDD] font-ia"
           />
         </div>
       </div>
@@ -149,8 +149,8 @@ export default function ConversationsPage() {
           onClick={() => setSortBy('recent')}
           className={`font-mono px-4 py-2 border ${
             sortBy === 'recent' 
-              ? 'bg-green-500 text-black border-green-500' 
-              : 'border-green-500 text-green-500'
+              ? 'bg-[#11111A] text-[#DDDDDD] border-[#DDDDDD]' 
+              : 'border-[#DDDDDD] text-[#DDDDDD]'
           }`}
         >
           SORT_BY_RECENT
@@ -159,8 +159,8 @@ export default function ConversationsPage() {
           onClick={() => setSortBy('upvoted')}
           className={`font-mono px-4 py-2 border ${
             sortBy === 'upvoted' 
-              ? 'bg-green-500 text-black border-green-500' 
-              : 'border-green-500 text-green-500'
+              ? 'bg-[#11111A] text-[#DDDDDD] border-[#DDDDDD]' 
+              : 'border-[#DDDDDD] text-[#DDDDDD]'
           }`}
         >
           SORT_BY_UPVOTES
@@ -172,12 +172,12 @@ export default function ConversationsPage() {
         {filteredConversations.map(conv => (
           <div 
             key={conv.id}
-            className="border border-green-500/20 p-4 font-mono"
+            className="border border-[#DDDDDD] p-4 font-ia"
           >
             <div className="flex justify-between items-start mb-2">
               <Link 
                 href={`/conversation/${conv.id}`}
-                className="text-green-500 hover:text-green-400 flex-1"
+                className="text-[#DDDDDD] hover:text-whiteflex-1"
               >
                 <h2 className="text-sm opacity-75">
                   {new Date(conv.timestamp).toLocaleString()}
@@ -188,7 +188,7 @@ export default function ConversationsPage() {
               <div className="flex flex-col items-end ml-4">
                 <button
                   onClick={() => handleUpvote(conv.id)}
-                  className="text-xs border border-green-500/50 px-2 py-1 hover:bg-green-500/10"
+                  className="text-xs border border-[#DDDDDD] px-2 py-1 hover:bg-white/10"
                 >
                   ↑ {conv.upvotes}
                 </button>
@@ -201,7 +201,7 @@ export default function ConversationsPage() {
         ))}
 
         {filteredConversations.length === 0 && (
-          <div className="text-center opacity-75 font-mono">
+          <div className="text-center opacity-75 font-ia">
             No conversations found
           </div>
         )}
