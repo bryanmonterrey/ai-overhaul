@@ -1,26 +1,159 @@
-// app/conversation/[id]/page.tsx
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { notFound, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { ConversationData } from '@/app/core/types/conversation';
 
-interface Message {
-  role: 'user' | 'assistant' | 'simulator';
-  content: string;
-}
-
-interface ConversationData {
-  id: string;
-  timestamp: string;
-  messages: Message[];
-  upvotes: number;
-}
-
-export default async function ConversationPage({ 
+export default function ConversationPage({ 
   params 
 }: { 
   params: { id: string } 
 }) {
-    const [conversation, setConversation] = useState<ConversationData | null>(null);
+  const supabase = createClientComponentClient();
+  const router = useRouter();
+  const [conversation, setConversation] = useState<ConversationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    checkAuth();
+    fetchConversation();
+  }, [params.id]);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push('/login');
+    }
+  };
+
+  const fetchConversation = async () => {
+    try {
+      // Fetch the chat session
+      const { data: session, error: sessionError } = await supabase
+        .from('chat_sessions')
+        .select(`
+          *,
+          chat_messages!chat_messages_session_id_fkey (
+            id,
+            content,
+            role,
+            emotional_state,
+            created_at,
+            metadata
+          )
+        `)
+        .eq('id', params.id)
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      if (!session) {
+        return notFound();
+      }
+
+      const conversationData: ConversationData = {
+        id: session.id,
+        timestamp: session.started_at,
+        messages: session.chat_messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.role,
+          timestamp: new Date(msg.created_at),
+          emotionalState: msg.emotional_state,
+          ...(msg.metadata && {
+            error: msg.metadata.error,
+            retryable: msg.metadata.retryable,
+            aiResponse: msg.metadata.aiResponse
+          })
+        })),
+        upvotes: session.upvotes || 0,
+        userId: session.user_id
+      };
+
+      setConversation(conversationData);
+    } catch (error) {
+      console.error('Failed to fetch conversation:', error);
+      setError('Failed to load conversation');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpvote = async () => {
+    if (!conversation) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Check if user has already upvoted
+      const { data: existingUpvote } = await supabase
+        .from('conversation_upvotes')
+        .select()
+        .eq('conversation_id', conversation.id)
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (existingUpvote) {
+        // Remove upvote
+        await supabase
+          .from('conversation_upvotes')
+          .delete()
+          .eq('conversation_id', conversation.id)
+          .eq('user_id', session.user.id);
+
+        await supabase.rpc('decrement_upvotes', {
+          conversation_id: conversation.id
+        });
+      } else {
+        // Add upvote
+        await supabase
+          .from('conversation_upvotes')
+          .insert({
+            conversation_id: conversation.id,
+            user_id: session.user.id
+          });
+
+        await supabase.rpc('increment_upvotes', {
+          conversation_id: conversation.id
+        });
+      }
+
+      // Refresh conversation data
+      await fetchConversation();
+    } catch (error) {
+      console.error('Error handling upvote:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black text-green-500 p-4 flex items-center justify-center">
+        <div className="text-xl font-mono">Loading conversation...</div>
+      </div>
+    );
+  }
+
+  if (error || !conversation) {
+    return (
+      <div className="min-h-screen bg-black text-green-500 p-4">
+        <div className="max-w-3xl mx-auto">
+          <Link 
+            href="/conversations"
+            className="text-green-500 hover:text-green-400 font-mono"
+          >
+            ← Back to conversations
+          </Link>
+          <div className="mt-8 text-center font-mono">
+            {error || 'Conversation not found'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-green-500 p-4">
@@ -28,36 +161,71 @@ export default async function ConversationPage({
         {/* Header */}
         <div className="mb-8">
           <Link 
-            href="/home"
-            className="text-green-500 hover:text-green-400"
+            href="/conversations"
+            className="text-green-500 hover:text-green-400 font-mono"
           >
-            return to home
+            ← Back to conversations
           </Link>
-          <h1 className="text-xl mt-4">
-            conversation {params.id}
+          <h1 className="text-xl mt-4 font-mono">
+            Conversation {conversation.id.slice(0, 8)}
           </h1>
-          <p className="text-sm">
-            timestamp: {conversation.timestamp}
+          <p className="text-sm font-mono opacity-75">
+            {new Date(conversation.timestamp).toLocaleString()}
           </p>
         </div>
 
         {/* Messages */}
         <div className="space-y-4">
-          {conversation.messages.map((msg, i) => (
-            <div key={i} className="space-y-2">
-              <div className="font-mono">
-                {msg.role === 'simulator' && '$ >simulator@zerebro> '}
+          {conversation.messages.map((msg) => (
+            <div 
+              key={msg.id} 
+              className={`p-4 border ${
+                msg.sender === 'user'
+                  ? 'border-green-500/20 ml-auto'
+                  : msg.error
+                  ? 'border-red-500/20'
+                  : 'border-green-500/20'
+              } max-w-[80%] font-mono`}
+            >
+              <div className="text-xs mb-2 opacity-75">
+                {msg.sender === 'ai' && (
+                  <span>
+                    {msg.emotionalState && `STATE: ${msg.emotionalState} | `}
+                    {new Date(msg.timestamp).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              
+              <div className={msg.sender === 'ai' ? 'text-green-500' : ''}>
                 {msg.content}
               </div>
-            </div>
+
+              {msg.aiResponse && (
+                <div className="text-xs mt-2 opacity-75 space-y-1">
+                  <div>MODEL: {msg.aiResponse.model}</div>
+                  <div>TOKENS: {msg.aiResponse.tokenCount.total}</div>
+                  {msg.aiResponse.cached && <div>CACHED_RESPONSE</div>}
+                </div>
+              )}
+
+              {msg.error && msg.retryable && (
+                <button
+                  className="mt-2 text-xs text-red-500 hover:text-red-400"
+                >
+                  RETRY_MESSAGE
+                </button>
+              )}
+              </div>
           ))}
         </div>
 
         {/* Upvote Section */}
-        <div className="mt-8">
-          <span>upvotes: {conversation.upvotes}</span>
-          <button className="ml-4 bg-green-500 text-black px-4 py-1">
-            Upvote
+        <div className="mt-8 mb-8 flex items-center space-x-4 font-mono">
+          <button
+            onClick={handleUpvote}
+            className="bg-black text-green-500 px-4 py-2 border border-green-500 hover:bg-green-500/10"
+          >
+            ↑ {conversation.upvotes} Upvotes
           </button>
         </div>
       </div>
