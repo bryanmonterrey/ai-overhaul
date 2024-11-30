@@ -26,6 +26,21 @@ import {
     cooldownPeriod: number; // in milliseconds
     lastApplied?: Date;
   }
+
+  export interface PromptTemplate {
+    id: string;
+    name: string;
+    content: string;
+    type: string;
+    is_active: boolean;
+  }
+
+  export interface TrainingConversation {
+    id: string;
+    messages: any[]; // Define proper message type
+    votes: number;
+    is_approved: boolean;
+  }
   
   /**
    * Represents the outcome of applying a training pattern
