@@ -25,12 +25,6 @@ interface ChatMessage {
     };
   }
 
-type ConversationPageProps = {
-    params: {
-      id: string;
-    };
-  };
-
   interface PageProps {
     params: {
       id: string;
@@ -38,8 +32,6 @@ type ConversationPageProps = {
     searchParams?: { [key: string]: string | string[] | undefined };
   }
   
-
-
   const ConversationPage: React.FC<PageProps> = ({ params }) => {
   const supabase = createClientComponentClient();
   const router = useRouter();
