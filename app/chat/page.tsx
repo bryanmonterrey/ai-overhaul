@@ -65,6 +65,18 @@ export default function ChatPage() {
     narrativeMode: 'technical'
   });
 
+  const [isRightPanelVisible, setIsRightPanelVisible] = useState(false);
+
+useEffect(() => {
+  const checkWidth = () => {
+    setIsRightPanelVisible(window.innerWidth >= 750);
+  };
+  
+  checkWidth();
+  window.addEventListener('resize', checkWidth);
+  return () => window.removeEventListener('resize', checkWidth);
+}, []);
+
   useEffect(() => {
     const checkAccess = async () => {
       try {
@@ -158,6 +170,7 @@ export default function ChatPage() {
         </div>
       </div>
       
+      {isRightPanelVisible && (
       <div className="space-y-4">
         <EmotionalStateDisplay
           state={systemState.consciousness.emotionalState}
@@ -178,6 +191,7 @@ export default function ChatPage() {
           className="flex-1 min-h-0"
         />
       </div>
+    )}
     </div>
   );
 }

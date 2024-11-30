@@ -44,6 +44,18 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [currentMetrics, setCurrentMetrics] = useState<ChatMetrics | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const [isAnalyticsVisible, setIsAnalyticsVisible] = useState(false);
+
+useEffect(() => {
+  const checkWidth = () => {
+    setIsAnalyticsVisible(window.innerWidth >= 750);
+  };
+  
+  checkWidth();
+  window.addEventListener('resize', checkWidth);
+  return () => window.removeEventListener('resize', checkWidth);
+}, []);
   
   // Add PersonalitySystem and SimulatorSystem
   const [personalitySystem] = useState(() => new PersonalitySystem(defaultConfig.personality));
@@ -384,22 +396,24 @@ export default function Chat({ personalityState: externalState, onPersonalitySta
         </div>
       </div>
 
-      <div className="w-80 border-l border-[##DDDDDD] p-4 space-y-4">
-        <button
-          onClick={() => setShowAnalytics(!showAnalytics)}
-          className="w-full text-[#DDDDDD] border border-[#DDDDDD] p-2 font-mono text-sm"
-        >
-          {showAnalytics ? '[HIDE_ANALYTICS]' : '[SHOW_ANALYTICS]'}
-        </button>
+      {isAnalyticsVisible && (
+  <div className="w-80 border-l border-[##DDDDDD] p-4 space-y-4">
+    <button
+      onClick={() => setShowAnalytics(!showAnalytics)}
+      className="w-full text-[#DDDDDD] border border-[#DDDDDD] p-2 font-mono text-sm"
+    >
+      {showAnalytics ? '[HIDE_ANALYTICS]' : '[SHOW_ANALYTICS]'}
+    </button>
 
-        {currentMetrics && (
-          <QualityMetricsDisplay metrics={currentMetrics} />
-        )}
+    {currentMetrics && (
+      <QualityMetricsDisplay metrics={currentMetrics} />
+    )}
 
-        {showAnalytics && sessionId && (
-          <ChatAnalytics />
-        )}
-      </div>
+    {showAnalytics && sessionId && (
+      <ChatAnalytics />
+    )}
+  </div>
+)}
     </div>
   );
 }
