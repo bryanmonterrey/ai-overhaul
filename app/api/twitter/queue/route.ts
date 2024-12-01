@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     const twitterManager = new TwitterManager(twitterClient, personalitySystem);
 
     const tweets = await twitterManager.getQueuedTweets();
+    console.log('Queued tweets:', tweets); // Add this log
     
     return NextResponse.json(tweets || []);
   } catch (error) {
