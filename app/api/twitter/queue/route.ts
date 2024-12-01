@@ -1,23 +1,18 @@
-// app/api/twitter/queue/route.ts
-
 import { withAuth } from '@/app/lib/middleware/auth-middleware';
 import { withConfig } from '@/app/lib/middleware/configMiddleware';
 import { NextRequest, NextResponse } from 'next/server';
 import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { Database } from '@/types/supabase.types';
 
 export async function GET(req: NextRequest) {
-    // Define the handler first
-    const handler = async (
-        supabase: SupabaseClient<Database>,
-        session: any
-    ) => {
+    const handler = async (supabase: any, session: any) => {
         try {
             const twitterManager = getTwitterManager();
             
             if (!twitterManager) {
-                throw new Error('Twitter manager not initialized');
+                return NextResponse.json(
+                    { error: 'Twitter manager not initialized' },
+                    { status: 500 }
+                );
             }
 
             const tweets = await twitterManager.getQueuedTweets();
@@ -36,7 +31,7 @@ export async function GET(req: NextRequest) {
         }
     };
 
-    // Apply middlewares correctly
+    // Apply auth first, then config
     const authMiddleware = await withAuth(handler);
     return withConfig(authMiddleware)(req);
 }
