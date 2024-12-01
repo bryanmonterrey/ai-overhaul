@@ -21,7 +21,7 @@ export function AdminSettings() {
   }, []);
 
   const handleToggleGating = async () => {
-    await updateAdminSetting('token_gate_enabled', !settings.token_gate_enabled);
+    await updateAdminSetting('admin', 'token_gate_enabled', (!settings.token_gate_enabled).toString());
     setSettings(prev => ({
       ...prev,
       token_gate_enabled: !prev.token_gate_enabled
@@ -29,7 +29,7 @@ export function AdminSettings() {
   };
 
   const handleValueChange = async (value: number) => {
-    await updateAdminSetting('required_token_value', value);
+    await updateAdminSetting('admin', 'required_token_value', value.toString());
     setSettings(prev => ({
       ...prev,
       required_token_value: value
