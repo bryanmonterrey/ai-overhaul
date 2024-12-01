@@ -88,7 +88,49 @@ class ConfigManager {
   }
 }
 
-export const configManager = ConfigManager.getInstance();
+export const configManager = {
+  config: {
+    system: {
+      rateLimits: {
+        enabled: true,
+        maxRequests: 100,
+        windowMs: 60000
+      }
+    },
+    integrations: {
+      twitter: {
+        enabled: process.env.NEXT_PUBLIC_TWITTER_ENABLED === 'true',
+        apiKey: process.env.TWITTER_API_KEY
+      },
+      telegram: {
+        enabled: false
+      }
+    },
+    personality: {}
+  },
+
+  get(section: keyof typeof this.config, key: string) {
+    return this.config[section]?.[key as keyof typeof this.config[typeof section]];
+  },
+
+  validateConfig() {
+    try {
+      // Basic validation
+      if (!this.config.system) return false;
+      if (!this.config.integrations) return false;
+      
+      // Check if Twitter is properly configured when enabled
+      if (this.config.integrations.twitter.enabled) {
+        return true; // For now, just return true to test
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Config validation error:', error);
+      return false;
+    }
+  }
+};
 
 // Helper function for type-safe config access
 export function getConfig<

@@ -1,53 +1,24 @@
 // app/api/twitter/queue/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
-import { Database } from '@/types/supabase.types';
+import { withAuth } from '@/app/lib/middleware/auth-middleware';
+import { withConfig } from '@/app/lib/middleware/configMiddleware';
+import { NextRequest } from 'next/server';
 import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
-import { withAuth, AuthenticatedHandler } from '@/app/lib/middleware/auth-middleware';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+
 
 export async function GET(req: NextRequest) {
-    const handler: AuthenticatedHandler = async (supabase, session, cookies) => {
-        try {
-            const twitterManager = getTwitterManager();
-            
-            if (!twitterManager) {
-                return NextResponse.json(
-                    { error: true, message: 'Twitter manager not initialized' },
-                    { status: 500 }
-                );
-            }
-
-            // Initialize the tweets table if it doesn't exist
-            const { data: existingTweets, error: dbError } = await supabase
-                .from('tweet_queue')
-                .select('*')
-                .limit(1);
-
-            if (dbError) {
-                console.error('Database error:', dbError);
-                return NextResponse.json(
-                    { error: true, message: 'Database error' },
-                    { status: 500 }
-                );
-            }
-
-            const tweets = await twitterManager.getQueuedTweets();
-            return NextResponse.json(tweets || []);
-            
-        } catch (error) {
-            console.error('Error in queue route:', error);
-            return NextResponse.json(
-                { 
-                    error: true,
-                    message: error instanceof Error ? error.message : 'Internal server error',
-                    code: 'QUEUE_ERROR'
-                },
-                { status: 500 }
-            );
-        }
-    };
-
-    return withAuth(handler);
+  return withConfig(withAuth(async (supabase, session) => {
+    try {
+      const twitterManager = getTwitterManager();
+      const tweets = await twitterManager.getQueuedTweets();
+      return NextResponse.json(tweets || []);
+    } catch (error) {
+      console.error('Error in queue route:', error);
+      return NextResponse.json(
+        { error: true, message: error.message, debug: process.env.NODE_ENV === 'development' ? error : undefined },
+        { status: 500 }
+      );
+    }
+  }))(req);
 }
