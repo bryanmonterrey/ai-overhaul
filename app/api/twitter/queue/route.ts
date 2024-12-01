@@ -8,6 +8,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase.types';
 
 export async function GET(req: NextRequest) {
+    // Define the handler first
     const handler = async (
         supabase: SupabaseClient<Database>,
         session: any
@@ -35,5 +36,7 @@ export async function GET(req: NextRequest) {
         }
     };
 
-    return withConfig(withAuth(handler))(req);
+    // Apply middlewares correctly
+    const authMiddleware = await withAuth(handler);
+    return withConfig(authMiddleware)(req);
 }
