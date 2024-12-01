@@ -1,3 +1,4 @@
+// app/api/twitter/route.ts
 import { NextResponse } from 'next/server';
 import { TwitterManager } from '@/app/lib/twitter';
 import { IntegrationManager } from '@/app/core/personality/IntegrationManager';
@@ -31,24 +32,25 @@ const twitterInputSchema = z.object({
   }).optional()
 });
 
-
 const twitterManager = new TwitterManager();
 
-const config = configManager.getAll();
-const personalitySystem = new PersonalitySystem({
-  baseTemperature: config.personality.baseTemperature,
-  creativityBias: config.personality.creativityBias,
-  emotionalVolatility: config.personality.emotionalVolatility,
-  memoryRetention: config.personality.memoryRetention,
+// Personality configuration
+const personalityConfig = {
+  baseTemperature: 0.7,
+  creativityBias: 0.5,
+  emotionalVolatility: 0.3,
+  memoryRetention: 0.8,
   responsePatterns: {
-    neutral: config.personality.responsePatterns?.neutral ?? [],
-    excited: config.personality.responsePatterns?.excited ?? [],
-    contemplative: config.personality.responsePatterns?.contemplative ?? [],
-    chaotic: config.personality.responsePatterns?.chaotic ?? [],
-    creative: config.personality.responsePatterns?.creative ?? [],
-    analytical: config.personality.responsePatterns?.analytical ?? []
+    neutral: [],
+    excited: [],
+    contemplative: [],
+    chaotic: [],
+    creative: [],
+    analytical: []
   }
-});
+};
+
+const personalitySystem = new PersonalitySystem(personalityConfig);
 
 const emotionalSystem = new EmotionalSystem();
 const memorySystem = new MemorySystem();
