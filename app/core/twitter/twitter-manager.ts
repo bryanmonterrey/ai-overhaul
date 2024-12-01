@@ -315,70 +315,78 @@ public toggleAutoMode(enabled: boolean): void {
     }
 }
 
-  private async scheduleNextTweet(): Promise<void> {
-    try {
-        console.log('Scheduling next tweet, automode:', this.isAutoMode);
-        
-        if (!this.isAutoMode) {
-            console.log('Auto mode is disabled, not scheduling');
-            return;
-        }
+private async scheduleNextTweet(): Promise<void> {
+  try {
+      console.log('Scheduling next tweet, automode:', this.isAutoMode);
+      
+      if (!this.isAutoMode) {
+          console.log('Auto mode is disabled, not scheduling');
+          return;
+      }
 
-        await this.syncQueueWithDatabase(); // Add this line
+      await this.syncQueueWithDatabase();
 
-        const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
-        console.log('Found approved tweets:', approvedTweets.length);
-        
-        if (approvedTweets.length === 0) {
-            console.log('No approved tweets to schedule');
-            return;
-        }
+      const approvedTweets = this.queuedTweets
+          .filter(t => t.status === 'approved')
+          .sort((a, b) => {
+              const timeA = a.scheduledFor?.getTime() || Infinity;
+              const timeB = b.scheduledFor?.getTime() || Infinity;
+              return timeA - timeB;
+          });
 
-        const nextTweet = approvedTweets[0];
-        const delay = this.getEngagementBasedDelay();
-        const scheduledTime = new Date(Date.now() + delay);
+      console.log('Found approved tweets:', approvedTweets.length);
+      
+      if (approvedTweets.length === 0) {
+          console.log('No approved tweets to schedule');
+          return;
+      }
 
-        console.log('Scheduling details:', {
-            tweetId: nextTweet.id,
-            content: nextTweet.content,
-            delay,
-            scheduledTime
-        });
+      const nextTweet = approvedTweets[0];
+      
+      if (!nextTweet.scheduledFor) {
+          console.log('Next tweet has no scheduled time:', nextTweet);
+          return;
+      }
 
-        // Update database first
-        await this.persistScheduledTweet(nextTweet.id, scheduledTime);
+      const now = new Date().getTime();
+      const scheduledTime = nextTweet.scheduledFor.getTime();
+      const delay = Math.max(0, scheduledTime - now);
 
-        // Update local state
-        nextTweet.scheduledFor = scheduledTime;
+      console.log('Scheduling details:', {
+          tweetId: nextTweet.id,
+          content: nextTweet.content,
+          scheduledTime: nextTweet.scheduledFor.toISOString(),
+          delay: delay
+      });
 
-        if (this.nextTweetTimeout) {
-            clearTimeout(this.nextTweetTimeout);
-        }
+      if (this.nextTweetTimeout) {
+          clearTimeout(this.nextTweetTimeout);
+      }
 
-        this.nextTweetTimeout = setTimeout(async () => {
-            try {
-                console.log('Executing scheduled tweet:', nextTweet);
-                await this.postTweet(nextTweet.content);
-                
-                // Remove from database and local queue
-                await this.supabase
-                    .from('tweet_queue')
-                    .delete()
-                    .eq('id', nextTweet.id);
-                    
-                this.queuedTweets = this.queuedTweets
-                    .filter(t => t.id !== nextTweet.id);
-                
-                console.log('Tweet posted successfully, scheduling next');
-                this.scheduleNextTweet();
-            } catch (error) {
-                console.error('Failed to post scheduled tweet:', error);
-                setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
-            }
-        }, delay);
-    } catch (error) {
-        console.error('Error in scheduleNextTweet:', error);
-    }
+      this.nextTweetTimeout = setTimeout(async () => {
+          try {
+              console.log('Executing scheduled tweet:', nextTweet);
+              await this.postTweet(nextTweet.content);
+              
+              // Remove from database and local queue
+              await this.supabase
+                  .from('tweet_queue')
+                  .delete()
+                  .eq('id', nextTweet.id);
+                  
+              this.queuedTweets = this.queuedTweets
+                  .filter(t => t.id !== nextTweet.id);
+              
+              console.log('Tweet posted successfully, scheduling next');
+              this.scheduleNextTweet();
+          } catch (error) {
+              console.error('Failed to post scheduled tweet:', error);
+              setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+          }
+      }, delay);
+  } catch (error) {
+      console.error('Error in scheduleNextTweet:', error);
+  }
 }
 
 public async getQueuedTweets(): Promise<QueuedTweet[]> {
