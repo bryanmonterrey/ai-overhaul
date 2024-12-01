@@ -106,7 +106,20 @@ export const configManager = {
         enabled: false
       }
     },
-    personality: {}
+    personality: {},
+    // Add the AI section
+    ai: {
+      settings: {
+        temperature: 0.7,
+        topP: 1,
+        presencePenalty: 0,
+        frequencyPenalty: 0,
+        repetitionPenalty: 1,
+        stopSequences: [],
+        maxTokens: 1000
+      },
+      model: process.env.AI_MODEL || 'claude-3-sonnet-20240229'
+    }
   },
 
   get(section: keyof typeof this.config, key: string) {
@@ -118,12 +131,8 @@ export const configManager = {
       // Basic validation
       if (!this.config.system) return false;
       if (!this.config.integrations) return false;
+      if (!this.config.ai) return false;
       
-      // Check if Twitter is properly configured when enabled
-      if (this.config.integrations.twitter.enabled) {
-        return true; // For now, just return true to test
-      }
-
       return true;
     } catch (error) {
       console.error('Config validation error:', error);
