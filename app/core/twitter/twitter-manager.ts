@@ -3,6 +3,7 @@ import type { TwitterClient, TwitterData } from './types';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { TweetStyle } from '../personality/types';
+import { TweetStats } from './TweetStats';
 
 interface QueuedTweet {
   id: string;
@@ -21,14 +22,16 @@ export class TwitterManager {
   private lastTweetTime?: Date;
   private isReady: boolean = true;
   private recentTweets = new Map<string, any>();
+  private stats: TweetStats;
   
 
   constructor(
     client: TwitterClient,
     private personality: PersonalitySystem
-  ) {
+) {
     this.client = client;
-  }
+    this.stats = new TweetStats();  // Initialize stats
+}
 
   // Your existing methods
   async postTweet(content: string): Promise<TwitterData> {
@@ -99,14 +102,25 @@ export class TwitterManager {
   }
 
   public updateTweetStatus(id: string, status: 'approved' | 'rejected'): void {
-    this.queuedTweets = this.queuedTweets.map(tweet => 
-      tweet.id === id ? { ...tweet, status } : tweet
-    );
+    this.queuedTweets = this.queuedTweets.map(tweet => {
+        if (tweet.id === id) {
+            this.stats.increment(status);  // Update stats
+            return {
+                ...tweet,
+                status,
+                updatedAt: new Date(),
+                scheduledFor: status === 'approved' ? 
+                    new Date(Date.now() + this.getEngagementBasedDelay()) : 
+                    undefined
+            };
+        }
+        return tweet;
+    });
 
     if (status === 'approved' && this.isAutoMode) {
-      this.scheduleNextTweet();
+        this.scheduleNextTweet();
     }
-  }
+}
 
   public toggleAutoMode(enabled: boolean): void {
     this.isAutoMode = enabled;
@@ -208,6 +222,57 @@ private async scheduleNextTweet(): Promise<void> {
     }
   }
 
+  // Add this method after getEnvironmentalFactors
+  private async trackEngagement() {
+    try {
+        const timeline = await this.client.userTimeline();
+        const tweets = timeline.data;
+        
+        // Analyze engagement patterns
+        const engagementData = tweets.map(tweet => ({
+            hour: new Date(tweet.created_at).getHours(),
+            likes: tweet.public_metrics?.like_count || 0,
+            retweets: tweet.public_metrics?.retweet_count || 0,
+            replies: tweet.public_metrics?.reply_count || 0
+        }));
+
+        // Update your engagement patterns based on this data
+        this.updateEngagementPatterns(engagementData);
+    } catch (error) {
+        console.error('Error tracking engagement:', error);
+    }
+}
+
+  // Add this method to handle the engagement data
+  private updateEngagementPatterns(engagementData: Array<{
+    hour: number;
+    likes: number;
+    retweets: number;
+    replies: number;
+}>) {
+    // Group by hour
+    const hourlyEngagement = engagementData.reduce((acc, data) => {
+        if (!acc[data.hour]) {
+            acc[data.hour] = {
+                totalEngagement: 0,
+                count: 0
+            };
+        }
+        
+        const engagement = data.likes + data.retweets + data.replies;
+        acc[data.hour].totalEngagement += engagement;
+        acc[data.hour].count++;
+        
+        return acc;
+    }, {} as Record<number, { totalEngagement: number; count: number }>);
+
+    // Calculate average engagement per hour
+    this.hourlyEngagementWeights = Object.entries(hourlyEngagement).reduce((acc, [hour, data]) => {
+        acc[parseInt(hour)] = data.totalEngagement / data.count;
+        return acc;
+    }, {} as Record<number, number>);
+}
+
   // Engagement-related methods
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
@@ -279,4 +344,12 @@ private async scheduleNextTweet(): Promise<void> {
   getRecentTweets() {
     return this.recentTweets;
   }
+
+  public getTweetStats() {
+    return this.stats.getStats();
+}
+
+public resetTweetStats() {
+    this.stats.reset();
+}
 }
