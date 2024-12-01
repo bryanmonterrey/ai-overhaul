@@ -47,7 +47,7 @@ export default function TweetComposer({
             onChange={(e) => setContent(e.target.value)}
             maxLength={maxChars}
             rows={3}
-            className="w-full bg-black text-white border border-white p-2 font-mono text-sm resize-none focus:outline-none focus:border-white"
+            className="w-full bg-[#11111A] text-white border border-white p-2 font-mono text-sm resize-none focus:outline-none focus:border-white"
             placeholder="Initialize tweet sequence..."
           />
         </div>
@@ -56,7 +56,7 @@ export default function TweetComposer({
           <select
             value={selectedStyle}
             onChange={(e) => setSelectedStyle(e.target.value as TweetStyle)}
-            className="bg-black text-white border border-white px-2 py-1 font-mono text-sm focus:outline-none focus:border-white"
+            className="bg-[#11111A] text-white border border-white px-2 py-1 font-mono text-sm focus:outline-none focus:border-white"
           >
             <option value="shitpost">SHITPOST</option>
             <option value="rant">RANT</option>
