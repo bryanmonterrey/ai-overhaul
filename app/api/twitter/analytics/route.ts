@@ -25,14 +25,14 @@ interface TwitterStatus {
 }
 
 interface EnvironmentalFactors {
-  platformActivity: number;
-  socialContext: string[];
-  marketConditions?: {
-    sentiment: number;
-    volatility: number;
-    momentum: number;
-    trends?: string[];
-  };
+    platformActivity: number;
+    socialContext: string[];
+    marketConditions: {  // Now this is required, not optional
+        sentiment: number;
+        volatility: number;
+        momentum: number;
+        trends?: string[];
+    };
 }
 
 
@@ -88,11 +88,11 @@ export async function GET() {
                     };
                 }
 
-                if (environmentalFactors?.marketConditions) {
+                if (environmentalFactors && 'marketConditions' in environmentalFactors) {
                     baseStats.trends = {
-                        sentiment: environmentalFactors.marketConditions.sentiment ?? 0,
-                        volatility: environmentalFactors.marketConditions.volatility ?? 0,
-                        momentum: environmentalFactors.marketConditions.momentum ?? 0,
+                        sentiment: (environmentalFactors as EnvironmentalFactors).marketConditions.sentiment ?? 0,
+                        volatility: (environmentalFactors as EnvironmentalFactors).marketConditions.volatility ?? 0,
+                        momentum: (environmentalFactors as EnvironmentalFactors).marketConditions.momentum ?? 0,
                     };
                 }
             } catch (innerError) {

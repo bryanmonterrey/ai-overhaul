@@ -10,6 +10,7 @@ import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalSta
 import { TweetStyle } from '@/app/core/types';
 import EngagementTargets from '../interfaces/twitter/components/EngagementTargets';
 import AutoTweetManager from '../interfaces/twitter/components/AutoTweetManager';
+import { ErrorBoundary } from '@/app/components/common/ErrorBoundary';
 
 
 export default function TwitterPage() {
@@ -99,6 +100,7 @@ export default function TwitterPage() {
   }, []);
 
   return (
+    <ErrorBoundary>
     <div className="grid grid-cols-[1fr_300px] gap-6 h-[calc(100vh-10rem)]">
       <div className="space-y-6">
         <TweetComposer
@@ -121,6 +123,7 @@ export default function TwitterPage() {
       </div>
       <AutoTweetManager />
       <EngagementTargets />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
