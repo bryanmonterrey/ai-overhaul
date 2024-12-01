@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Header from "./components/layout/Header";
 import Sidebar from "./components/layout/Sidebar";
 import Footer from "./components/layout/Footer";
-
+import { Analytics } from "@vercel/analytics/react"
 export default function ClientLayout({
   children,
 }: {
@@ -34,6 +34,7 @@ export default function ClientLayout({
         </main>
       </div>
       <Footer />
+      <Analytics />
     </div>
   );
 }
