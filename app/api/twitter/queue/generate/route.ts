@@ -10,23 +10,29 @@ import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
 import { getTwitterClient } from '@/app/lib/twitter-client';
 
 export async function POST(req: NextRequest) {
-  try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
-    const session = await supabase.auth.getSession();
-    
-    if (!session.data.session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    try {
+      const cookieStore = cookies()
+      const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+      const session = await supabase.auth.getSession();
+      
+      if (!session.data.session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+  
+      const twitterClient = getTwitterClient();
+      const personalitySystem = new PersonalitySystem(DEFAULT_PERSONALITY);
+      const twitterManager = new TwitterManager(twitterClient, personalitySystem);
+  
+      await twitterManager.generateTweetBatch();
+      // Get the generated tweets after batch generation
+      const queuedTweets = twitterManager.getQueuedTweets();
+  
+      return NextResponse.json({
+        success: true,
+        tweets: queuedTweets
+      });
+    } catch (error) {
+      console.error('Error generating tweets:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-
-    const twitterClient = getTwitterClient();
-    const personalitySystem = new PersonalitySystem(DEFAULT_PERSONALITY);
-    const twitterManager = new TwitterManager(twitterClient, personalitySystem);
-
-    await twitterManager.generateTweetBatch();
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error generating tweets:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}

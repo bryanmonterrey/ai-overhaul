@@ -47,16 +47,16 @@ export default function AutoTweetManager() {
 
   const generateTweetBatch = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const response = await fetch('/api/twitter/queue/generate', { method: 'POST' });
-      if (!response.ok) {
-        throw new Error(`Failed to generate tweets: ${response.statusText}`);
+      const data = await response.json();
+      if (data.success && data.tweets) {
+        setQueuedTweets(data.tweets);
+      } else {
+        throw new Error('Failed to generate tweets');
       }
-      await fetchQueuedTweets();
     } catch (error) {
       console.error('Error generating tweets:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate tweets');
     } finally {
       setIsLoading(false);
     }
