@@ -63,6 +63,16 @@ export interface AIConfig {
   };
 }
 
+export interface AISettings {
+  temperature: number;
+  topP: number;
+  presencePenalty: number;
+  frequencyPenalty: number;
+  repetitionPenalty: number;
+  stopSequences: string[];
+  maxTokens: number;
+}
+
 export interface TokenCount {
   prompt: number;
   completion: number;
