@@ -167,41 +167,40 @@ export class TwitterManager {
 
   // In twitter-manager.ts update:
 
-private async scheduleNextTweet(): Promise<void> {
-  if (!this.isAutoMode) return;
+  private async scheduleNextTweet(): Promise<void> {
+    if (!this.isAutoMode) return;
 
-  const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
-  if (approvedTweets.length === 0) return;
+    const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
+    if (approvedTweets.length === 0) return;
 
-  const nextTweet = approvedTweets[0];
-  const now = new Date();
-  const delay = 30 * 60 * 1000; // 30 minutes between tweets
+    const nextTweet = approvedTweets[0];
+    const delay = this.getEngagementBasedDelay(); // Use random delay
+    const scheduledTime = new Date(Date.now() + delay);
 
-  nextTweet.scheduledFor = new Date(now.getTime() + delay);
+    nextTweet.scheduledFor = scheduledTime;
 
-  if (this.nextTweetTimeout) {
-    clearTimeout(this.nextTweetTimeout);
-  }
-
-  console.log(`Scheduling tweet for ${nextTweet.scheduledFor}`);
-
-  this.nextTweetTimeout = setTimeout(async () => {
-    try {
-      console.log(`Posting scheduled tweet: ${nextTweet.content}`);
-      await this.postTweet(nextTweet.content);
-      
-      // Remove the posted tweet from queue
-      this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
-      
-      // Log success and schedule next tweet
-      console.log('Tweet posted successfully');
-      this.scheduleNextTweet();
-    } catch (error) {
-      console.error('Error posting scheduled tweet:', error);
-      // Retry in 5 minutes if posting fails
-      setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+    if (this.nextTweetTimeout) {
+        clearTimeout(this.nextTweetTimeout);
     }
-  }, delay);
+
+    console.log(`Scheduling tweet for ${nextTweet.scheduledFor}`);
+
+    this.nextTweetTimeout = setTimeout(async () => {
+        try {
+            console.log(`Posting scheduled tweet: ${nextTweet.content}`);
+            await this.postTweet(nextTweet.content);
+            
+            // Remove the posted tweet from queue
+            this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
+            
+            // Log success and schedule next tweet
+            console.log('Tweet posted successfully');
+            this.scheduleNextTweet();
+        } catch (error) {
+            console.error('Error posting scheduled tweet:', error);
+            setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+        }
+    }, delay);
 }
 
 public async getQueuedTweets(): Promise<QueuedTweet[]> {
