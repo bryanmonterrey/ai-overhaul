@@ -71,26 +71,25 @@ export class TwitterManager {
 
   // Auto-tweeter methods
   public async generateTweetBatch(count: number = 10): Promise<void> {
-    const newTweets: QueuedTweet[] = [];
+    const newTweets: Omit<QueuedTweet, 'id'>[] = [];
     
     for (let i = 0; i < count; i++) {
-      const style = this.personality.getCurrentTweetStyle();
-      const content = await this.personality.processInput(
-        'Generate a tweet', 
-        { platform: 'twitter', style }
-      );
+        const style = this.personality.getCurrentTweetStyle();
+        const content = await this.personality.processInput(
+            'Generate a tweet', 
+            { platform: 'twitter', style }
+        );
 
-      newTweets.push({
-        id: crypto.randomUUID(),
-        content: this.cleanTweet(content),
-        style,
-        status: 'pending',
-        generatedAt: new Date()
-      });
+        newTweets.push({
+            content: this.cleanTweet(content),
+            style,
+            status: 'pending',
+            generatedAt: new Date()
+        });
     }
 
-    this.queuedTweets = [...this.queuedTweets, ...newTweets];
-  }
+    await this.addTweetsToQueue(newTweets);
+}
 
   private cleanTweet(tweet: string): string {
     return tweet
@@ -192,21 +191,62 @@ private async scheduleNextTweet(): Promise<void> {
 }
 
 public async getQueuedTweets(): Promise<QueuedTweet[]> {
-  const { data, error } = await this.supabase
+  try {
+      // First check if table exists by attempting a count
+      const { count, error: countError } = await this.supabase
+          .from('tweet_queue')
+          .select('*', { count: 'exact', head: true });
+
+      if (countError) {
+          // If table doesn't exist, return empty array
+          console.log('Tweet queue table might not exist:', countError);
+          return [];
+      }
+
+      // If table exists, get tweets
+      const { data, error } = await this.supabase
+          .from('tweet_queue')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+      if (error) {
+          console.error('Error fetching tweets:', error);
+          return [];
+      }
+
+      if (!data) return [];
+
+      return data.map(tweet => ({
+          id: tweet.id,
+          content: tweet.content,
+          style: tweet.style,
+          status: tweet.status,
+          generatedAt: new Date(tweet.generated_at),
+          scheduledFor: tweet.scheduled_for ? new Date(tweet.scheduled_for) : undefined
+      }));
+  } catch (error) {
+      console.error('Error in getQueuedTweets:', error);
+      return [];
+  }
+}
+
+public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> {
+  const { error } = await this.supabase
       .from('tweet_queue')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .insert(
+          tweets.map(tweet => ({
+              content: tweet.content,
+              style: tweet.style,
+              status: tweet.status,
+              generated_at: tweet.generatedAt.toISOString(),
+              scheduled_for: tweet.scheduledFor?.toISOString()
+          }))
+      );
 
-  if (error) throw error;
-
-  return data.map(tweet => ({
-      id: tweet.id,
-      content: tweet.content,
-      style: tweet.style,
-      status: tweet.status,
-      generatedAt: new Date(tweet.generated_at),
-      scheduledFor: tweet.scheduled_for ? new Date(tweet.scheduled_for) : undefined
-  }));
+  if (error) {
+      console.error('Error adding tweets to queue:', error);
+      throw error;
+  }
 }
 
   public clearRejectedTweets(): void {
