@@ -15,6 +15,12 @@ export function getPersonalitySystem(): PersonalitySystem {
   return new PersonalitySystem(DEFAULT_PERSONALITY);
 }
 
+interface FallbackConfig {
+  enabled: boolean;
+  provider: 'claude' | 'openai';
+  model: string;
+}
+
 export class AIService {
   private static instance: AIService;
   private provider: 'claude' | 'openai';
@@ -60,8 +66,8 @@ export class AIService {
       return data.response;
 
     } catch (error) {
-      // If primary provider fails and fallback is enabled
-      if (configManager.get('ai', 'fallback').enabled) {
+      const fallback = configManager.get('ai', 'fallback') as FallbackConfig;
+      if (fallback.enabled) {
         console.warn(`Primary AI provider failed, using fallback`);
         return this.generateWithFallback(prompt, context);
       }
@@ -70,7 +76,7 @@ export class AIService {
   }
 
   private async generateWithFallback(prompt: string, context?: string) {
-    const fallbackConfig = configManager.get('ai', 'fallback');
+    const fallbackConfig = configManager.get('ai', 'fallback') as FallbackConfig;
     
     try {
       const response = await fetch(`${API_BASE_URL}/api/ai`, {

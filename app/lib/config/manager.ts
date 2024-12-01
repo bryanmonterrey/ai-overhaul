@@ -7,6 +7,8 @@ import deepMerge from 'deepmerge';
 import { aiConfigSchema } from './ai-schemas';
 import { AIConfig } from '@/app/core/types/ai';
 
+type ConfigSections = 'personality' | 'system' | 'integrations' | 'ai' | 'emotional';
+
 class ConfigManager {
   private static instance: ConfigManager;
   private config: ValidConfig;
@@ -119,6 +121,21 @@ export const configManager = {
         maxTokens: 1000
       },
       model: process.env.AI_MODEL || 'claude-3-sonnet-20240229'
+    },
+    emotional: {
+      baseState: 'neutral',
+      volatility: 0.5,
+      states: {
+        neutral: { intensity: 0.5 },
+        happy: { intensity: 0.7 },
+        sad: { intensity: 0.3 },
+        excited: { intensity: 0.8 },
+        angry: { intensity: 0.6 }
+      },
+      transitions: {
+        cooldown: 0.1,
+        recovery: 0.2
+      }
     }
   },
 
@@ -142,10 +159,10 @@ export const configManager = {
 };
 
 // Helper function for type-safe config access
-export function getConfig<
-  K extends keyof ValidConfig,
-  SK extends keyof ValidConfig[K]
->(category: K, key: SK): ValidConfig[K][SK] {
+export function getConfig(
+  category: keyof typeof configManager.config,
+  key: string
+) {
   return configManager.get(category, key);
 }
 
