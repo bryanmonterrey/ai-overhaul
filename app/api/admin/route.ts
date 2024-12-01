@@ -41,7 +41,16 @@ const personalitySystem = new PersonalitySystem({
   creativityBias: config.personality.creativityBias,
   emotionalVolatility: config.personality.emotionalVolatility,
   memoryRetention: config.personality.memoryRetention,
-  responsePatterns: config.personality.responsePatterns as Record<EmotionalState, string[]>
+  responsePatterns: {
+    neutral: [config.personality.responsePatterns.neutral],
+    happy: [config.personality.responsePatterns.happy],
+    sad: [config.personality.responsePatterns.sad],
+    excited: [config.personality.responsePatterns.excited],
+    contemplative: [config.personality.responsePatterns.contemplative],
+    analytical: [config.personality.responsePatterns.analytical],
+    chaotic: [],
+    creative: []
+  } as Record<EmotionalState, string[]>
 });
 const emotionalSystem = new EmotionalSystem();
 const memorySystem = new MemorySystem();

@@ -108,8 +108,20 @@ export const configManager = {
         enabled: false
       }
     },
-    personality: {},
-    // Add the AI section
+    personality: {
+      baseTemperature: 0.7,
+      creativityBias: 0.5,
+      emotionalVolatility: 0.3,
+      memoryRetention: 0.8,
+      responsePatterns: {
+        neutral: 'Maintaining a balanced and objective tone.',
+        happy: 'Expressing joy and enthusiasm.',
+        sad: 'Showing empathy and understanding.',
+        excited: 'Demonstrating high energy and enthusiasm.',
+        contemplative: 'Taking a thoughtful and reflective approach.',
+        analytical: 'Using logical and structured reasoning.'
+      }
+    },
     ai: {
       settings: {
         temperature: 0.7,
@@ -142,6 +154,12 @@ export const configManager = {
   get(section: keyof typeof this.config, key: string) {
     return this.config[section]?.[key as keyof typeof this.config[typeof section]];
   },
+
+  // Add this method
+  getAll() {
+    return this.config;
+  },
+
 
   validateConfig() {
     try {
