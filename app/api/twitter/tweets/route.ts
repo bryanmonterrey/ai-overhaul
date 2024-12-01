@@ -15,7 +15,7 @@ export async function GET() {
 
       const twitterClient = getTwitterClient();
       const personalitySystem = new PersonalitySystem(DEFAULT_PERSONALITY);
-      const twitterManager = new TwitterManager(twitterClient, personalitySystem);
+      const twitterManager = new TwitterManager(twitterClient, personalitySystem, supabase);
       
       const status = await twitterManager.getStatus();
       const recentTweets = twitterManager.getRecentTweets();
