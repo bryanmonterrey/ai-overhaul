@@ -1,12 +1,14 @@
-// app/api/twitter/queue/generate/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/types/supabase.types';
 import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
 import { withAuth, AuthenticatedHandler } from '@/app/lib/middleware/auth-middleware';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {
-  const handler: AuthenticatedHandler = async (supabase, session, cookies) => {
+  const handler: AuthenticatedHandler = async (
+    supabase: SupabaseClient<Database>,
+    session
+  ) => {
     try {
       const twitterManager = getTwitterManager();
       await twitterManager.generateTweetBatch();
@@ -14,8 +16,7 @@ export async function POST(req: NextRequest) {
       
       return NextResponse.json({
         success: true,
-        tweets,
-        message: 'Tweet batch generated successfully'
+        tweets
       });
     } catch (error) {
       console.error('Error generating tweets:', error);

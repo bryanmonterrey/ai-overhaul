@@ -10,31 +10,55 @@ export async function withAuth(handler: Function) {
       cookies: () => cookieStore
     });
 
-    // For development mode, bypass authentication
+    // For development mode, provide a mock session
     if (process.env.NODE_ENV === 'development') {
-      return handler(supabase, { user: { id: 'dev-user' } });
+      const mockSession = {
+        user: { 
+          id: 'dev-user',
+          role: 'admin'
+        }
+      };
+      const result = await handler(supabase, mockSession);
+      return result;
     }
 
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const sessionResponse = await supabase.auth.getSession();
     
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      return NextResponse.json(
-        { error: 'Authentication error', details: sessionError },
-        { status: 401 }
-      );
+    // Handle session errors silently in development
+    if (!sessionResponse.data.session && process.env.NODE_ENV === 'development') {
+      const mockSession = {
+        user: { 
+          id: 'dev-user',
+          role: 'admin'
+        }
+      };
+      return handler(supabase, mockSession);
     }
 
-    if (!session) {
+    if (!sessionResponse.data.session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    return handler(supabase, session);
+    return handler(supabase, sessionResponse.data.session);
   } catch (error) {
     console.error('Auth middleware error:', error);
+    // In development, continue with mock data
+    if (process.env.NODE_ENV === 'development') {
+      const cookieStore = cookies();
+      const supabase = createRouteHandlerClient<Database>({ 
+        cookies: () => cookieStore
+      });
+      const mockSession = {
+        user: { 
+          id: 'dev-user',
+          role: 'admin'
+        }
+      };
+      return handler(supabase, mockSession);
+    }
     return NextResponse.json(
       { error: 'Authentication error', details: error },
       { status: 500 }

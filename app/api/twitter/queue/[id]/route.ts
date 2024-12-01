@@ -1,15 +1,17 @@
-// app/api/twitter/queue/[id]/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/types/supabase.types';
 import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
 import { withAuth, AuthenticatedHandler } from '@/app/lib/middleware/auth-middleware';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export async function PATCH(
   req: NextRequest,
   context: { params: { id: string } }
 ) {
-  const handler: AuthenticatedHandler = async (supabase, session, cookies) => {
+  const handler: AuthenticatedHandler = async (
+    supabase: SupabaseClient<Database>,
+    session
+  ) => {
     try {
       const { id } = context.params;
       const twitterManager = getTwitterManager();
