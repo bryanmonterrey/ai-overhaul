@@ -108,6 +108,19 @@ export class TwitterManager {
     }
 }
 
+private async syncQueueWithDatabase(): Promise<void> {
+  try {
+      const tweets = await this.getQueuedTweets();
+      this.queuedTweets = tweets;
+      console.log('Queue synced with database:', {
+          queueLength: this.queuedTweets.length,
+          approvedCount: this.queuedTweets.filter(t => t.status === 'approved').length
+      });
+  } catch (error) {
+      console.error('Error syncing queue with database:', error);
+  }
+}
+
   // Auto-tweeter methods
   public async generateTweetBatch(count: number = 10): Promise<void> {
     const newTweets: Omit<QueuedTweet, 'id'>[] = [];
@@ -145,53 +158,118 @@ export class TwitterManager {
   }
 
   public async updateTweetStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
-    // Update in database
-    const { data, error } = await this.supabase
-        .from('tweet_queue')
-        .update({ 
+    try {
+        await this.syncQueueWithDatabase(); // Add this line
+
+        console.log('Starting tweet status update:', {
+            id,
             status,
-            scheduled_for: status === 'approved' ? 
-                new Date(Date.now() + this.getEngagementBasedDelay()) : 
-                null
-        })
-        .eq('id', id);
+            currentTime: new Date().toISOString()
+        });
 
-    if (error) throw error;
+        const delay = this.getEngagementBasedDelay();
+        const scheduledTime = status === 'approved' ? 
+            new Date(Date.now() + delay) : 
+            null;
 
-    // We also need to update the local queue
-    this.queuedTweets = this.queuedTweets.map(tweet => {
-        if (tweet.id === id) {
-            return {
-                ...tweet,
+        console.log('Calculated scheduling details:', {
+            delay,
+            scheduledTime: scheduledTime?.toISOString(),
+            isAutoMode: this.isAutoMode
+        });
+
+        // Update in database
+        const { data, error } = await this.supabase
+            .from('tweet_queue')
+            .update({ 
                 status,
-                scheduledFor: status === 'approved' ? 
-                    new Date(Date.now() + this.getEngagementBasedDelay()) : 
-                    undefined
-            };
+                scheduled_for: scheduledTime?.toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select();
+
+        if (error) {
+            console.error('Database update error:', {
+                error,
+                operation: 'updateTweetStatus',
+                tweetId: id
+            });
+            throw error;
         }
-        return tweet;
-    });
 
-    // Update stats
-    this.stats.increment(status);
+        console.log('Database update successful:', {
+            updatedTweet: data?.[0],
+            affectedRows: data?.length
+        });
 
-    // Then schedule if approved
-    if (status === 'approved') {
-        await this.persistAutoMode(true);
-        await this.scheduleNextTweet();  // Add await here
+        // Update local queue
+        const updatedQueue = this.queuedTweets.map(tweet => {
+            if (tweet.id === id) {
+                return {
+                    ...tweet,
+                    status,
+                    scheduledFor: scheduledTime || undefined
+                };
+            }
+            return tweet;
+        });
+
+        // Update the queue and log the change
+        const oldQueueLength = this.queuedTweets.length;
+        this.queuedTweets = updatedQueue;
+        
+        console.log('Local queue updated:', {
+            previousLength: oldQueueLength,
+            newLength: updatedQueue.length,
+            approvedCount: updatedQueue.filter(t => t.status === 'approved').length
+        });
+
+        // Update stats
+        this.stats.increment(status);
+
+        // Handle scheduling if approved
+        if (status === 'approved') {
+            console.log('Tweet approved, preparing to schedule...');
+            await this.persistAutoMode(true);
+            await this.scheduleNextTweet();
+            
+            console.log('Scheduling process completed', {
+                nextScheduledTweet: this.getNextScheduledTime()?.toISOString(),
+                autoModeActive: this.isAutoMode
+            });
+        }
+    } catch (error) {
+        console.error('Error in updateTweetStatus:', {
+            error,
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            tweetId: id,
+            requestedStatus: status
+        });
+        throw error;
     }
 }
 
-  public toggleAutoMode(enabled: boolean): void {
-    this.isAutoMode = enabled;
-    if (enabled) {
-      this.scheduleNextTweet();
-    } else {
+public toggleAutoMode(enabled: boolean): void {
+  console.log('Toggling auto mode:', {
+      currentState: this.isAutoMode,
+      newState: enabled
+  });
+  
+  this.isAutoMode = enabled;
+  if (enabled) {
+      this.scheduleNextTweet().catch(error => {
+          console.error('Error scheduling next tweet:', error);
+      });
+  } else {
       if (this.nextTweetTimeout) {
-        clearTimeout(this.nextTweetTimeout);
+          clearTimeout(this.nextTweetTimeout);
       }
-    }
   }
+}
+
+
 
   private async persistAutoMode(enabled: boolean): Promise<void> {
     const { error } = await this.supabase
@@ -245,6 +323,8 @@ export class TwitterManager {
             console.log('Auto mode is disabled, not scheduling');
             return;
         }
+
+        await this.syncQueueWithDatabase(); // Add this line
 
         const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
         console.log('Found approved tweets:', approvedTweets.length);
@@ -308,8 +388,13 @@ public async getQueuedTweets(): Promise<QueuedTweet[]> {
           .from('tweet_queue')
           .select('*', { count: 'exact', head: true });
 
+      console.log('Tweet queue table check:', {
+          count,
+          error: countError,
+          exists: !countError
+      });
+
       if (countError) {
-          // If table doesn't exist, return empty array
           console.log('Tweet queue table might not exist:', countError);
           return [];
       }
@@ -320,14 +405,25 @@ public async getQueuedTweets(): Promise<QueuedTweet[]> {
           .select('*')
           .order('created_at', { ascending: false });
 
+      console.log('Tweet queue fetch results:', {
+          data,
+          error,
+          hasData: !!data,
+          count: data?.length,
+          approvedCount: data?.filter(t => t.status === 'approved').length
+      });
+
       if (error) {
           console.error('Error fetching tweets:', error);
           return [];
       }
 
-      if (!data) return [];
+      if (!data) {
+          console.log('No data returned from tweet queue');
+          return [];
+      }
 
-      return data.map(tweet => ({
+      const mappedTweets = data.map(tweet => ({
           id: tweet.id,
           content: tweet.content,
           style: tweet.style,
@@ -335,8 +431,20 @@ public async getQueuedTweets(): Promise<QueuedTweet[]> {
           generatedAt: new Date(tweet.generated_at),
           scheduledFor: tweet.scheduled_for ? new Date(tweet.scheduled_for) : undefined
       }));
+
+      console.log('Mapped tweets:', {
+          totalTweets: mappedTweets.length,
+          approvedTweets: mappedTweets.filter(t => t.status === 'approved').length,
+          scheduledTweets: mappedTweets.filter(t => t.scheduledFor).length
+      });
+
+      return mappedTweets;
   } catch (error) {
-      console.error('Error in getQueuedTweets:', error);
+      console.error('Error in getQueuedTweets:', {
+          error,
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+      });
       return [];
   }
 }
