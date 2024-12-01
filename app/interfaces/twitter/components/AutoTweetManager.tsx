@@ -21,6 +21,8 @@ export default function AutoTweetManager() {
   const [queuedTweets, setQueuedTweets] = useState<QueuedTweet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [totalTweets] = useState(10);
 
   useEffect(() => {
     fetchQueuedTweets();
@@ -47,16 +49,19 @@ export default function AutoTweetManager() {
 
   const generateTweetBatch = async () => {
     setIsLoading(true);
+    setGenerationProgress(0);
     try {
       const response = await fetch('/api/twitter/queue/generate', { method: 'POST' });
       const data = await response.json();
       if (data.success && data.tweets) {
         setQueuedTweets(data.tweets);
+        setGenerationProgress(totalTweets);
       } else {
         throw new Error('Failed to generate tweets');
       }
     } catch (error) {
       console.error('Error generating tweets:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate tweets');
     } finally {
       setIsLoading(false);
     }
@@ -98,6 +103,15 @@ export default function AutoTweetManager() {
     }
   };
 
+  const renderProgressBar = () => (
+    <div className="w-full bg-gray-700 h-1 rounded-full overflow-hidden">
+      <div 
+        className="h-full bg-green-500 transition-all duration-300"
+        style={{ width: `${(generationProgress / totalTweets) * 100}%` }}
+      />
+    </div>
+  );
+
   return (
     <Card variant="system" title="AUTO_TWEET_MANAGER">
       <div className="space-y-4">
@@ -129,6 +143,27 @@ export default function AutoTweetManager() {
           </Button>
         </div>
 
+        {isLoading && (
+          <div className="space-y-2 font-mono text-xs">
+            <div>GENERATING: {generationProgress}/{totalTweets}</div>
+            {renderProgressBar()}
+          </div>
+        )}
+
+        {!isLoading && (
+          <div className="grid grid-cols-3 gap-2 text-xs font-mono">
+            <div className="border border-white/20 p-2">
+              TOTAL: {queuedTweets.length}
+            </div>
+            <div className="border border-white/20 p-2">
+              PENDING: {queuedTweets.filter(t => t.status === 'pending').length}
+            </div>
+            <div className="border border-white/20 p-2">
+              APPROVED: {queuedTweets.filter(t => t.status === 'approved').length}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           {queuedTweets.map(tweet => (
             <div key={tweet.id} className="p-2 border border-white font-mono text-xs">
@@ -150,7 +185,9 @@ export default function AutoTweetManager() {
                 </div>
               </div>
               
-              <div className="mb-2 whitespace-pre-wrap">{tweet.content}</div>
+              <div className="mb-2 whitespace-pre-wrap border-l-2 border-white/20 pl-2">
+                {tweet.content}
+              </div>
               
               {tweet.status === 'pending' && (
                 <div className="flex gap-2">
@@ -170,8 +207,20 @@ export default function AutoTweetManager() {
                   </Button>
                 </div>
               )}
+
+              {tweet.status === 'approved' && (
+                <div className="mt-2 text-green-500/50 text-xs">
+                  ESTIMATED_POST: {new Date(Date.now() + 1800000).toLocaleString()}
+                </div>
+              )}
             </div>
           ))}
+
+          {queuedTweets.length === 0 && !isLoading && (
+            <div className="text-center font-mono text-xs opacity-50 p-4">
+              NO_TWEETS_IN_QUEUE
+            </div>
+          )}
         </div>
       </div>
     </Card>
