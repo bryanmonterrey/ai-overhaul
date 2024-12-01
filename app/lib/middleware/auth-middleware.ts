@@ -5,9 +5,9 @@ import { NextResponse } from 'next/server';
 
 export async function withAuth(handler: Function) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createRouteHandlerClient<Database>({ 
-      cookies: () => cookieStore 
+      cookies: () => Promise.resolve(cookieStore)
     });
 
     const sessionResponse = await supabase.auth.getSession();
@@ -21,9 +21,16 @@ export async function withAuth(handler: Function) {
     }
 
     const routeCookies = {
-      get: async (name: string) => cookieStore.get(name),
-      set: async (name: string, value: string) => cookieStore.set(name, value),
-      remove: async (name: string) => cookieStore.delete(name)
+      get: async (name: string): Promise<{ name: string; value: string } | undefined> => {
+        const cookie = cookieStore.get(name);
+        return cookie ? { name: cookie.name, value: cookie.value } : undefined;
+      },
+      set: async (name: string, value: string): Promise<void> => {
+        cookieStore.set(name, value);
+      },
+      remove: async (name: string): Promise<void> => {
+        cookieStore.delete(name);
+      }
     };
 
     return handler(supabase, session, routeCookies);

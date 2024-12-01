@@ -2,6 +2,7 @@
 
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { TweetStyle } from '../personality/types';
+import { TweetStats } from './TweetStats'; 
 
 interface QueuedTweet {
   id: string;
@@ -17,11 +18,23 @@ export class AutoTweeter {
   private isAutoMode: boolean = false;
   private minTimeBetweenTweets = 30 * 60 * 1000; // 30 minutes
   private nextTweetTimeout?: NodeJS.Timeout;
+  private stats: TweetStats;
 
   constructor(
     private personality: PersonalitySystem,
     private twitterService: any // Your Twitter service
-  ) {}
+  ) {
+    this.stats = new TweetStats();  // Initialize stats
+  }
+
+  private updateStatistics(status: 'approved' | 'rejected' | 'posted') {
+    this.stats.increment(status);
+  }
+
+  // Add postTweet method
+  private async postTweet(content: string): Promise<any> {
+    return this.twitterService.postTweet(content);
+  }
 
   public async generateTweetBatch(count: number = 10): Promise<void> {
     const newTweets: QueuedTweet[] = [];
@@ -108,11 +121,10 @@ export class AutoTweeter {
 private getEngagementBasedDelay(): number {
     const hour = new Date().getHours();
     
-    // Define engagement weights for different hours (0-1)
-    const hourlyWeights = {
+    // Define engagement weights with proper type
+    const hourlyWeights: Record<number, number> = {
         0: 0.2,  // 12 AM
         1: 0.1,
-        // ... morning hours
         9: 0.8,  // 9 AM
         10: 0.9,
         11: 0.8,
@@ -134,12 +146,11 @@ private getEngagementBasedDelay(): number {
     const baseDelay = this.getRandomDelay();
     
     // Adjust delay based on engagement weight
-    const weight = hourlyWeights[hour] || 0.5;
+    const weight = hourlyWeights[hour] ?? 0.5;  // Use nullish coalescing
     const adjustedDelay = baseDelay * (1 + (1 - weight));
     
     return Math.floor(adjustedDelay);
-}
-
+  }
 
 private async scheduleNextTweet(): Promise<void> {
     if (!this.isAutoMode) return;
