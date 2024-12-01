@@ -78,7 +78,12 @@ export default function AutoTweetManager() {
       if (!response.ok) {
         throw new Error(`Failed to update tweet status: ${response.statusText}`);
       }
-      await fetchQueuedTweets();
+      const data = await response.json();
+      if (data.success && data.tweets) {
+        setQueuedTweets(data.tweets);
+      } else {
+        throw new Error('Failed to update tweets');
+      }
     } catch (error) {
       console.error('Error updating tweet status:', error);
       setError(error instanceof Error ? error.message : 'Failed to update status');

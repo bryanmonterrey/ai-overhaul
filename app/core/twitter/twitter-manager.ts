@@ -21,6 +21,7 @@ export class TwitterManager {
   private lastTweetTime?: Date;
   private isReady: boolean = true;
   private recentTweets = new Map<string, any>();
+  
 
   constructor(
     client: TwitterClient,
@@ -89,6 +90,14 @@ export class TwitterManager {
       .trim();
   }
 
+  public getNextScheduledTime(): Date | null {
+    const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
+    if (approvedTweets.length === 0) return null;
+    
+    const nextTweet = approvedTweets[0];
+    return nextTweet.scheduledFor || null;
+  }
+
   public updateTweetStatus(id: string, status: 'approved' | 'rejected'): void {
     this.queuedTweets = this.queuedTweets.map(tweet => 
       tweet.id === id ? { ...tweet, status } : tweet
@@ -122,33 +131,44 @@ export class TwitterManager {
     return now;
   }
 
-  private async scheduleNextTweet(): Promise<void> {
-    if (!this.isAutoMode) return;
+  // In twitter-manager.ts update:
 
-    const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
-    if (approvedTweets.length === 0) return;
+private async scheduleNextTweet(): Promise<void> {
+  if (!this.isAutoMode) return;
 
-    const nextTweet = approvedTweets[0];
-    const optimalTime = this.getOptimalTweetTime();
-    const delay = Math.max(
-      optimalTime.getTime() - Date.now(),
-      30 * 60 * 1000 // Min 30 minutes between tweets
-    );
+  const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
+  if (approvedTweets.length === 0) return;
 
-    nextTweet.scheduledFor = new Date(Date.now() + delay);
+  const nextTweet = approvedTweets[0];
+  const now = new Date();
+  const delay = 30 * 60 * 1000; // 30 minutes between tweets
 
-    this.nextTweetTimeout = setTimeout(async () => {
-      try {
-        await this.postTweet(nextTweet.content);
-        this.lastTweetTime = new Date();
-        this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
-        this.scheduleNextTweet();
-      } catch (error) {
-        console.error('Error posting tweet:', error);
-        setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
-      }
-    }, delay);
+  nextTweet.scheduledFor = new Date(now.getTime() + delay);
+
+  if (this.nextTweetTimeout) {
+    clearTimeout(this.nextTweetTimeout);
   }
+
+  console.log(`Scheduling tweet for ${nextTweet.scheduledFor}`);
+
+  this.nextTweetTimeout = setTimeout(async () => {
+    try {
+      console.log(`Posting scheduled tweet: ${nextTweet.content}`);
+      await this.postTweet(nextTweet.content);
+      
+      // Remove the posted tweet from queue
+      this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
+      
+      // Log success and schedule next tweet
+      console.log('Tweet posted successfully');
+      this.scheduleNextTweet();
+    } catch (error) {
+      console.error('Error posting scheduled tweet:', error);
+      // Retry in 5 minutes if posting fails
+      setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+    }
+  }, delay);
+}
 
   public getQueuedTweets(): QueuedTweet[] {
     return this.queuedTweets;

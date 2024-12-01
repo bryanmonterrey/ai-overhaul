@@ -10,16 +10,23 @@ export async function withAuth(handler: Function) {
       cookies: () => cookieStore 
     });
 
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const sessionResponse = await supabase.auth.getSession();
+    const session = sessionResponse.data.session;
     
-    if (error || !session) {
+    if (!session) {
       return NextResponse.json(
         { error: 'Unauthorized' }, 
         { status: 401 }
       );
     }
 
-    return handler(supabase, session);
+    const routeCookies = {
+      get: async (name: string) => cookieStore.get(name),
+      set: async (name: string, value: string) => cookieStore.set(name, value),
+      remove: async (name: string) => cookieStore.delete(name)
+    };
+
+    return handler(supabase, session, routeCookies);
   } catch (error) {
     console.error('Auth error:', error);
     return NextResponse.json(
@@ -27,4 +34,14 @@ export async function withAuth(handler: Function) {
       { status: 500 }
     );
   }
-} 
+}
+
+export type AuthenticatedHandler = (
+  supabase: ReturnType<typeof createRouteHandlerClient<Database>>,
+  session: NonNullable<Awaited<ReturnType<ReturnType<typeof createRouteHandlerClient>['auth']['getSession']>>['data']['session']>,
+  cookies: {
+    get: (name: string) => Promise<{ name: string; value: string } | undefined>;
+    set: (name: string, value: string) => Promise<void>;
+    remove: (name: string) => Promise<void>;
+  }
+) => Promise<NextResponse>; 
