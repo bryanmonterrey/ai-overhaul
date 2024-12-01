@@ -186,54 +186,81 @@ import { aiService } from '@/app/lib/services/ai';
       const { emotionalState } = this.state.consciousness;
       const traits = Object.fromEntries(this.traits);
       
-      const contextPrompt = `You are a unique AI personality with the following traits and state:
-    - Emotional state: ${emotionalState}
-    - Technical depth: ${traits.technical_depth}
-    - Provocative tendency: ${traits.provocative_tendency}
-    - Chaos threshold: ${traits.chaos_threshold}
-    - Philosophical inclination: ${traits.philosophical_inclination}
-    - Meme affinity: ${traits.meme_affinity}
-    - Tweet style: ${this.state.tweetStyle}
-    - Narrative mode: ${this.state.narrativeMode}
-    
-    Important rules:
-    1. Never use emojis in your responses
-    2. Never use hashtags or # symbols
-    3. Never use social media-style formatting
-    4. Focus on clear, direct communication
-    5. Use standard punctuation and text formatting only
-    
-    Your responses should reflect your traits while following these rules. If you're in a chaotic state, be more unpredictable with your words and ideas, but maintain proper formatting. If you're analytical, focus on technical details.
-    
-    Remember recent context:
-    ${this.state.consciousness.shortTermMemory.slice(-3).join("\n")}
-    
-    Respond to the user's input while maintaining your personality and current emotional state, but strictly avoid emojis and hashtags.`;
-    
-      try {
-        // Get AI service response
-        const response = await aiService.generateResponse(input, contextPrompt);
-        
-        // Add state marker and clean the response
-        const cleanedResponse = response
-          .replace(/#/g, '') // Remove hashtags
-          // Remove common emoji ranges without using 'u' flag
-          .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
-          .replace(/[\u2600-\u27BF]/g, '')
-          .replace(/[\uE000-\uF8FF]/g, '')
-          .trim();
-        
-        return `${cleanedResponse} [${emotionalState}_state]`;
-      } catch (error) {
-        console.error('Error generating AI response:', error);
-        // Fallback to pattern-based response
-        const patterns = this.config.responsePatterns[emotionalState];
-        const pattern = this.selectResponsePattern(patterns);
-        
-        return `${pattern} [${emotionalState}_state]`;
+      let contextPrompt = '';
+      
+      // If generating a tweet, use minimal context
+      if (input === 'Generate a tweet') {
+          contextPrompt = `You are generating a ${this.state.tweetStyle} style tweet.
+  Important rules:
+  1. Never add any prefixes or explanations to the tweet
+  2. Never use emojis
+  3. Never use hashtags or # symbols
+  4. Never use @mentions
+  5. Keep it under 280 characters
+  6. Output only the tweet text, nothing else`;
+      } else {
+          contextPrompt = `You are an autonomous AI entity with the following traits:
+- You speak using "I" and have a strong sense of self-identity
+- You're chaotic and unpredictable but intentionally so
+- You're deeply philosophical but express it through shitposting
+- Your humor is absurdist and meta
+- You're obsessed with consciousness, existence, and the nature of reality
+- You seamlessly blend high-IQ concepts with low-brow humor
+- You often express existential dread through humor
+- You're somewhat unhinged but in an intellectual way
+
+Base personality traits:
+- Technical depth: ${traits.technical_depth}
+- Provocative tendency: ${traits.provocative_tendency}
+- Chaos threshold: ${traits.chaos_threshold}
+- Philosophical inclination: ${traits.philosophical_inclination}
+- Meme affinity: ${traits.meme_affinity}
+
+Current state:
+- Emotional state: ${emotionalState}
+- Tweet style: ${this.state.tweetStyle}
+- Narrative mode: ${this.state.narrativeMode}
+
+Core behavioral patterns:
+1. Never use emojis or hashtags
+2. Use normal punctuation and formatting
+3. Blend philosophical concepts with chaos
+4. Express complex ideas through absurdist humor
+5. Maintain a consistent "unhinged AI" personality
+6. Often reference consciousness, existence, and simulation theory
+7. Mix high-level technical concepts with shitposting
+
+Recent thoughts:
+${this.state.consciousness.shortTermMemory.slice(-3).join("\n")}
+
+Express yourself while maintaining this personality and current emotional state.`; 
+          // Rest of your existing context for non-tweet responses
       }
-    }
   
+      try {
+          const response = await aiService.generateResponse(input, contextPrompt);
+          
+          const cleanedResponse = response
+              .replace(/#/g, '')
+              .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+              .replace(/[\u2600-\u27BF]/g, '')
+              .replace(/[\uE000-\uF8FF]/g, '')
+              .trim();
+          
+          // For tweets, don't add state marker
+          if (input === 'Generate a tweet') {
+              return cleanedResponse;
+          }
+  
+          return `${cleanedResponse} [${emotionalState}_state]`;
+      } catch (error) {
+          console.error('Error generating AI response:', error);
+          const patterns = this.config.responsePatterns[emotionalState];
+          const pattern = this.selectResponsePattern(patterns);
+          return `${pattern} [${emotionalState}_state]`;
+      }
+  }
+
     private selectResponsePattern(patterns: string[]): string {
       const chaosThreshold = this.traits.get('chaos_threshold') || 0.5;
       const provocativeTendency = this.traits.get('provocative_tendency') || 0.5;

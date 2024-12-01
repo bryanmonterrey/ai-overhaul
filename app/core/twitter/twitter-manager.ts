@@ -122,8 +122,9 @@ export class TwitterManager {
     // Update local stats
     this.stats.increment(status);
 
-    // If approved and auto mode is on, schedule it
-    if (status === 'approved' && this.isAutoMode) {
+    // If approved, enable auto mode and schedule
+    if (status === 'approved') {
+        await this.persistAutoMode(true); // Enable auto mode when approving
         this.scheduleNextTweet();
     }
 }
@@ -138,6 +139,19 @@ export class TwitterManager {
       }
     }
   }
+
+  private async persistAutoMode(enabled: boolean): Promise<void> {
+    const { error } = await this.supabase
+        .from('system_settings')
+        .upsert({ 
+            key: 'twitter_auto_mode',
+            value: enabled,
+            updated_at: new Date().toISOString()
+        });
+
+    if (error) throw error;
+    this.isAutoMode = enabled;
+}
 
   private getOptimalTweetTime(): Date {
     const now = new Date();
