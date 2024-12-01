@@ -25,6 +25,32 @@ export default function AutoTweetManager() {
   const [totalTweets] = useState(10);
 
   useEffect(() => {
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const subscription = supabase
+        .channel('tweet_queue_changes')
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'tweet_queue'
+            },
+            () => {
+                fetchQueuedTweets();  // Refresh when changes occur
+            }
+        )
+        .subscribe();
+
+    return () => {
+        subscription.unsubscribe();
+    };
+}, []);
+
+  useEffect(() => {
     fetchQueuedTweets();
   }, []);
 

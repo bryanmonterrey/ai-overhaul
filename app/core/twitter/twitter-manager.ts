@@ -4,6 +4,7 @@ import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { TweetStyle } from '../personality/types';
 import { TweetStats } from './TweetStats';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 interface QueuedTweet {
   id: string;
@@ -16,6 +17,7 @@ interface QueuedTweet {
 
 export class TwitterManager {
   private client: TwitterClient;
+  private supabase: SupabaseClient;
   private queuedTweets: QueuedTweet[] = [];
   private isAutoMode: boolean = false;
   private nextTweetTimeout?: NodeJS.Timeout;
@@ -28,10 +30,12 @@ export class TwitterManager {
 
   constructor(
     client: TwitterClient,
-    private personality: PersonalitySystem
+    private personality: PersonalitySystem,
+    supabase: SupabaseClient  // Add this parameter
 ) {
     this.client = client;
-    this.stats = new TweetStats();  // Initialize stats
+    this.supabase = supabase;
+    this.stats = new TweetStats();
 }
 
   // Your existing methods
@@ -102,22 +106,24 @@ export class TwitterManager {
     return nextTweet.scheduledFor || null;
   }
 
-  public updateTweetStatus(id: string, status: 'approved' | 'rejected'): void {
-    this.queuedTweets = this.queuedTweets.map(tweet => {
-        if (tweet.id === id) {
-            this.stats.increment(status);  // Update stats
-            return {
-                ...tweet,
-                status,
-                updatedAt: new Date(),
-                scheduledFor: status === 'approved' ? 
-                    new Date(Date.now() + this.getEngagementBasedDelay()) : 
-                    undefined
-            };
-        }
-        return tweet;
-    });
+  public async updateTweetStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
+    // Update in database first
+    const { data, error } = await this.supabase
+        .from('tweet_queue')
+        .update({ 
+            status,
+            scheduled_for: status === 'approved' ? 
+                new Date(Date.now() + this.getEngagementBasedDelay()) : 
+                null
+        })
+        .eq('id', id);
 
+    if (error) throw error;
+
+    // Update local stats
+    this.stats.increment(status);
+
+    // If approved and auto mode is on, schedule it
     if (status === 'approved' && this.isAutoMode) {
         this.scheduleNextTweet();
     }
@@ -185,9 +191,23 @@ private async scheduleNextTweet(): Promise<void> {
   }, delay);
 }
 
-  public getQueuedTweets(): QueuedTweet[] {
-    return this.queuedTweets;
-  }
+public async getQueuedTweets(): Promise<QueuedTweet[]> {
+  const { data, error } = await this.supabase
+      .from('tweet_queue')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data.map(tweet => ({
+      id: tweet.id,
+      content: tweet.content,
+      style: tweet.style,
+      status: tweet.status,
+      generatedAt: new Date(tweet.generated_at),
+      scheduledFor: tweet.scheduled_for ? new Date(tweet.scheduled_for) : undefined
+  }));
+}
 
   public clearRejectedTweets(): void {
     this.queuedTweets = this.queuedTweets.filter(t => t.status !== 'rejected');
