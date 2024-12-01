@@ -43,8 +43,10 @@ export class TwitterManager {
     try {
         console.log('Attempting to post tweet:', { content });
 
-        if (content.length > 280) {
-            throw new TwitterDataError('Tweet exceeds character limit');
+        // Update character limit for Twitter Premium/Blue
+        const TWITTER_PREMIUM_CHAR_LIMIT = 25000;
+        if (content.length > TWITTER_PREMIUM_CHAR_LIMIT) {
+            throw new TwitterDataError('Tweet exceeds Twitter Premium character limit');
         }
 
         if (!this.client) {
