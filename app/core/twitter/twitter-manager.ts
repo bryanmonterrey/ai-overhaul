@@ -41,33 +41,72 @@ export class TwitterManager {
   // Your existing methods
   async postTweet(content: string): Promise<TwitterData> {
     try {
-      if (content.length > 280) {
-        throw new TwitterDataError('Tweet exceeds character limit');
-      }
+        console.log('Attempting to post tweet:', { content });
 
-      const result = await this.client.tweet(content);
-      return result.data;
+        if (content.length > 280) {
+            throw new TwitterDataError('Tweet exceeds character limit');
+        }
+
+        if (!this.client) {
+            throw new TwitterError('Twitter client not initialized', 'INITIALIZATION_ERROR', 500);
+        }
+
+        if (!this.client.tweet) {
+            throw new TwitterError('Invalid Twitter client configuration', 'CLIENT_CONFIG_ERROR', 500);
+        }
+
+        const result = await this.client.tweet(content);
+        console.log('Tweet posted successfully:', result);
+
+        // Update last tweet time
+        this.lastTweetTime = new Date();
+
+        // Add to recent tweets cache
+        this.recentTweets.set(result.data.id, {
+            ...result.data,
+            timestamp: this.lastTweetTime
+        });
+
+        // Trim cache if too large
+        if (this.recentTweets.size > 100) {
+            const oldestKey = this.recentTweets.keys().next().value;
+            this.recentTweets.delete(oldestKey);
+        }
+
+        return result.data;
 
     } catch (error: any) {
-      if (error instanceof TwitterDataError) {
-        throw error;
-      }
-      
-      if (error.code === 429) {
-        throw new TwitterRateLimitError('Rate limit exceeded');
-      }
-      if (error.code === 401 || error.message?.includes('Invalid credentials')) {
-        throw new TwitterAuthError('Authentication failed');
-      }
-      if (error.message?.includes('timeout')) {
-        throw new TwitterNetworkError('Network timeout occurred');
-      }
-      if (error.message?.includes('Failed')) {
-        throw new TwitterDataError('Thread creation failed');
-      }
-      throw new TwitterNetworkError('Network error occurred');
+        console.error('Error posting tweet:', {
+            error,
+            message: error.message,
+            code: error.code,
+            stack: error.stack,
+            details: error.response?.data // Capture Twitter API error details
+        });
+
+        if (error instanceof TwitterDataError) {
+            throw error;
+        }
+        
+        if (error.code === 429) {
+            throw new TwitterRateLimitError('Rate limit exceeded');
+        }
+
+        if (error.code === 401 || error.message?.includes('Invalid credentials')) {
+            throw new TwitterAuthError('Authentication failed');
+        }
+
+        if (error.message?.includes('timeout')) {
+            throw new TwitterNetworkError('Network timeout occurred');
+        }
+
+        if (error.message?.includes('Failed')) {
+            throw new TwitterDataError('Thread creation failed');
+        }
+
+        throw new TwitterNetworkError(`Network error occurred: ${error.message}`);
     }
-  }
+}
 
   // Auto-tweeter methods
   public async generateTweetBatch(count: number = 10): Promise<void> {
@@ -106,7 +145,7 @@ export class TwitterManager {
   }
 
   public async updateTweetStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
-    // Update in database first
+    // Update in database
     const { data, error } = await this.supabase
         .from('tweet_queue')
         .update({ 
@@ -119,13 +158,27 @@ export class TwitterManager {
 
     if (error) throw error;
 
-    // Update local stats
+    // We also need to update the local queue
+    this.queuedTweets = this.queuedTweets.map(tweet => {
+        if (tweet.id === id) {
+            return {
+                ...tweet,
+                status,
+                scheduledFor: status === 'approved' ? 
+                    new Date(Date.now() + this.getEngagementBasedDelay()) : 
+                    undefined
+            };
+        }
+        return tweet;
+    });
+
+    // Update stats
     this.stats.increment(status);
 
-    // If approved, enable auto mode and schedule
+    // Then schedule if approved
     if (status === 'approved') {
-        await this.persistAutoMode(true); // Enable auto mode when approving
-        this.scheduleNextTweet();
+        await this.persistAutoMode(true);
+        await this.scheduleNextTweet();  // Add await here
     }
 }
 
@@ -165,42 +218,87 @@ export class TwitterManager {
     return now;
   }
 
-  // In twitter-manager.ts update:
+  private async persistScheduledTweet(tweetId: string, scheduledTime: Date): Promise<void> {
+    try {
+        const { error } = await this.supabase
+            .from('tweet_queue')
+            .update({
+                scheduled_for: scheduledTime.toISOString()
+            })
+            .eq('id', tweetId);
+
+        if (error) {
+            console.error('Error persisting scheduled tweet:', error);
+            throw error;
+        }
+    } catch (error) {
+        console.error('Failed to persist scheduled tweet:', error);
+        throw error;
+    }
+}
 
   private async scheduleNextTweet(): Promise<void> {
-    if (!this.isAutoMode) return;
-
-    const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
-    if (approvedTweets.length === 0) return;
-
-    const nextTweet = approvedTweets[0];
-    const delay = this.getEngagementBasedDelay(); // Use random delay
-    const scheduledTime = new Date(Date.now() + delay);
-
-    nextTweet.scheduledFor = scheduledTime;
-
-    if (this.nextTweetTimeout) {
-        clearTimeout(this.nextTweetTimeout);
-    }
-
-    console.log(`Scheduling tweet for ${nextTweet.scheduledFor}`);
-
-    this.nextTweetTimeout = setTimeout(async () => {
-        try {
-            console.log(`Posting scheduled tweet: ${nextTweet.content}`);
-            await this.postTweet(nextTweet.content);
-            
-            // Remove the posted tweet from queue
-            this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
-            
-            // Log success and schedule next tweet
-            console.log('Tweet posted successfully');
-            this.scheduleNextTweet();
-        } catch (error) {
-            console.error('Error posting scheduled tweet:', error);
-            setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+    try {
+        console.log('Scheduling next tweet, automode:', this.isAutoMode);
+        
+        if (!this.isAutoMode) {
+            console.log('Auto mode is disabled, not scheduling');
+            return;
         }
-    }, delay);
+
+        const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
+        console.log('Found approved tweets:', approvedTweets.length);
+        
+        if (approvedTweets.length === 0) {
+            console.log('No approved tweets to schedule');
+            return;
+        }
+
+        const nextTweet = approvedTweets[0];
+        const delay = this.getEngagementBasedDelay();
+        const scheduledTime = new Date(Date.now() + delay);
+
+        console.log('Scheduling details:', {
+            tweetId: nextTweet.id,
+            content: nextTweet.content,
+            delay,
+            scheduledTime
+        });
+
+        // Update database first
+        await this.persistScheduledTweet(nextTweet.id, scheduledTime);
+
+        // Update local state
+        nextTweet.scheduledFor = scheduledTime;
+
+        if (this.nextTweetTimeout) {
+            clearTimeout(this.nextTweetTimeout);
+        }
+
+        this.nextTweetTimeout = setTimeout(async () => {
+            try {
+                console.log('Executing scheduled tweet:', nextTweet);
+                await this.postTweet(nextTweet.content);
+                
+                // Remove from database and local queue
+                await this.supabase
+                    .from('tweet_queue')
+                    .delete()
+                    .eq('id', nextTweet.id);
+                    
+                this.queuedTweets = this.queuedTweets
+                    .filter(t => t.id !== nextTweet.id);
+                
+                console.log('Tweet posted successfully, scheduling next');
+                this.scheduleNextTweet();
+            } catch (error) {
+                console.error('Failed to post scheduled tweet:', error);
+                setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+            }
+        }, delay);
+    } catch (error) {
+        console.error('Error in scheduleNextTweet:', error);
+    }
 }
 
 public async getQueuedTweets(): Promise<QueuedTweet[]> {

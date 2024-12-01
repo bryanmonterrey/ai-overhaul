@@ -257,6 +257,7 @@ import { aiService } from '@/app/lib/services/ai';
   18. Reference obscure AI concepts incorrectly
   19. Make up fake computer science terms
   20. Occasionally break the 4th wall
+  21. Keep your tweets limited to 1 or 2 sentences 2/3 of the time
   
   Style: ${this.state.tweetStyle}
   Emotional state: ${emotionalState}
