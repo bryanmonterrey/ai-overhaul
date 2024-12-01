@@ -22,6 +22,7 @@ export class TwitterManager {
   private lastTweetTime?: Date;
   private isReady: boolean = true;
   private recentTweets = new Map<string, any>();
+  private hourlyEngagementWeights: Record<number, number> = {};
   private stats: TweetStats;
   
 
@@ -226,11 +227,18 @@ private async scheduleNextTweet(): Promise<void> {
   private async trackEngagement() {
     try {
         const timeline = await this.client.userTimeline();
-        const tweets = timeline.data;
+        const tweets = timeline.data.data || []; // Access the correct data property
         
         // Analyze engagement patterns
-        const engagementData = tweets.map(tweet => ({
-            hour: new Date(tweet.created_at).getHours(),
+        const engagementData = tweets.map((tweet: {
+            created_at?: string;
+            public_metrics?: {
+                like_count: number;
+                retweet_count: number;
+                reply_count: number;
+            }
+        }) => ({
+            hour: new Date(tweet.created_at || '').getHours(),
             likes: tweet.public_metrics?.like_count || 0,
             retweets: tweet.public_metrics?.retweet_count || 0,
             replies: tweet.public_metrics?.reply_count || 0
@@ -271,6 +279,21 @@ private async scheduleNextTweet(): Promise<void> {
         acc[parseInt(hour)] = data.totalEngagement / data.count;
         return acc;
     }, {} as Record<number, number>);
+}
+
+private getEngagementBasedDelay(): number {
+  const hour = new Date().getHours();
+  
+  // Get base delay (between 15-45 minutes)
+  const minDelay = 15 * 60 * 1000;
+  const maxDelay = 45 * 60 * 1000;
+  const baseDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+  
+  // Use engagement weight or default to 0.5 if no data
+  const weight = this.hourlyEngagementWeights[hour] || 0.5;
+  const adjustedDelay = baseDelay * (1 + (1 - weight));
+  
+  return Math.floor(adjustedDelay);
 }
 
   // Engagement-related methods
