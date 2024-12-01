@@ -52,14 +52,27 @@ export class AutoTweeter {
   }
 
   public updateTweetStatus(id: string, status: 'approved' | 'rejected'): void {
-    this.queuedTweets = this.queuedTweets.map(tweet => 
-      tweet.id === id ? { ...tweet, status } : tweet
-    );
+    // Update the tweet status
+    this.queuedTweets = this.queuedTweets.map(tweet => {
+      if (tweet.id === id) {
+        return {
+          ...tweet,
+          status,
+          updatedAt: new Date(), // Add timestamp for tracking
+          scheduledFor: status === 'approved' ? new Date(Date.now() + this.getRandomDelay()) : undefined
+        };
+      }
+      return tweet;
+    });
 
+    // Emit an event or update statistics
+    this.updateStatistics(status);
+    
+    // If approved and auto mode is on, schedule it
     if (status === 'approved' && this.isAutoMode) {
       this.scheduleNextTweet();
     }
-  }
+}
 
   public toggleAutoMode(enabled: boolean): void {
     this.isAutoMode = enabled;
@@ -85,37 +98,95 @@ export class AutoTweeter {
     return now;
   }
 
-  private async scheduleNextTweet(): Promise<void> {
+  private getRandomDelay(): number {
+    // Random delay between 15-45 minutes (in milliseconds)
+    const minDelay = 15 * 60 * 1000;
+    const maxDelay = 45 * 60 * 1000;
+    return Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+}
+
+private getEngagementBasedDelay(): number {
+    const hour = new Date().getHours();
+    
+    // Define engagement weights for different hours (0-1)
+    const hourlyWeights = {
+        0: 0.2,  // 12 AM
+        1: 0.1,
+        // ... morning hours
+        9: 0.8,  // 9 AM
+        10: 0.9,
+        11: 0.8,
+        12: 0.7,
+        13: 0.8,
+        14: 0.7,
+        15: 0.8,
+        16: 0.9,  // 4 PM
+        17: 1.0,  // 5 PM peak
+        18: 0.9,
+        19: 0.8,
+        20: 0.7,
+        21: 0.6,
+        22: 0.4,
+        23: 0.3
+    };
+
+    // Get base delay
+    const baseDelay = this.getRandomDelay();
+    
+    // Adjust delay based on engagement weight
+    const weight = hourlyWeights[hour] || 0.5;
+    const adjustedDelay = baseDelay * (1 + (1 - weight));
+    
+    return Math.floor(adjustedDelay);
+}
+
+
+private async scheduleNextTweet(): Promise<void> {
     if (!this.isAutoMode) return;
 
     const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
     if (approvedTweets.length === 0) return;
 
     const nextTweet = approvedTweets[0];
-    const optimalTime = this.getOptimalTweetTime();
-    const delay = Math.max(
-      optimalTime.getTime() - Date.now(),
-      this.minTimeBetweenTweets
-    );
+    
+    // Get delay based on engagement patterns
+    const delay = this.getEngagementBasedDelay();
+    const scheduledTime = new Date(Date.now() + delay);
 
-    nextTweet.scheduledFor = new Date(Date.now() + delay);
+    // Don't schedule during low engagement hours (11 PM - 6 AM)
+    if (scheduledTime.getHours() >= 23 || scheduledTime.getHours() < 6) {
+        scheduledTime.setHours(7, 0, 0, 0); // Set to 7 AM
+        if (scheduledTime.getHours() >= 23) scheduledTime.setDate(scheduledTime.getDate() + 1);
+    }
+
+    nextTweet.scheduledFor = scheduledTime;
+
+    if (this.nextTweetTimeout) {
+        clearTimeout(this.nextTweetTimeout);
+    }
+
+    console.log(`Scheduling tweet for ${scheduledTime}`);
 
     this.nextTweetTimeout = setTimeout(async () => {
-      try {
-        await this.twitterService.postTweet(nextTweet.content);
-        
-        // Remove posted tweet from queue
-        this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
-        
-        // Schedule next tweet if there are more
-        this.scheduleNextTweet();
-      } catch (error) {
-        console.error('Error posting tweet:', error);
-        // Retry in 5 minutes if failed
-        setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
-      }
+        try {
+            console.log(`Posting scheduled tweet: ${nextTweet.content}`);
+            await this.postTweet(nextTweet.content);
+            
+            // Remove the posted tweet from queue
+            this.queuedTweets = this.queuedTweets.filter(t => t.id !== nextTweet.id);
+            
+            // Update stats
+            this.updateStatistics('posted');
+            
+            // Log success and schedule next tweet
+            console.log('Tweet posted successfully');
+            this.scheduleNextTweet();
+        } catch (error) {
+            console.error('Error posting scheduled tweet:', error);
+            setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+        }
     }, delay);
-  }
+}
 
   public getQueuedTweets(): QueuedTweet[] {
     return this.queuedTweets;
