@@ -86,11 +86,13 @@ export default function EngagementTargets() {
           <Input
             placeholder="TWITTER_USERNAME"
             value={newTarget.username}
+            className='bg-[#11111A] text-white'
             onChange={(e) => setNewTarget(prev => ({ ...prev, username: e.target.value }))}
           />
           <Input
             placeholder="TOPICS [COMMA_SEPARATED]"
             value={newTarget.topics}
+            className='bg-[#11111A] text-white'
             onChange={(e) => setNewTarget(prev => ({ ...prev, topics: e.target.value }))}
           />
           <div className="flex items-center gap-2 font-mono text-xs">
