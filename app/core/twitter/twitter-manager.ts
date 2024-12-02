@@ -15,6 +15,13 @@ interface QueuedTweet {
   scheduledFor?: Date;
 }
 
+interface EngagementRules {
+  maxRepliesPerDay: number;
+  cooldownPeriod: number;  // minutes
+  topicRelevanceThreshold: number;
+  replyTypes: ('agree' | 'disagree' | 'question' | 'build')[];
+}
+
 export class TwitterManager {
   private client: TwitterClient;
   private supabase: SupabaseClient;
@@ -588,20 +595,36 @@ private getEngagementBasedDelay(): number {
   // Engagement-related methods
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
-      const timelineResponse = await this.client.userTimeline();
-      const timeline = timelineResponse.data.data; // Access the tweets array
-      const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
-  
-      for (const tweet of timeline) {
-        const tweetDate = new Date(tweet.created_at || '');
-        if (tweetDate > lastCheck && this.shouldReplyToTweet(tweet, target)) {
-          await this.generateAndSendReply(tweet, target);
+        const timelineResponse = await this.client.userTimeline({
+            user_id: target.username,  // Make sure this is the correct user ID
+            max_results: 10,  // Get latest tweets
+            exclude: ['retweets', 'replies']
+        });
+        
+        const timeline = timelineResponse.data.data;
+        const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
+
+        console.log(`Monitoring tweets for ${target.username}`, {
+            tweetsFound: timeline?.length,
+            lastCheck: lastCheck.toISOString()
+        });
+
+        for (const tweet of (timeline || [])) {
+            const tweetDate = new Date(tweet.created_at || '');
+            if (tweetDate > lastCheck && await this.shouldReplyToTweet(tweet, target)) {
+                await this.generateAndSendReply(tweet, target);
+                
+                // Update last interaction time
+                await this.supabase
+                    .from('engagement_targets')
+                    .update({ last_interaction: new Date().toISOString() })
+                    .eq('id', target.id);
+            }
         }
-      }
     } catch (error) {
-      console.error(`Error monitoring tweets for ${target.username}:`, error);
+        console.error(`Error monitoring tweets for ${target.username}:`, error);
     }
-  }
+}
 
   private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
     // Check if tweet contains relevant topics
@@ -614,28 +637,70 @@ private getEngagementBasedDelay(): number {
 
   private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
     try {
-      const context = {
-        platform: 'twitter' as const,
-        environmentalFactors: {
-          timeOfDay: this.getTimeOfDay(),
-          platformActivity: 0.5,
-          socialContext: [target.relationship_level],
-          platform: 'twitter'
-        },
-        style: target.preferred_style as TweetStyle, // Cast the style
-        additionalContext: `Replying to @${target.username}'s tweet: ${tweet.text}`
-      };
-  
-      const reply = await this.personality.processInput(tweet.text, context);
-      
-      if (reply) {
-        await this.postTweet(reply);
-      }
+        // Create context for the personality system
+        const context = {
+            platform: 'twitter' as const,
+            environmentalFactors: {
+                timeOfDay: this.getTimeOfDay(),
+                platformActivity: 0.5,
+                socialContext: [target.relationship_level],
+                platform: 'twitter'
+            },
+            style: target.preferred_style as TweetStyle,
+            additionalContext: {
+                replyingTo: target.username,
+                originalTweet: tweet.text,
+                topics: target.topics,
+                relationship: target.relationship_level
+            }
+        };
+
+        // Get training examples for replies
+        const examples = await this.trainingService.getTrainingExamples(3, 'replies');
+        
+        // Generate reply with context and examples
+        const reply = await this.personality.processInput(
+            `Generate a reply to: ${tweet.text}`,
+            context,
+            examples
+        );
+
+        if (reply) {
+            // Post as reply to original tweet
+            await this.client.tweet(reply, {
+                reply: {
+                    in_reply_to_tweet_id: tweet.id
+                }
+            });
+            
+            console.log(`Reply sent to ${target.username}:`, reply);
+        }
     } catch (error) {
-      console.error(`Error generating reply for ${target.username}:`, error);
+        console.error(`Error generating reply for ${target.username}:`, error);
     }
-  }
-  
+}
+
+private monitoringInterval?: NodeJS.Timeout;
+
+public startMonitoring(): void {
+    this.monitoringInterval = setInterval(async () => {
+        const { data: targets } = await this.supabase
+            .from('engagement_targets')
+            .select('*');
+            
+        if (targets) {
+            for (const target of targets) {
+                await this.monitorTargetTweets(target);
+            }
+        }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+}
+
+public stopMonitoring(): void {
+    if (this.monitoringInterval) {
+        clearInterval(this.monitoringInterval);
+    }
+}
 
   private getTimeOfDay(): string {
     const hour = new Date().getHours();
