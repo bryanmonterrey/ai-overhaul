@@ -198,10 +198,10 @@ import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
     if (input === 'Generate a tweet') {
       // Get training examples first
       const examplesArrays = await Promise.all([
-        this.trainingService.getTrainingExamples(250, 'truth_terminal'),
-        this.trainingService.getTrainingExamples(250, 'RNR_0'),
-        this.trainingService.getTrainingExamples(250, '0xzerebro'),
-        this.trainingService.getTrainingExamples(250, 'a1lon9')
+        this.trainingService.getTrainingExamples(50, 'truth_terminal'),
+        this.trainingService.getTrainingExamples(50, 'RNR_0'),
+        this.trainingService.getTrainingExamples(50, '0xzerebro'),
+        this.trainingService.getTrainingExamples(50, 'a1lon9')
     ]);
     
     // Flatten the arrays of examples into a single array
