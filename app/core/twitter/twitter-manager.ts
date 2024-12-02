@@ -681,12 +681,19 @@ private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
             this.monitoringStats.repliesSent++;
             console.log(`Reply sent to ${target.username}:`, reply);
 
-            // Update last interaction time
+            // First get the current total_interactions
+            const { data: currentTarget } = await this.supabase
+                .from('engagement_targets')
+                .select('total_interactions')
+                .eq('id', target.id)
+                .single();
+
+            // Update last interaction time and increment total_interactions
             await this.supabase
                 .from('engagement_targets')
                 .update({ 
                     last_interaction: new Date().toISOString(),
-                    total_interactions: target.total_interactions + 1
+                    total_interactions: ((currentTarget?.total_interactions || 0) + 1)
                 })
                 .eq('id', target.id);
         }

@@ -58,67 +58,77 @@ export class TwitterApiClient implements TwitterClient {
 
   async userTimeline(): Promise<TwitterTimelineResponse> {
     try {
-      const timeline = await this.client.v2.userTimeline(
-        await this.getCurrentUserId(), 
-        {
-          max_results: 10,
-          "tweet.fields": ["created_at", "public_metrics"]
-        }
-      );
-
-      const tweets = timeline.data.data || [];
-
-      return {
-        data: {
-          data: tweets.map((tweet: any) => ({
-            id: tweet.id,
-            text: tweet.text,
-            created_at: tweet.created_at,
-            public_metrics: {
-              like_count: tweet.public_metrics?.like_count || 0,
-              retweet_count: tweet.public_metrics?.retweet_count || 0,
-              reply_count: tweet.public_metrics?.reply_count || 0
+        console.log('Fetching user timeline...');
+        const timeline = await this.client.v2.userTimeline(
+            await this.getCurrentUserId(), 
+            {
+                max_results: 10,
+                "tweet.fields": ["created_at", "public_metrics"]
             }
-          }))
-        }
-      };
-    } catch (error: any) {
-      console.error('Error fetching user timeline:', error);
-      throw new Error(error.message || 'Failed to fetch user timeline');
-    }
-  }
+        );
 
-  async userMentionTimeline(): Promise<TwitterTimelineResponse> {
-    try {
+        const tweets = timeline.data.data || [];
+        console.log('Timeline response:', {
+            tweetsFound: tweets.length,
+            firstTweet: tweets[0]?.text
+        });
+
+        return {
+            data: {
+                data: tweets.map((tweet: any) => ({
+                    id: tweet.id,
+                    text: tweet.text,
+                    created_at: tweet.created_at,
+                    public_metrics: {
+                        like_count: tweet.public_metrics?.like_count || 0,
+                        retweet_count: tweet.public_metrics?.retweet_count || 0,
+                        reply_count: tweet.public_metrics?.reply_count || 0
+                    }
+                }))
+            }
+        };
+    } catch (error: any) {
+        console.error('Error fetching user timeline:', error);
+        throw new Error(error.message || 'Failed to fetch user timeline');
+    }
+}
+
+async userMentionTimeline(): Promise<TwitterTimelineResponse> {
+  try {
+      console.log('Fetching user mention timeline...');
       const mentions = await this.client.v2.userMentionTimeline(
-        await this.getCurrentUserId(),
-        {
-          max_results: 10,
-          "tweet.fields": ["created_at", "public_metrics"]
-        }
+          await this.getCurrentUserId(),
+          {
+              max_results: 10,
+              "tweet.fields": ["created_at", "public_metrics"]
+          }
       );
 
       const tweets = mentions.data.data || [];
+      console.log('Mentions response:', {
+          mentionsFound: tweets.length,
+          firstMention: tweets[0]?.text
+      });
 
       return {
-        data: {
-          data: tweets.map((tweet: any) => ({
-            id: tweet.id,
-            text: tweet.text,
-            created_at: tweet.created_at,
-            public_metrics: {
-              like_count: tweet.public_metrics?.like_count || 0,
-              retweet_count: tweet.public_metrics?.retweet_count || 0,
-              reply_count: tweet.public_metrics?.reply_count || 0
-            }
-          }))
-        }
+          data: {
+              data: tweets.map((tweet: any) => ({
+                  id: tweet.id,
+                  text: tweet.text,
+                  created_at: tweet.created_at,
+                  public_metrics: {
+                      like_count: tweet.public_metrics?.like_count || 0,
+                      retweet_count: tweet.public_metrics?.retweet_count || 0,
+                      reply_count: tweet.public_metrics?.reply_count || 0
+                  }
+              }))
+          }
       };
-    } catch (error: any) {
+  } catch (error: any) {
       console.error('Error fetching mentions:', error);
       throw new Error(error.message || 'Failed to fetch mentions');
-    }
   }
+}
 
   private async getCurrentUserId(): Promise<string> {
     const me = await this.client.v2.me();
