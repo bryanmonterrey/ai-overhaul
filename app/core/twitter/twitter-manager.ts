@@ -35,6 +35,13 @@ private client: TwitterClient;
   private is24HourMode = false;
   private monitoringInterval?: NodeJS.Timeout;
 private lastTweetTime: Date | null = null;
+private isMonitoring: boolean = false;
+    private lastMonitoringCheck: Date | null = null;
+    private monitoringStats = {
+        targetsChecked: 0,
+        repliesSent: 0,
+        lastError: null as Error | null
+    };
   
 
   constructor(
@@ -647,21 +654,45 @@ private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
             trainingExamples: await this.trainingService.getTrainingExamples(3, 'replies')
         };
 
+        console.log('Generating reply for target:', {
+            username: target.username,
+            tweetText: tweet.text,
+            context
+        });
+
         const reply = await this.personality.processInput(
             `Generate a reply to: ${tweet.text}`,
             context as unknown as Partial<Context>
         );
 
         if (reply) {
+            console.log('Sending reply:', {
+                to: target.username,
+                replyText: reply,
+                originalTweet: tweet.id
+            });
+
             await this.client.tweet(reply, {
                 reply: {
                     in_reply_to_tweet_id: tweet.id
                 }
             });
+
+            this.monitoringStats.repliesSent++;
             console.log(`Reply sent to ${target.username}:`, reply);
+
+            // Update last interaction time
+            await this.supabase
+                .from('engagement_targets')
+                .update({ 
+                    last_interaction: new Date().toISOString(),
+                    total_interactions: target.total_interactions + 1
+                })
+                .eq('id', target.id);
         }
     } catch (error) {
         console.error(`Error generating reply for ${target.username}:`, error);
+        throw error;
     }
 }
 
@@ -748,42 +779,76 @@ private async handleReply(tweet: {
 }
 
 
-public startMonitoring(): void {
+public async startMonitoring(): Promise<void> {
+    if (this.isMonitoring) {
+        console.log('Monitoring already running');
+        return;
+    }
+
+    console.log('Starting Twitter monitoring...');
+    this.isMonitoring = true;
+
     this.monitoringInterval = setInterval(async () => {
         try {
+            this.lastMonitoringCheck = new Date();
+            console.log('Running monitoring check at:', this.lastMonitoringCheck);
+
             // Monitor engagement targets
-            const { data: targets } = await this.supabase
+            const { data: targets, error: targetsError } = await this.supabase
                 .from('engagement_targets')
                 .select('*');
-                
+
+            if (targetsError) {
+                throw new Error(`Failed to fetch targets: ${targetsError.message}`);
+            }
+
+            console.log(`Found ${targets?.length || 0} engagement targets to monitor`);
+            
             if (targets) {
                 for (const target of targets) {
                     await this.monitorTargetTweets(target);
+                    this.monitoringStats.targetsChecked++;
                 }
             }
 
-            // Monitor mentions and replies to own tweets
+            // Monitor mentions and replies
             const [mentions, replies] = await Promise.all([
-                this.client.userMentionTimeline(),  // Remove v2
-                this.client.userTimeline({          // Use proper options
+                this.client.userMentionTimeline(),
+                this.client.userTimeline({
                     user_id: process.env.TWITTER_USER_ID!,
                     max_results: 10
                 })
             ]);
+
+            console.log('Monitoring results:', {
+                mentions: mentions.data.data?.length || 0,
+                replies: replies.data.data?.length || 0
+            });
+
             // Handle mentions
             for (const mention of mentions.data.data || []) {
                 await this.handleMention(mention);
             }
 
-            // Handle replies to own tweets
+            // Handle replies
             for (const tweet of replies.data.data || []) {
                 await this.handleReply(tweet);
             }
 
         } catch (error) {
             console.error('Error in monitoring cycle:', error);
+            this.monitoringStats.lastError = error as Error;
         }
     }, 2 * 60 * 1000); // Check every 2 minutes
+}
+
+public async getMonitoringStatus(): Promise<any> {
+    return {
+        isMonitoring: this.isMonitoring,
+        lastCheck: this.lastMonitoringCheck,
+        stats: this.monitoringStats,
+        recentTweets: Array.from(this.recentTweets.values()).slice(0, 5)
+    };
 }
 
 public stopMonitoring(): void {

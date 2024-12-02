@@ -72,7 +72,6 @@ const twitterManager = new TwitterManager(
   new TwitterTrainingService()
 );
 
-twitterManager.startMonitoring();
 
 const emotionalSystem = new EmotionalSystem();
 const memorySystem = new MemorySystem();
