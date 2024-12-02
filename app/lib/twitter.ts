@@ -16,6 +16,7 @@ import { TwitterAuthError, TwitterRateLimitError, TwitterNetworkError, TwitterDa
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { Context, TweetStyle } from '@/app/core/personality/types';
+import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
 
 interface QueuedTweet {
   id: string;
@@ -42,32 +43,32 @@ export class TwitterManager {
 
   constructor() {
     const requiredEnvVars = [
-      'TWITTER_API_KEY',
-      'TWITTER_API_SECRET',
-      'TWITTER_ACCESS_TOKEN',
-      'TWITTER_ACCESS_TOKEN_SECRET'
+        'TWITTER_API_KEY',
+        'TWITTER_API_SECRET',
+        'TWITTER_ACCESS_TOKEN',
+        'TWITTER_ACCESS_TOKEN_SECRET'
     ];
 
     requiredEnvVars.forEach(varName => {
-      if (!process.env[varName]) {
-        throw new Error(`${varName} is not defined`);
-      }
+        if (!process.env[varName]) {
+            throw new Error(`${varName} is not defined`);
+        }
     });
 
     this.client = new TwitterApi({
-      appKey: process.env.TWITTER_API_KEY!,
-      appSecret: process.env.TWITTER_API_SECRET!,
-      accessToken: process.env.TWITTER_ACCESS_TOKEN!,
-      accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET!,
+        appKey: process.env.TWITTER_API_KEY!,
+        appSecret: process.env.TWITTER_API_SECRET!,
+        accessToken: process.env.TWITTER_ACCESS_TOKEN!,
+        accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET!,
     });
 
     this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
+    this.trainingService = new TwitterTrainingService();
     this.personality = new PersonalitySystem({
-        platform: 'twitter',
         baseTemperature: 0.7,
         creativityBias: 0.5,
         emotionalVolatility: 0.3,
@@ -79,11 +80,12 @@ export class TwitterManager {
             chaotic: [],
             creative: [],
             analytical: []
-        }
+        },
+        platform: 'twitter'
     });
 
     this.loadRecentTweets();
-  }
+}
 
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
