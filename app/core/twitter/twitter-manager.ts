@@ -2,7 +2,7 @@ import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkEr
 import type { TwitterClient, TwitterData } from './types';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
-import { TweetStyle } from '../personality/types';
+import { Context, TweetStyle } from '../personality/types';
 import { TweetStats } from './TweetStats';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -605,7 +605,11 @@ private getEngagementBasedDelay(): number {
   // Engagement-related methods
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
-        const timelineResponse = await this.client.userTimeline();
+        const timelineResponse = await this.client.userTimeline({
+            user_id: target.username, 
+            max_results: 10, 
+            exclude: ['retweets', 'replies']
+        });
         
         const timeline = timelineResponse.data.data;
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
@@ -653,23 +657,30 @@ private getEngagementBasedDelay(): number {
                 platform: 'twitter'
             },
             style: target.preferred_style as TweetStyle,
-            additionalContext: JSON.stringify({
+            additionalContext: {
                 replyingTo: target.username,
                 originalTweet: tweet.text,
                 topics: target.topics,
                 relationship: target.relationship_level
-            })
+            }
         };
 
-        // Remove the examples parameter since ProcessInput only takes up to 2 args
+        // Get training examples for replies
+        const examples = await this.trainingService.getTrainingExamples(3, 'replies');
+        
+        // Generate reply with context and examples
         const reply = await this.personality.processInput(
-            `Generate a reply to: ${tweet.text}`,
-            context  // Remove examples parameter
-        );
+          `Generate a reply to: ${tweet.text}`,
+          context as unknown as Partial<Context>                         
+      );
 
         if (reply) {
-            // Post reply without options object
-            await this.client.tweet(reply);
+            // Post as reply to original tweet
+            await this.client.tweet(reply, {
+                reply: {
+                    in_reply_to_tweet_id: tweet.id
+                }
+            });
             
             console.log(`Reply sent to ${target.username}:`, reply);
         }
