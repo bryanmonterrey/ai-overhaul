@@ -12,17 +12,22 @@ import {
     PersonalityConfig
   } from '@/app/core/personality/types';
 import { aiService } from '@/app/lib/services/ai';
+import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
   
   export class PersonalitySystem {
     private state: PersonalityState;
     private config: PersonalityConfig;
     private traits: Map<string, number> = new Map();
-  
+    private trainingService: TwitterTrainingService;
+
     constructor(config: PersonalityConfig) {
       this.config = config;
       this.state = this.initializeState();
       this.initializeTraits();
+      this.trainingService = new TwitterTrainingService();
     }
+
+    
   
     private initializeTraits(): void {
       this.traits.set('technical_depth', 0.8);
