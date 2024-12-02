@@ -33,6 +33,7 @@ const twitterInputSchema = z.object({
 });
 
 const twitterManager = new TwitterManager();
+twitterManager.startMonitoring();
 
 // Personality configuration
 const personalityConfig = {

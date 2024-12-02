@@ -48,54 +48,48 @@ export class TwitterManager {
     try {
         console.log('Attempting to post tweet:', { content });
 
-        // Update character limit for Twitter Premium/Blue
-        const TWITTER_PREMIUM_CHAR_LIMIT = 25000;
-        if (content.length > TWITTER_PREMIUM_CHAR_LIMIT) {
+        if (content.length > 25000) {
             throw new TwitterDataError('Tweet exceeds Twitter Premium character limit');
         }
 
-        if (!this.client) {
+        if (!this.client?.tweet) {
             throw new TwitterError('Twitter client not initialized', 'INITIALIZATION_ERROR', 500);
         }
 
-        if (!this.client.tweet) {
-            throw new TwitterError('Invalid Twitter client configuration', 'CLIENT_CONFIG_ERROR', 500);
+        const MIN_WAIT = 2 * 60 * 1000; // 2 minutes minimum between tweets
+        const lastTweetTime = this.lastTweetTime?.getTime() || 0;
+        const timeSinceLastTweet = Date.now() - lastTweetTime;
+        
+        if (timeSinceLastTweet < MIN_WAIT) {
+            const waitTime = MIN_WAIT - timeSinceLastTweet;
+            console.log(`Waiting ${Math.round(waitTime/1000)}s before next tweet`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
         }
 
-        let result;
         try {
-            result = await this.client.tweet(content);
+            const result = await this.client.tweet(content);
+            this.lastTweetTime = new Date();
+            this.recentTweets.set(result.data.id, {
+                ...result.data,
+                timestamp: this.lastTweetTime
+            });
+
+            if (this.recentTweets.size > 100) {
+                const oldestKey = this.recentTweets.keys().next().value;
+                this.recentTweets.delete(oldestKey);
+            }
+
+            return result.data;
         } catch (tweetError: any) {
             if (tweetError.code === 429) {
-                // Rate limit hit - pause and retry
-                console.log('Rate limit hit, pausing for 15 minutes');
-                await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
-                // Retry the tweet after waiting
-                result = await this.client.tweet(content);
-            } else {
-                throw tweetError;
+                const waitTime = 15 * 60 * 1000 + (Math.random() * 60000);
+                console.log(`Rate limit hit, waiting ${Math.round(waitTime/1000)}s`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                const retryResult = await this.client.tweet(content);
+                return retryResult.data;
             }
+            throw tweetError;
         }
-
-        console.log('Tweet posted successfully:', result);
-
-        // Update last tweet time
-        this.lastTweetTime = new Date();
-
-        // Add to recent tweets cache
-        this.recentTweets.set(result.data.id, {
-            ...result.data,
-            timestamp: this.lastTweetTime
-        });
-
-        // Trim cache if too large
-        if (this.recentTweets.size > 100) {
-            const oldestKey = this.recentTweets.keys().next().value;
-            this.recentTweets.delete(oldestKey);
-        }
-
-        return result.data;
-
     } catch (error: any) {
         console.error('Error posting tweet:', {
             error,
@@ -105,25 +99,13 @@ export class TwitterManager {
             details: error.response?.data
         });
 
-        if (error instanceof TwitterDataError) {
-            throw error;
-        }
-        
-        if (error.code === 429) {
-            throw new TwitterRateLimitError('Rate limit exceeded');
-        }
-
+        if (error instanceof TwitterDataError) throw error;
+        if (error.code === 429) throw new TwitterRateLimitError('Rate limit exceeded');
         if (error.code === 401 || error.message?.includes('Invalid credentials')) {
             throw new TwitterAuthError('Authentication failed');
         }
-
-        if (error.message?.includes('timeout')) {
-            throw new TwitterNetworkError('Network timeout occurred');
-        }
-
-        if (error.message?.includes('Failed')) {
-            throw new TwitterDataError('Thread creation failed');
-        }
+        if (error.message?.includes('timeout')) throw new TwitterNetworkError('Network timeout occurred');
+        if (error.message?.includes('Failed')) throw new TwitterDataError('Thread creation failed');
 
         throw new TwitterNetworkError(`Network error occurred: ${error.message}`);
     }
@@ -270,7 +252,7 @@ private async syncQueueWithDatabase(): Promise<void> {
         throw error;
     }
  }
- 
+
 public toggleAutoMode(enabled: boolean): void {
   console.log('Toggling auto mode:', {
       currentState: this.isAutoMode,
