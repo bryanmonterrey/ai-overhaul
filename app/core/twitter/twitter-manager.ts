@@ -754,42 +754,54 @@ private async getLastInteractionTime(): Promise<Date> {
 
 private async handleMention(mention: TwitterData): Promise<void> {
     const lastCheck = await this.getLastInteractionTime();
-    const mentionTime = new Date(mention.created_at);
+    const mentionTime = new Date(mention.created_at || '');
   
     if (mentionTime > lastCheck) {
-        const context = {
-            type: 'mention',
-            content: mention.text,
-            user: mention.author_id
-        };
-  
-        const reply = await this.generateReply(context);
-        if (reply) {
-            await this.client.tweet(reply, {
-                reply: { in_reply_to_tweet_id: mention.id }
-            });
-        }
-    }
-  
-}
-private async handleReply(tweet: any): Promise<void> {
-    const lastCheck = await this.getLastInteractionTime();
-    const replyTime = new Date(tweet.created_at);
-  
-    if (replyTime > lastCheck) {
-        const context = {
-            platform: 'twitter' as const,
+        const context: Context = {
+            platform: 'twitter',
             environmentalFactors: {
                 timeOfDay: this.getTimeOfDay(),
                 platformActivity: 0.5,
                 socialContext: ['casual'],
                 platform: 'twitter'
             },
-            style: 'casual' as TweetStyle,
-            additionalContext: JSON.stringify({
+            style: 'casual',
+            additionalContext: {
+                originalTweet: mention.text,
+                replyingTo: mention.id
+            }
+        };
+  
+        const reply = await this.personality.processInput(
+            `Generate a reply to: ${mention.text}`,
+            context
+        );
+        if (reply) {
+            await this.client.tweet(reply, {
+                reply: { in_reply_to_tweet_id: mention.id }
+            });
+        }
+    }
+}
+
+private async handleReply(tweet: TwitterData): Promise<void> {
+    const lastCheck = await this.getLastInteractionTime();
+    const replyTime = new Date(tweet.created_at || '');
+  
+    if (replyTime > lastCheck) {
+        const context: Context = {
+            platform: 'twitter',
+            environmentalFactors: {
+                timeOfDay: this.getTimeOfDay(),
+                platformActivity: 0.5,
+                socialContext: ['casual'],
+                platform: 'twitter'
+            },
+            style: 'casual',
+            additionalContext: {
                 originalTweet: tweet.text,
-                replyingTo: tweet.author_id
-            })
+                replyingTo: tweet.id
+            }
         };
   
         const reply = await this.personality.processInput(
@@ -798,39 +810,21 @@ private async handleReply(tweet: any): Promise<void> {
         );
   
         if (reply) {
-            await this.postTweet(reply, tweet.id);
+            await this.client.tweet(reply, {
+                reply: { in_reply_to_tweet_id: tweet.id }
+            });
         }
     }
-  }
-
-  private async generateReply(context: any): Promise<string | null> {
-    try {
-        const reply = await this.personality.processInput(
-            `Generate a reply to: ${context.content}`,
-            {
-                platform: 'twitter',
-                additionalContext: JSON.stringify({
-                    originalTweet: context.content,
-                    replyingTo: context.user
-                })
-            }
-        );
-        return reply;
-    } catch (error) {
-        console.error('Error generating reply:', error);
-        return null;
-    }
-  }
+}
 
 public getRecentTweets() {
     return this.recentTweets;
-  }
+}
 
-  public getTweetStats() {
+public getTweetStats() {
     return this.stats.getStats();
 }
 
 public resetTweetStats() {
     this.stats.reset();
-}
 }
