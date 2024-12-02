@@ -1,14 +1,12 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase.types';
 
 export class TwitterTrainingService {
     private supabase;
 
-    constructor() {
-        const cookieStore = cookies();
+    constructor(cookieStore: any) {
         this.supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
-    }
+      }
 
     async saveTweet(content: string, source: string, themes?: string[]) {
         const { data, error } = await this.supabase
