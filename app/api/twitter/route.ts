@@ -49,7 +49,8 @@ const personalityConfig = {
     chaotic: [],
     creative: [],
     analytical: []
-  }
+  },
+  platform: 'twitter'
 };
 
 const personalitySystem = new PersonalitySystem(personalityConfig);

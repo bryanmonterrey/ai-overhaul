@@ -197,7 +197,7 @@ import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
       // If generating a tweet, use minimal context
     if (input === 'Generate a tweet') {
       // Get training examples first
-      const examples = await this.trainingService.getTrainingExamples(3, 'truth_terminal');
+      const examples = await this.trainingService.getTrainingExamples(1000, 'truth_terminal');
       const trainingExamplesPrompt = examples.length > 0 ? `
       Here are some example tweets to learn from:
       ${examples.map(ex => ex.content).join('\n\n')}

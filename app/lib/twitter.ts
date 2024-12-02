@@ -13,11 +13,32 @@ import {
   TweetSearchResult
 } from './types/twitter';
 import { TwitterAuthError, TwitterRateLimitError, TwitterNetworkError, TwitterDataError, TwitterError } from '@/app/lib/errors/TwitterErrors';
+import type { EngagementTargetRow } from '@/app/types/supabase';
+import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
+import { Context, TweetStyle } from '@/app/core/personality/types';
+
+interface QueuedTweet {
+  id: string;
+  content: string; 
+  style: string;
+  status: 'pending' | 'approved' | 'rejected';
+  generatedAt: Date;
+  scheduledFor?: Date;
+}
 
 export class TwitterManager {
   private client: TwitterApi;
   private supabase;
   private recentTweets: Map<string, CachedTweet> = new Map();
+  private monitoringInterval?: NodeJS.Timeout;
+  private personality: PersonalitySystem;
+  private trainingService: any;
+  private queuedTweets: QueuedTweet[] = [];
+  private isAutoMode: boolean = false;
+  private nextTweetTimeout?: NodeJS.Timeout;
+  private is24HourMode = false;
+  private hourlyEngagementWeights: Record<number, number> = {};
+  private lastTweetTime: Date | null = null;
 
   constructor() {
     const requiredEnvVars = [
@@ -45,63 +66,290 @@ export class TwitterManager {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
+    this.personality = new PersonalitySystem({
+        platform: 'twitter',
+        baseTemperature: 0.7,
+        creativityBias: 0.5,
+        emotionalVolatility: 0.3,
+        memoryRetention: 0.8,
+        responsePatterns: {
+            neutral: [],
+            excited: [],
+            contemplative: [],
+            chaotic: [],
+            creative: [],
+            analytical: []
+        }
+    });
+
     this.loadRecentTweets();
   }
 
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
-      const timelineResponse = await this.client.userTimeline({
-        user_id: target.username,
-        max_results: 10,
-        exclude: ['retweets', 'replies']
-      });
-  
-      const timeline = timelineResponse.data.data;
-      const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
-  
-      console.log(`Monitoring tweets for ${target.username}`, {
-        tweetsFound: timeline?.length,
-        lastCheck: lastCheck.toISOString()
-      });
-  
-      for (const tweet of (timeline || [])) {
-        const tweetDate = new Date(tweet.created_at || '');
-        if (tweetDate > lastCheck && await this.shouldReplyToTweet(tweet, target)) {
-          await this.generateAndSendReply(tweet, target);
-          
-          await this.supabase
-            .from('engagement_targets')
-            .update({ last_interaction: new Date().toISOString() })
-            .eq('id', target.id);
+        const timelineResponse = await this.client.v2.userTimeline(target.username, {
+            max_results: 10, 
+            exclude: ['retweets', 'replies']
+        });
+        
+        const timeline = timelineResponse.data.data;
+        const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
+
+        console.log(`Monitoring tweets for ${target.username}`, {
+            tweetsFound: timeline?.length,
+            lastCheck: lastCheck.toISOString()
+        });
+
+        for (const tweet of (timeline || [])) {
+            const tweetDate = new Date(tweet.created_at || '');
+            if (tweetDate > lastCheck && await this.shouldReplyToTweet(tweet, target)) {
+                await this.generateAndSendReply(tweet, target);
+                
+                // Update last interaction time
+                await this.supabase
+                    .from('engagement_targets')
+                    .update({ last_interaction: new Date().toISOString() })
+                    .eq('id', target.id);
+            }
         }
-      }
     } catch (error) {
-      console.error(`Error monitoring tweets for ${target.username}:`, error);
+        console.error(`Error monitoring tweets for ${target.username}:`, error);
     }
+}
+
+  private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
+    // Check if tweet contains relevant topics
+    const hasTopic = target.topics.some(topic => 
+      tweet.text.toLowerCase().includes(topic.toLowerCase())
+    );
+
+    return hasTopic && Math.random() < target.reply_probability;
   }
+
+  private async generateAndSendReply(tweet: TweetV2, target: EngagementTargetRow): Promise<void> {
+    try {
+        const context = {
+            platform: 'twitter' as const,
+            environmentalFactors: {
+                timeOfDay: this.getTimeOfDay(),
+                platformActivity: 0.5,
+                socialContext: [target.relationship_level],
+                platform: 'twitter'
+            },
+            style: target.preferred_style as TweetStyle,
+            additionalContext: {
+                replyingTo: target.username,
+                originalTweet: tweet.text,
+                topics: target.topics,
+                relationship: target.relationship_level
+            },
+            trainingExamples: await this.trainingService.getTrainingExamples(3, 'replies')
+        };
+
+        const reply = await this.personality.processInput(
+            `Generate a reply to: ${tweet.text}`,
+            context as unknown as Partial<Context>
+        );
+
+        if (reply) {
+            await this.client.v2.reply(reply, tweet.id);
+            console.log(`Reply sent to ${target.username}:`, reply);
+        }
+    } catch (error) {
+        console.error(`Error generating reply for ${target.username}:`, error);
+    }
+}
 
   // Add these methods to your TwitterManager class
   public startMonitoring(): void {
     this.monitoringInterval = setInterval(async () => {
-      const { data: targets } = await this.supabase
-        .from('engagement_targets')
-        .select('*');
-        
-      if (targets) {
-        for (const target of targets) {
-          await this.monitorTargetTweets(target);
+        const { data: targets } = await this.supabase
+            .from('engagement_targets')
+            .select('*');
+        if (targets) {
+            for (const target of targets) {
+                await this.monitorTargetTweets(target);
+            }
         }
-      }
-    }, 5 * 60 * 1000);  // Every 5 minutes
-  }
+    }, 5 * 60 * 1000);
+}
 
-  public stopMonitoring(): void {
+public stopMonitoring(): void {
     if (this.monitoringInterval) {
-      clearInterval(this.monitoringInterval);
+        clearInterval(this.monitoringInterval);
     }
-  }
+}
 
-  private monitoringInterval?: NodeJS.Timeout;
+private getTimeOfDay(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 17) return 'afternoon';
+  if (hour >= 17 && hour < 22) return 'evening';
+  return 'night';
+}
+
+private async syncQueueWithDatabase(): Promise<void> {
+  try {
+      const tweets = await this.getQueuedTweets();
+      this.queuedTweets = tweets;
+  } catch (error) {
+      console.error('Error syncing queue:', error);
+  }
+}
+
+public async getQueuedTweets(): Promise<QueuedTweet[]> {
+  const { count, error: countError } = await this.supabase
+      .from('tweet_queue')
+      .select('*', { count: 'exact', head: true });
+
+  if (countError) return [];
+
+  const { data, error } = await this.supabase
+      .from('tweet_queue')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map(tweet => ({
+      id: tweet.id,
+      content: tweet.content,
+      style: tweet.style,
+      status: tweet.status,
+      generatedAt: new Date(tweet.generated_at),
+      scheduledFor: tweet.scheduled_for ? new Date(tweet.scheduled_for) : undefined
+  }));
+}
+
+public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> {
+  const { error } = await this.supabase
+      .from('tweet_queue')
+      .insert(
+          tweets.map(tweet => ({
+              content: tweet.content,
+              style: tweet.style,
+              status: tweet.status,
+              generated_at: tweet.generatedAt.toISOString(),
+              scheduled_for: tweet.scheduledFor?.toISOString()
+          }))
+      );
+
+  if (error) throw error;
+}
+
+private async scheduleNextTweet(): Promise<void> {
+  if (!this.isAutoMode) return;
+
+  await this.syncQueueWithDatabase();
+
+  const approvedTweets = this.queuedTweets
+      .filter(t => t.status === 'approved')
+      .sort((a, b) => {
+          const timeA = a.scheduledFor?.getTime() || Infinity;
+          const timeB = b.scheduledFor?.getTime() || Infinity;
+          return timeA - timeB;
+      });
+
+  if (approvedTweets.length === 0) return;
+
+  const nextTweet = approvedTweets[0];
+  if (!nextTweet.scheduledFor) return;
+
+  const now = new Date().getTime();
+  const scheduledTime = nextTweet.scheduledFor.getTime();
+  const delay = Math.max(0, scheduledTime - now);
+
+  if (this.nextTweetTimeout) clearTimeout(this.nextTweetTimeout);
+
+  this.nextTweetTimeout = setTimeout(async () => {
+      try {
+          await this.postTweet(nextTweet.content);
+          await this.supabase
+              .from('tweet_queue')
+              .delete()
+              .eq('id', nextTweet.id);
+          
+          this.queuedTweets = this.queuedTweets
+              .filter(t => t.id !== nextTweet.id);
+          
+          this.scheduleNextTweet();
+      } catch (error) {
+          console.error('Failed to post tweet:', error);
+          setTimeout(() => this.scheduleNextTweet(), 5 * 60 * 1000);
+      }
+  }, delay);
+}
+
+public toggle24HourMode(enabled: boolean) {
+  this.is24HourMode = enabled;
+  if (enabled) {
+      this.schedule24Hours().catch(console.error);
+  }
+}
+
+private async schedule24Hours() {
+  const tweets = await this.getQueuedTweets();
+  const pendingTweets = tweets.filter(t => t.status === 'pending');
+  const interval = (24 * 60 * 60 * 1000) / (pendingTweets.length || 1);
+  
+  const baseTime = new Date();
+  for (let i = 0; i < pendingTweets.length; i++) {
+      const scheduledTime = new Date(baseTime.getTime() + (interval * i));
+      await this.updateTweetStatus(pendingTweets[i].id, 'approved', scheduledTime);
+  }
+}
+
+private async trackEngagement() {
+  try {
+      const timeline = await this.client.v2.userTimeline(process.env.TWITTER_USER_ID!, {
+          max_results: 100,
+          "tweet.fields": ["public_metrics", "created_at"]
+      });
+      const tweets = timeline.data.data || [];
+      const engagementData = tweets.map((tweet: {
+          created_at?: string;
+          public_metrics?: {
+              like_count: number;
+              retweet_count: number;
+              reply_count: number;
+          }
+      }) => ({
+          hour: new Date(tweet.created_at || '').getHours(),
+          likes: tweet.public_metrics?.like_count || 0,
+          retweets: tweet.public_metrics?.retweet_count || 0,
+          replies: tweet.public_metrics?.reply_count || 0
+      }));
+      this.updateEngagementPatterns(engagementData);
+  } catch (error) {
+      console.error('Error tracking engagement:', error);
+  }
+}
+
+private updateEngagementPatterns(engagementData: Array<{
+  hour: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+}>) {
+  const hourlyEngagement = engagementData.reduce((acc, data) => {
+      if (!acc[data.hour]) {
+          acc[data.hour] = {
+              totalEngagement: 0,
+              count: 0
+          };
+      }
+      const engagement = data.likes + data.retweets + data.replies;
+      acc[data.hour].totalEngagement += engagement;
+      acc[data.hour].count++;
+      return acc;
+  }, {} as Record<number, { totalEngagement: number; count: number }>);
+
+  this.hourlyEngagementWeights = Object.entries(hourlyEngagement).reduce((acc, [hour, data]) => {
+      acc[parseInt(hour)] = data.totalEngagement / data.count;
+      return acc;
+  }, {} as Record<number, number>);
+}
+
 
 private async retryOperation<T>(
     operation: () => Promise<T>,
@@ -163,6 +411,7 @@ private async retryOperation<T>(
           : { text: content };
   
         const tweet = await this.client.v2.tweet(tweetData);
+        this.lastTweetTime = new Date();
   
         // Add missing property to match TweetV2 type
         const tweetWithEditHistory = {
@@ -223,6 +472,80 @@ private async retryOperation<T>(
       console.error('Error loading recent tweets:', error);
     }
   }
+
+  public async toggleAutoMode(enabled: boolean): Promise<void> {
+    this.isAutoMode = enabled;
+    if (enabled) {
+        await this.scheduleNextTweet();
+    } else if (this.nextTweetTimeout) {
+        clearTimeout(this.nextTweetTimeout);
+    }
+}
+ 
+ public async generateTweetBatch(count: number = 10): Promise<void> {
+    const newTweets: Omit<QueuedTweet, 'id'>[] = [];
+    
+    for (let i = 0; i < count; i++) {
+        const style = this.personality.getCurrentTweetStyle();
+        const content = await this.personality.processInput(
+            'Generate a tweet', 
+            { platform: 'twitter', style }
+        );
+ 
+        newTweets.push({
+            content: this.cleanTweet(content),
+            style,
+            status: 'pending',
+            generatedAt: new Date()
+        });
+    }
+ 
+    await this.addTweetsToQueue(newTweets);
+ }
+ 
+ public getNextScheduledTime(): Date | null {
+    const approvedTweets = this.queuedTweets.filter(t => t.status === 'approved');
+    if (approvedTweets.length === 0) return null;
+    
+    const nextTweet = approvedTweets[0];
+    return nextTweet.scheduledFor || null;
+ }
+ 
+ private async persistScheduledTweet(tweetId: string, scheduledTime: Date): Promise<void> {
+    const { error } = await this.supabase
+        .from('tweet_queue')
+        .update({
+            scheduled_for: scheduledTime.toISOString()
+        })
+        .eq('id', tweetId);
+ 
+    if (error) throw error;
+ }
+ 
+ private getOptimalTweetTime(): Date {
+    const now = new Date();
+    const hour = now.getHours();
+    
+    if (hour >= 23 || hour < 6) {
+        now.setHours(7, 0, 0, 0);
+        if (hour >= 23) now.setDate(now.getDate() + 1);
+    }
+    
+    return now;
+ }
+ 
+ public clearRejectedTweets(): void {
+    this.queuedTweets = this.queuedTweets.filter(t => t.status !== 'rejected');
+ }
+ 
+ public getTweetStats() {
+    return {
+        recentTweets: this.recentTweets.size,
+        queuedTweets: this.queuedTweets.length,
+        approvedTweets: this.queuedTweets.filter(t => t.status === 'approved').length,
+        lastTweetTime: this.lastTweetTime
+    };
+ }
 
   async getEnvironmentalFactors(): Promise<Partial<EnvironmentalFactors>> {
     try {
@@ -438,6 +761,71 @@ private async retryOperation<T>(
     }
   }
 
+  private getEngagementBasedDelay(): number {
+    if (this.is24HourMode) return 0;
+    
+    const minDelay = 15 * 60 * 1000;  // 15 minutes
+    const maxDelay = 30 * 60 * 1000;  // 30 minutes
+    const baseDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    
+    const hour = new Date().getHours();
+    const weight = this.hourlyEngagementWeights[hour] || 0.5;
+    return Math.floor(baseDelay * (1 + (1 - weight)));
+ }
+ 
+ private async persistAutoMode(enabled: boolean): Promise<void> {
+    const { error } = await this.supabase
+        .from('system_settings')
+        .upsert({ 
+            key: 'twitter_auto_mode',
+            value: enabled,
+            updated_at: new Date().toISOString()
+        });
+ 
+    if (error) throw error;
+    this.isAutoMode = enabled;
+ }
+ 
+ private cleanTweet(tweet: string): string {
+    return tweet
+        .replace(/\[(\w+)_state\]$/, '')
+        .trim();
+ }
+ 
+ public async updateTweetStatus(
+    id: string, 
+    status: 'approved' | 'rejected',
+    scheduledTime?: Date
+ ): Promise<void> {
+    await this.syncQueueWithDatabase();
+    
+    const delay = this.getEngagementBasedDelay();
+    const finalScheduledTime = status === 'approved' 
+        ? (scheduledTime || new Date(Date.now() + delay))
+        : null;
+ 
+    const { error } = await this.supabase
+        .from('tweet_queue')
+        .update({ 
+            status,
+            scheduled_for: finalScheduledTime?.toISOString(),
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+ 
+    if (error) throw error;
+ 
+    this.queuedTweets = this.queuedTweets.map(tweet => 
+        tweet.id === id 
+            ? {...tweet, status, scheduledFor: finalScheduledTime || undefined}
+            : tweet
+    );
+ 
+    if (status === 'approved') {
+        await this.persistAutoMode(true);
+        await this.scheduleNextTweet();
+    }
+ }
   
 
   async processScheduledTweets(): Promise<number> {
