@@ -152,7 +152,9 @@ export class TwitterManager {
         );
 
         if (reply) {
-            await this.client.v2.reply(reply, tweet.id);
+            await this.client.v2.tweet(reply, {
+                reply: { in_reply_to_tweet_id: tweet.id }
+            });
             console.log(`Reply sent to ${target.username}:`, reply);
         }
     } catch (error) {
@@ -160,19 +162,112 @@ export class TwitterManager {
     }
 }
 
+private async handleMention(mention: any): Promise<void> {
+  const lastCheck = await this.getLastInteractionTime();
+  const mentionTime = new Date(mention.created_at);
+
+  if (mentionTime > lastCheck) {
+      const context = {
+          type: 'mention',
+          content: mention.text,
+          user: mention.author_id
+      };
+
+      const reply = await this.generateReply(context);
+      if (reply) {
+          await this.client.v2.tweet(reply, {
+              reply: { in_reply_to_tweet_id: mention.id }
+          });
+      }
+  }
+}
+
+private async handleReply(tweet: any): Promise<void> {
+  const lastCheck = await this.getLastInteractionTime();
+  const replyTime = new Date(tweet.created_at);
+
+  if (replyTime > lastCheck && this.shouldReplyToTweet(tweet, {
+    id: '',
+    username: tweet.author_id,
+    last_interaction: null,
+    relationship_level: 'new',
+    topics: [],
+    reply_probability: 1,
+    preferred_style: 'neutral',
+    created_at: new Date().toISOString()
+  })) {
+      const context = {
+          type: 'reply',
+          content: tweet.text,
+          user: tweet.author_id
+      };
+
+      const reply = await this.generateReply(context);
+      if (reply) {
+          await this.client.v2.tweet(reply, {
+              reply: { in_reply_to_tweet_id: tweet.id }
+          });
+      }
+  }
+}
+
+private async generateReply(context: any): Promise<string | null> {
+  try {
+      const reply = await this.personality.processInput(
+          `Generate a reply to: ${context.content}`,
+          {
+              platform: 'twitter',
+              additionalContext: JSON.stringify({
+                  originalTweet: context.content,
+                  replyingTo: context.user
+              })
+          }
+      );
+      return reply;
+  } catch (error) {
+      console.error('Error generating reply:', error);
+      return null;
+  }
+}
+
   // Add these methods to your TwitterManager class
   public startMonitoring(): void {
     this.monitoringInterval = setInterval(async () => {
-        const { data: targets } = await this.supabase
-            .from('engagement_targets')
-            .select('*');
-        if (targets) {
-            for (const target of targets) {
-                await this.monitorTargetTweets(target);
+        try {
+            // Monitor engagement targets
+            const { data: targets } = await this.supabase
+                .from('engagement_targets')
+                .select('*');
+                
+            if (targets) {
+                for (const target of targets) {
+                    await this.monitorTargetTweets(target);
+                }
             }
+
+            // Monitor mentions and replies to own tweets
+            const [mentions, replies] = await Promise.all([
+                this.client.v2.userMentionTimeline(process.env.TWITTER_USER_ID!),
+                this.client.v2.userTimeline(process.env.TWITTER_USER_ID!)
+            ]);
+
+            // Handle mentions
+            for (const mention of mentions.data.data || []) {
+                await this.handleMention(mention);
+            }
+
+            // Handle replies to own tweets
+            for (const tweet of replies.data.data || []) {
+                await this.handleReply(tweet);
+            }
+
+        } catch (error) {
+            console.error('Error in monitoring cycle:', error);
         }
-    }, 5 * 60 * 1000);
+    }, 2 * 60 * 1000); // Check every 2 minutes
 }
+
+
 
 public stopMonitoring(): void {
     if (this.monitoringInterval) {
@@ -852,6 +947,15 @@ private async retryOperation<T>(
       console.error('Error processing scheduled tweets:', error);
       throw error;
     }
+  }
+
+  private async getLastInteractionTime(): Promise<Date> {
+    const { data } = await this.supabase
+      .from('last_interaction')
+      .select('timestamp')
+      .single();
+    
+    return data ? new Date(data.timestamp) : new Date(0);
   }
 }
 

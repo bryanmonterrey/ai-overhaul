@@ -197,14 +197,22 @@ import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
       // If generating a tweet, use minimal context
     if (input === 'Generate a tweet') {
       // Get training examples first
-      const examples = await this.trainingService.getTrainingExamples(1000, 'truth_terminal');
-      const trainingExamplesPrompt = examples.length > 0 ? `
-      Here are some example tweets to learn from:
-      ${examples.map(ex => ex.content).join('\n\n')}
-      
-      Generate a new tweet that follows similar patterns but is unique.
-      ` : '';
-
+      const examplesArrays = await Promise.all([
+        this.trainingService.getTrainingExamples(250, 'truth_terminal'),
+        this.trainingService.getTrainingExamples(250, 'RNR_0'),
+        this.trainingService.getTrainingExamples(250, '0xzerebro'),
+        this.trainingService.getTrainingExamples(250, 'a1lon9')
+    ]);
+    
+    // Flatten the arrays of examples into a single array
+    const allExamples = examplesArrays.flat();
+    
+    const trainingExamplesPrompt = allExamples.length > 0 ? `
+    Here are some example tweets to learn from:
+    ${allExamples.map(ex => ex.content).join('\n\n')}
+    
+    Generate a new tweet that follows similar patterns but is unique.
+    ` : '';
       contextPrompt = `You are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.
       
       ${trainingExamplesPrompt}
