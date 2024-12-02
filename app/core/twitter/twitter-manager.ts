@@ -28,6 +28,7 @@ export class TwitterManager {
   private hourlyEngagementWeights: Record<number, number> = {};
   private stats: TweetStats;
   private trainingService: any;
+  private is24HourMode = false;
   
 
   constructor(
@@ -177,38 +178,41 @@ private async syncQueueWithDatabase(): Promise<void> {
     return nextTweet.scheduledFor || null;
   }
 
-  public async updateTweetStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
+  public async updateTweetStatus(
+    id: string, 
+    status: 'approved' | 'rejected',
+    scheduledTime?: Date
+ ): Promise<void> {
     try {
-        await this.syncQueueWithDatabase(); // Add this line
-
+        await this.syncQueueWithDatabase();
+ 
         console.log('Starting tweet status update:', {
             id,
             status,
             currentTime: new Date().toISOString()
         });
-
+ 
         const delay = this.getEngagementBasedDelay();
-        const scheduledTime = status === 'approved' ? 
-            new Date(Date.now() + delay) : 
-            null;
-
+        const finalScheduledTime = status === 'approved' 
+            ? (scheduledTime || new Date(Date.now() + delay))
+            : null;
+ 
         console.log('Calculated scheduling details:', {
             delay,
-            scheduledTime: scheduledTime?.toISOString(),
+            scheduledTime: finalScheduledTime?.toISOString(),
             isAutoMode: this.isAutoMode
         });
-
-        // Update in database
+ 
         const { data, error } = await this.supabase
             .from('tweet_queue')
             .update({ 
                 status,
-                scheduled_for: scheduledTime?.toISOString(),
+                scheduled_for: finalScheduledTime?.toISOString(),
                 updated_at: new Date().toISOString()
             })
             .eq('id', id)
             .select();
-
+ 
         if (error) {
             console.error('Database update error:', {
                 error,
@@ -217,25 +221,23 @@ private async syncQueueWithDatabase(): Promise<void> {
             });
             throw error;
         }
-
+ 
         console.log('Database update successful:', {
             updatedTweet: data?.[0],
             affectedRows: data?.length
         });
-
-        // Update local queue
+ 
         const updatedQueue = this.queuedTweets.map(tweet => {
             if (tweet.id === id) {
                 return {
                     ...tweet,
                     status,
-                    scheduledFor: scheduledTime || undefined
+                    scheduledFor: finalScheduledTime || undefined
                 };
             }
             return tweet;
         });
-
-        // Update the queue and log the change
+ 
         const oldQueueLength = this.queuedTweets.length;
         this.queuedTweets = updatedQueue;
         
@@ -244,11 +246,9 @@ private async syncQueueWithDatabase(): Promise<void> {
             newLength: updatedQueue.length,
             approvedCount: updatedQueue.filter(t => t.status === 'approved').length
         });
-
-        // Update stats
+ 
         this.stats.increment(status);
-
-        // Handle scheduling if approved
+ 
         if (status === 'approved') {
             console.log('Tweet approved, preparing to schedule...');
             await this.persistAutoMode(true);
@@ -269,8 +269,8 @@ private async syncQueueWithDatabase(): Promise<void> {
         });
         throw error;
     }
-}
-
+ }
+ 
 public toggleAutoMode(enabled: boolean): void {
   console.log('Toggling auto mode:', {
       currentState: this.isAutoMode,
@@ -589,6 +589,8 @@ public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> 
 }
 
 private getEngagementBasedDelay(): number {
+    if (this.is24HourMode) return 0;
+    
     const minDelay = 15 * 60 * 1000;  // 15 minutes
     const maxDelay = 30 * 60 * 1000;  // 30 minutes
     const baseDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
@@ -717,7 +719,6 @@ public stopMonitoring(): void {
     };
   }
 
-  private is24HourMode = false;
 
 public toggle24HourMode(enabled: boolean) {
     this.is24HourMode = enabled;
