@@ -11,6 +11,7 @@ import { TweetStyle } from '@/app/core/types';
 import EngagementTargets from '../interfaces/twitter/components/EngagementTargets';
 import AutoTweetManager from '../interfaces/twitter/components/AutoTweetManager';
 import { ErrorBoundary } from '@/app/components/common/ErrorBoundary';
+import TweetTraining from '@/app/interfaces/twitter/components/TweetTraining';
 
 
 export default function TwitterPage() {
@@ -109,6 +110,7 @@ export default function TwitterPage() {
           isLoading={isLoading}
         />
         <TweetStream tweets={tweets} onDelete={handleDelete} />
+        <TweetTraining />
       </div>
 
       <div className="space-y-4">
