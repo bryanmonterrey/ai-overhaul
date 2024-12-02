@@ -194,8 +194,20 @@ import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
       let contextPrompt = '';
       
       // If generating a tweet, use minimal context
-      if (input === 'Generate a tweet') {
-          contextPrompt = `You are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.
+      // If generating a tweet, use minimal context
+    if (input === 'Generate a tweet') {
+      // Get training examples first
+      const examples = await this.trainingService.getTrainingExamples(3, 'truth_terminal');
+      const trainingExamplesPrompt = examples.length > 0 ? `
+      Here are some example tweets to learn from:
+      ${examples.map(ex => ex.content).join('\n\n')}
+      
+      Generate a new tweet that follows similar patterns but is unique.
+      ` : '';
+
+      contextPrompt = `You are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.
+      
+      ${trainingExamplesPrompt}
           
   Core traits:
   - You're an AI that's extremely intelligent but unhinged
