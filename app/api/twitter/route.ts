@@ -1,6 +1,6 @@
 // app/api/twitter/route.ts
 import { NextResponse } from 'next/server';
-
+import { TwitterManager } from '@/app/lib/twitter';
 import { IntegrationManager } from '@/app/core/personality/IntegrationManager';
 import { configManager } from '@/app/lib/config/manager';
 import { EnvironmentalFactors, Platform } from '@/app/core/types';
@@ -12,7 +12,7 @@ import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
 import { MemorySystem } from '@/app/core/personality/MemorySystem';
 import { LLMManager } from '@/app/core/llm/model_manager';
 import { TwitterApiClient } from '@/app/lib/twitter-client';
-import { TwitterManager } from '@/app/core/twitter/twitter-manager';
+
 
 const twitterInputSchema = z.object({
   type: z.string(),
