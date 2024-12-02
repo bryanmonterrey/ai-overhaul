@@ -21,6 +21,11 @@ export interface TwitterResponse {
   data: TwitterData;
 }
 
+export interface TwitterManager {
+  startMonitoring(): void;
+  stopMonitoring(): void;
+}
+
 export interface TwitterTimelineResponse {
   data: {
     data: TwitterData[];

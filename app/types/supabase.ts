@@ -31,7 +31,7 @@ export interface EngagementHistoryRow {
   created_at: string;
 }
 
-interface EngagementRules {
+export interface EngagementRules {
     maxRepliesPerDay: number;
     cooldownPeriod: number;  // minutes
     topicRelevanceThreshold: number;
