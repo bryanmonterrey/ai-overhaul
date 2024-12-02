@@ -13,6 +13,7 @@ import {
   } from '@/app/core/personality/types';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { cookies } from 'next/headers';
   
   export class PersonalitySystem {
     private state: PersonalityState;
@@ -24,7 +25,7 @@ import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
       this.config = config;
       this.state = this.initializeState();
       this.initializeTraits();
-      this.trainingService = new TwitterTrainingService();
+      this.trainingService = new TwitterTrainingService(cookies());
     }
 
     
