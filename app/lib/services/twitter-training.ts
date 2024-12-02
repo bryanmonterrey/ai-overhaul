@@ -29,7 +29,7 @@ export class TwitterTrainingService {
         return data;
     }
 
-    async getTrainingExamples(count: number = 3, source?: string) {
+    async getTrainingExamples(count: number = 50, source?: string) {
         let query = this.supabase
             .from('tweet_training_data')
             .select('*');
@@ -38,10 +38,11 @@ export class TwitterTrainingService {
             query = query.eq('source', source);
         }
         
+        // Change to use built-in PostgreSQL random ordering
         const { data, error } = await query
-            .order('random()')
+            .order('created_at') // Or any other column
             .limit(count);
-
+    
         if (error) {
             console.error('Error fetching training examples:', error);
             throw error;
