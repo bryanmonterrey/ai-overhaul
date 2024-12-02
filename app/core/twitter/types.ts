@@ -45,6 +45,16 @@ export interface TwitterTimelineResponse {
   };
 }
 
+export interface TweetStats {
+  getStats(): any;
+  reset(): void;
+  increment(status: string): void;
+}
+
+export interface LastInteraction {
+  timestamp: string;
+}
+
 export interface TweetV2 extends TwitterData {
   edit_history_tweet_ids?: string[];
 }

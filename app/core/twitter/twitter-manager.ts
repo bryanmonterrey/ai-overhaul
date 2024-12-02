@@ -22,7 +22,6 @@ private client: TwitterClient;
   private queuedTweets: QueuedTweet[] = [];
   private isAutoMode: boolean = false;
   private nextTweetTimeout?: NodeJS.Timeout;
-  private lastTweetTime?: Date;
   private isReady: boolean = true;
   private recentTweets = new Map<string, any>();
   private hourlyEngagementWeights: Record<number, number> = {};
@@ -30,6 +29,7 @@ private client: TwitterClient;
   private trainingService: any;
   private is24HourMode = false;
   private monitoringInterval?: NodeJS.Timeout;
+private lastTweetTime: Date | null = null;
   
 
   constructor(
@@ -677,10 +677,12 @@ public startMonitoring(): void {
 
             // Monitor mentions and replies to own tweets
             const [mentions, replies] = await Promise.all([
-                this.client.v2.userMentionTimeline(process.env.TWITTER_USER_ID!),
-                this.client.v2.userTimeline(process.env.TWITTER_USER_ID!)
+                this.client.userMentionTimeline(),  // Remove v2
+                this.client.userTimeline({          // Use proper options
+                    user_id: process.env.TWITTER_USER_ID!,
+                    max_results: 10
+                })
             ]);
-
             // Handle mentions
             for (const mention of mentions.data.data || []) {
                 await this.handleMention(mention);
@@ -750,7 +752,7 @@ private async getLastInteractionTime(): Promise<Date> {
   }
 }
 
-private async handleMention(mention: any): Promise<void> {
+private async handleMention(mention: TwitterData): Promise<void> {
     const lastCheck = await this.getLastInteractionTime();
     const mentionTime = new Date(mention.created_at);
   
@@ -763,13 +765,13 @@ private async handleMention(mention: any): Promise<void> {
   
         const reply = await this.generateReply(context);
         if (reply) {
-            await this.client.v2.tweet(reply, {
+            await this.client.tweet(reply, {
                 reply: { in_reply_to_tweet_id: mention.id }
             });
         }
     }
-  }
-
+  
+}
 private async handleReply(tweet: any): Promise<void> {
     const lastCheck = await this.getLastInteractionTime();
     const replyTime = new Date(tweet.created_at);
