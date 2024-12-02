@@ -66,17 +66,17 @@ export default function TweetTraining() {
 
     return (
         <div className="space-y-4">
-            <Card>
-                <h2 className="text-lg font-semibold mb-4">Add Training Data</h2>
+            <Card variant="system" title="ADD_TRAINING_DATA">
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <textarea
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         placeholder="Enter tweet text"
-                        className="min-h-[100px]"
+                        className="min-h-[100px] w-full p-2 bg-[#11111A] text-[#DDDDDD] border border-[#DDDDDD] resize-none"
                     />
                     <Input
                         value={source}
+                        className='bg-[#11111A] text-[#DDDDDD]'
                         onChange={(e) => setSource(e.target.value)}
                         placeholder="Source (e.g., truth_terminal)"
                     />
@@ -86,17 +86,18 @@ export default function TweetTraining() {
                 </form>
             </Card>
 
-            <Card>
-                <h2 className="text-lg font-semibold mb-4">Upload CSV</h2>
+            <Card variant="system" title="UPLOAD_CSV">
                 <div className="space-y-4">
                     <Input
                         type="file"
                         accept=".csv"
+                        className='space-x-5 bg-[#11111A] border border-[#DDDDDD] text-[#DDDDDD] gap-x-3'
                         onChange={handleFileUpload}
                     />
                     <Button 
                         onClick={uploadCSV} 
                         disabled={!file || loading}
+                        className='bg-[#11111A] text-[#DDDDDD]'
                     >
                         {loading ? 'Uploading...' : 'Upload CSV'}
                     </Button>

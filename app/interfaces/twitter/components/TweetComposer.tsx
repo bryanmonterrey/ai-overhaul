@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { Card } from '@/app/components/common/Card';
 import { Input } from '@/app/components/common/Input';
 import { Button } from '@/app/components/common/Button';
-import { TweetStyle } from '@/core/types';
+import { TweetStyle } from '@/app/core/types';
 
 interface TweetComposerProps {
   onTweet: (content: string, style: TweetStyle) => Promise<void>;
