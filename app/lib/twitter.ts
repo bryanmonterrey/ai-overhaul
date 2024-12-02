@@ -49,6 +49,27 @@ export class TwitterManager {
   }
 
   // Add these methods to your TwitterManager class
+  public startMonitoring(): void {
+    this.monitoringInterval = setInterval(async () => {
+      const { data: targets } = await this.supabase
+        .from('engagement_targets')
+        .select('*');
+        
+      if (targets) {
+        for (const target of targets) {
+          await this.monitorTargetTweets(target);
+        }
+      }
+    }, 5 * 60 * 1000);  // Every 5 minutes
+  }
+
+  public stopMonitoring(): void {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+    }
+  }
+
+  private monitoringInterval?: NodeJS.Timeout;
 
 private async retryOperation<T>(
     operation: () => Promise<T>,
