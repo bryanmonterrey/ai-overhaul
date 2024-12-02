@@ -119,14 +119,10 @@ export class TwitterManager {
     }
 }
 
-  private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
-    // Check if tweet contains relevant topics
-    const hasTopic = target.topics.some(topic => 
-      tweet.text.toLowerCase().includes(topic.toLowerCase())
-    );
-
-    return hasTopic && Math.random() < target.reply_probability;
-  }
+private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
+  // Reply based on probability alone
+  return Math.random() < target.reply_probability;
+}
 
   private async generateAndSendReply(tweet: TweetV2, target: EngagementTargetRow): Promise<void> {
     try {
