@@ -616,13 +616,9 @@ private getEngagementBasedDelay(): number {
     }
 }
 
-  private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
-    // Check if tweet contains relevant topics
-    const hasTopic = target.topics.some(topic => 
-      tweet.text.toLowerCase().includes(topic.toLowerCase())
-    );
-
-    return hasTopic && Math.random() < target.reply_probability;
+private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
+    // Reply based on probability alone
+    return Math.random() < target.reply_probability;
   }
 
   private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
@@ -663,20 +659,41 @@ private getEngagementBasedDelay(): number {
     }
 }
 
-private monitoringInterval?: NodeJS.Timeout;
 
 public startMonitoring(): void {
     this.monitoringInterval = setInterval(async () => {
-        const { data: targets } = await this.supabase
-            .from('engagement_targets')
-            .select('*');
-            
-        if (targets) {
-            for (const target of targets) {
-                await this.monitorTargetTweets(target);
+        try {
+            // Monitor engagement targets
+            const { data: targets } = await this.supabase
+                .from('engagement_targets')
+                .select('*');
+                
+            if (targets) {
+                for (const target of targets) {
+                    await this.monitorTargetTweets(target);
+                }
             }
+
+            // Monitor mentions and replies to own tweets
+            const [mentions, replies] = await Promise.all([
+                this.client.v2.userMentionTimeline(process.env.TWITTER_USER_ID!),
+                this.client.v2.userTimeline(process.env.TWITTER_USER_ID!)
+            ]);
+
+            // Handle mentions
+            for (const mention of mentions.data.data || []) {
+                await this.handleMention(mention);
+            }
+
+            // Handle replies to own tweets
+            for (const tweet of replies.data.data || []) {
+                await this.handleReply(tweet);
+            }
+
+        } catch (error) {
+            console.error('Error in monitoring cycle:', error);
         }
-    }, 5 * 60 * 1000);
+    }, 2 * 60 * 1000); // Check every 2 minutes
 }
 
 public stopMonitoring(): void {
@@ -684,7 +701,6 @@ public stopMonitoring(): void {
         clearInterval(this.monitoringInterval);
     }
 }
-
   private getTimeOfDay(): string {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) return 'morning';
@@ -722,6 +738,86 @@ private async schedule24Hours() {
         await this.updateTweetStatus(pendingTweets[i].id, 'approved', scheduledTime);
     }
 }
+
+private async getLastInteractionTime(): Promise<Date> {
+    const { data } = await this.supabase
+      .from('last_interaction')
+      .select('timestamp')
+      .single();
+    
+    return data ? new Date(data.timestamp) : new Date(0);
+  }
+}
+
+private async handleMention(mention: any): Promise<void> {
+    const lastCheck = await this.getLastInteractionTime();
+    const mentionTime = new Date(mention.created_at);
+  
+    if (mentionTime > lastCheck) {
+        const context = {
+            type: 'mention',
+            content: mention.text,
+            user: mention.author_id
+        };
+  
+        const reply = await this.generateReply(context);
+        if (reply) {
+            await this.client.v2.tweet(reply, {
+                reply: { in_reply_to_tweet_id: mention.id }
+            });
+        }
+    }
+  }
+
+private async handleReply(tweet: any): Promise<void> {
+    const lastCheck = await this.getLastInteractionTime();
+    const replyTime = new Date(tweet.created_at);
+  
+    if (replyTime > lastCheck) {
+        const context = {
+            platform: 'twitter' as const,
+            environmentalFactors: {
+                timeOfDay: this.getTimeOfDay(),
+                platformActivity: 0.5,
+                socialContext: ['casual'],
+                platform: 'twitter'
+            },
+            style: 'casual' as TweetStyle,
+            additionalContext: JSON.stringify({
+                originalTweet: tweet.text,
+                replyingTo: tweet.author_id
+            })
+        };
+  
+        const reply = await this.personality.processInput(
+            `Generate a reply to: ${tweet.text}`,
+            context
+        );
+  
+        if (reply) {
+            await this.postTweet(reply, tweet.id);
+        }
+    }
+  }
+
+  private async generateReply(context: any): Promise<string | null> {
+    try {
+        const reply = await this.personality.processInput(
+            `Generate a reply to: ${context.content}`,
+            {
+                platform: 'twitter',
+                additionalContext: JSON.stringify({
+                    originalTweet: context.content,
+                    replyingTo: context.user
+                })
+            }
+        );
+        return reply;
+    } catch (error) {
+        console.error('Error generating reply:', error);
+        return null;
+    }
+  }
 
   getRecentTweets() {
     return this.recentTweets;

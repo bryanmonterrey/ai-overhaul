@@ -87,36 +87,37 @@ export class TwitterManager {
     this.loadRecentTweets();
 }
 
-  async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
-    try {
-        const timelineResponse = await this.client.v2.userTimeline(target.username, {
-            max_results: 10, 
-            exclude: ['retweets', 'replies']
-        });
-        
-        const timeline = timelineResponse.data.data;
-        const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
+async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
+  try {
+      const timelineResponse = await this.client.userTimeline({
+          user_id: target.username, 
+          max_results: 10, 
+          exclude: ['retweets', 'replies']
+      });
+      
+      const timeline = timelineResponse.data.data;
+      const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
 
-        console.log(`Monitoring tweets for ${target.username}`, {
-            tweetsFound: timeline?.length,
-            lastCheck: lastCheck.toISOString()
-        });
+      console.log(`Monitoring tweets for ${target.username}`, {
+          tweetsFound: timeline?.length,
+          lastCheck: lastCheck.toISOString()
+      });
 
-        for (const tweet of (timeline || [])) {
-            const tweetDate = new Date(tweet.created_at || '');
-            if (tweetDate > lastCheck && await this.shouldReplyToTweet(tweet, target)) {
-                await this.generateAndSendReply(tweet, target);
-                
-                // Update last interaction time
-                await this.supabase
-                    .from('engagement_targets')
-                    .update({ last_interaction: new Date().toISOString() })
-                    .eq('id', target.id);
-            }
-        }
-    } catch (error) {
-        console.error(`Error monitoring tweets for ${target.username}:`, error);
-    }
+      for (const tweet of (timeline || [])) {
+          const tweetDate = new Date(tweet.created_at || '');
+          if (tweetDate > lastCheck && await this.shouldReplyToTweet(tweet, target)) {
+              await this.generateAndSendReply(tweet, target);
+              
+              // Update last interaction time
+              await this.supabase
+                  .from('engagement_targets')
+                  .update({ last_interaction: new Date().toISOString() })
+                  .eq('id', target.id);
+          }
+      }
+  } catch (error) {
+      console.error(`Error monitoring tweets for ${target.username}:`, error);
+  }
 }
 
 private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {

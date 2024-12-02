@@ -1,6 +1,6 @@
 // app/api/twitter/route.ts
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '@/app/lib/twitter';
+import { TwitterManager } from '@/app/core/twitter/twitter-manager';
 import { IntegrationManager } from '@/app/core/personality/IntegrationManager';
 import { configManager } from '@/app/lib/config/manager';
 import { EnvironmentalFactors, Platform } from '@/app/core/types';
@@ -42,20 +42,7 @@ const client = new TwitterApiClient({
   accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET!
 });
 
-const twitterManager = new TwitterManager(
-  client,
-  personalitySystem,  // This is already defined above in your file
-  createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ),
-  new TwitterTrainingService()
-);
-
-twitterManager.startMonitoring();
-
-
-// Personality configuration
+// Move personalitySystem initialization here
 const personalityConfig = {
   baseTemperature: 0.7,
   creativityBias: 0.5,
@@ -73,6 +60,19 @@ const personalityConfig = {
 };
 
 const personalitySystem = new PersonalitySystem(personalityConfig);
+
+// Now twitterManager can use personalitySystem
+const twitterManager = new TwitterManager(
+  client,
+  personalitySystem,
+  createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ),
+  new TwitterTrainingService()
+);
+
+twitterManager.startMonitoring();
 
 const emotionalSystem = new EmotionalSystem();
 const memorySystem = new MemorySystem();
