@@ -717,6 +717,29 @@ public stopMonitoring(): void {
     };
   }
 
+  private is24HourMode = false;
+
+public toggle24HourMode(enabled: boolean) {
+    this.is24HourMode = enabled;
+    if (enabled) {
+        this.schedule24Hours().catch(console.error);
+    }
+}
+
+private async schedule24Hours() {
+    const baseTime = new Date();
+    const tweets = await this.getQueuedTweets();
+    const pendingTweets = tweets.filter(t => t.status === 'pending');
+    
+    // Spread tweets over 24 hours
+    const interval = (24 * 60 * 60 * 1000) / (pendingTweets.length || 1);
+    
+    for (let i = 0; i < pendingTweets.length; i++) {
+        const scheduledTime = new Date(baseTime.getTime() + (interval * i));
+        await this.updateTweetStatus(pendingTweets[i].id, 'approved', scheduledTime);
+    }
+}
+
   getRecentTweets() {
     return this.recentTweets;
   }
