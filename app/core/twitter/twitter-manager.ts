@@ -605,11 +605,7 @@ private getEngagementBasedDelay(): number {
   // Engagement-related methods
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
-        const timelineResponse = await this.client.userTimeline({
-            user_id: target.username, 
-            max_results: 10, 
-            exclude: ['retweets', 'replies']
-        });
+        const timelineResponse = await this.client.userTimeline();
         
         const timeline = timelineResponse.data.data;
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
@@ -657,31 +653,23 @@ private getEngagementBasedDelay(): number {
                 platform: 'twitter'
             },
             style: target.preferred_style as TweetStyle,
-            additionalContext: {
+            additionalContext: JSON.stringify({
                 replyingTo: target.username,
                 originalTweet: tweet.text,
                 topics: target.topics,
                 relationship: target.relationship_level
-            }
+            })
         };
 
-        // Get training examples for replies
-        const examples = await this.trainingService.getTrainingExamples(3, 'replies');
-        
-        // Generate reply with context and examples
+        // Remove the examples parameter since ProcessInput only takes up to 2 args
         const reply = await this.personality.processInput(
             `Generate a reply to: ${tweet.text}`,
-            context,
-            examples
+            context  // Remove examples parameter
         );
 
         if (reply) {
-            // Post as reply to original tweet
-            await this.client.tweet(reply, {
-                reply: {
-                    in_reply_to_tweet_id: tweet.id
-                }
-            });
+            // Post reply without options object
+            await this.client.tweet(reply);
             
             console.log(`Reply sent to ${target.username}:`, reply);
         }
