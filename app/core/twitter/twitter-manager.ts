@@ -589,17 +589,13 @@ public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> 
 }
 
 private getEngagementBasedDelay(): number {
-  const hour = new Date().getHours();
-  
-  // Increase base delay to avoid rate limits
-  const minDelay = 60 * 60 * 1000;  // 60 minutes
-  const maxDelay = 120 * 60 * 1000; // 120 minutes
-  const baseDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-  
-  const weight = this.hourlyEngagementWeights[hour] || 0.5;
-  const adjustedDelay = baseDelay * (1 + (1 - weight));
-  
-  return Math.floor(adjustedDelay);
+    const minDelay = 15 * 60 * 1000;  // 15 minutes
+    const maxDelay = 30 * 60 * 1000;  // 30 minutes
+    const baseDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    
+    const hour = new Date().getHours();
+    const weight = this.hourlyEngagementWeights[hour] || 0.5;
+    return Math.floor(baseDelay * (1 + (1 - weight)));
 }
 
   // Engagement-related methods
@@ -647,7 +643,6 @@ private getEngagementBasedDelay(): number {
 
   private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
     try {
-        // Create context for the personality system
         const context = {
             platform: 'twitter' as const,
             environmentalFactors: {
@@ -662,26 +657,21 @@ private getEngagementBasedDelay(): number {
                 originalTweet: tweet.text,
                 topics: target.topics,
                 relationship: target.relationship_level
-            }
+            },
+            trainingExamples: await this.trainingService.getTrainingExamples(3, 'replies')
         };
 
-        // Get training examples for replies
-        const examples = await this.trainingService.getTrainingExamples(3, 'replies');
-        
-        // Generate reply with context and examples
         const reply = await this.personality.processInput(
-          `Generate a reply to: ${tweet.text}`,
-          context as unknown as Partial<Context>                         
-      );
+            `Generate a reply to: ${tweet.text}`,
+            context as unknown as Partial<Context>
+        );
 
         if (reply) {
-            // Post as reply to original tweet
             await this.client.tweet(reply, {
                 reply: {
                     in_reply_to_tweet_id: tweet.id
                 }
             });
-            
             console.log(`Reply sent to ${target.username}:`, reply);
         }
     } catch (error) {
