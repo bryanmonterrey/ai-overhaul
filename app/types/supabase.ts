@@ -31,6 +31,13 @@ export interface EngagementHistoryRow {
   created_at: string;
 }
 
+interface EngagementRules {
+    maxRepliesPerDay: number;
+    cooldownPeriod: number;  // minutes
+    topicRelevanceThreshold: number;
+    replyTypes: ('agree' | 'disagree' | 'question' | 'build')[];
+}
+
 // Fixed Database interface
 export type Database = BaseDatabase & {
   public: {
@@ -95,3 +102,4 @@ export async function deleteEngagementTarget(id: string) {
 
   if (error) throw error;
 }
+

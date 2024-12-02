@@ -15,12 +15,6 @@ interface QueuedTweet {
   scheduledFor?: Date;
 }
 
-interface EngagementRules {
-  maxRepliesPerDay: number;
-  cooldownPeriod: number;  // minutes
-  topicRelevanceThreshold: number;
-  replyTypes: ('agree' | 'disagree' | 'question' | 'build')[];
-}
 
 export class TwitterManager {
   private client: TwitterClient;
@@ -693,7 +687,7 @@ public startMonitoring(): void {
                 await this.monitorTargetTweets(target);
             }
         }
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    }, 5 * 60 * 1000);
 }
 
 public stopMonitoring(): void {
