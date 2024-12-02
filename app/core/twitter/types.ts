@@ -11,6 +11,36 @@ interface TweetOptions {
   };
 }
 
+export interface TweetStyle {
+    tone?: string;
+    length?: 'short' | 'medium' | 'long';
+    formality?: 'casual' | 'formal';
+}
+
+export interface ContextData {
+  platform: 'twitter';
+  environmentalFactors: {
+      timeOfDay: string;
+      platformActivity: number;
+      socialContext: string[];
+      platform: string;
+  };
+  style: TweetStyle;
+  additionalContext: {
+      originalTweet?: string;
+      replyingTo?: string;
+      topics?: string[];
+      relationship?: string;
+  };
+}
+
+
+export interface ReplyContext {
+  type: 'mention' | 'reply';
+  content: string;
+  user: string;
+}
+
 export interface TwitterClient {
   tweet: (content: string, options?: { reply?: { in_reply_to_tweet_id: string } }) => Promise<TwitterResponse>;
   userTimeline: (options?: { user_id: string; max_results?: number; exclude?: string[] }) => Promise<TwitterTimelineResponse>;
@@ -75,4 +105,8 @@ export interface PersonalitySystem {
     context?: any,
     examples?: any[]
   ): Promise<string>;
+}
+
+export interface TwitterClientWithV2 extends TwitterClient {
+  tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse>;
 }
