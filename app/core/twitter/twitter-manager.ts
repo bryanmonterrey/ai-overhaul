@@ -27,16 +27,19 @@ export class TwitterManager {
   private recentTweets = new Map<string, any>();
   private hourlyEngagementWeights: Record<number, number> = {};
   private stats: TweetStats;
+  private trainingService: any;
   
 
   constructor(
     client: TwitterClient,
     private personality: PersonalitySystem,
-    supabase: SupabaseClient  // Add this parameter
+    supabase: SupabaseClient,
+    trainingService: any
 ) {
     this.client = client;
     this.supabase = supabase;
     this.stats = new TweetStats();
+    this.trainingService = trainingService;
 }
 
   // Your existing methods
@@ -590,8 +593,8 @@ private getEngagementBasedDelay(): number {
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
         const timelineResponse = await this.client.userTimeline({
-            user_id: target.username,  // Make sure this is the correct user ID
-            max_results: 10,  // Get latest tweets
+            user_id: target.username, 
+            max_results: 10, 
             exclude: ['retweets', 'replies']
         });
         
