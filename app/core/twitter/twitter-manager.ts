@@ -61,7 +61,21 @@ export class TwitterManager {
             throw new TwitterError('Invalid Twitter client configuration', 'CLIENT_CONFIG_ERROR', 500);
         }
 
-        const result = await this.client.tweet(content);
+        let result;
+        try {
+            result = await this.client.tweet(content);
+        } catch (tweetError: any) {
+            if (tweetError.code === 429) {
+                // Rate limit hit - pause and retry
+                console.log('Rate limit hit, pausing for 15 minutes');
+                await new Promise(resolve => setTimeout(resolve, 15 * 60 * 1000));
+                // Retry the tweet after waiting
+                result = await this.client.tweet(content);
+            } else {
+                throw tweetError;
+            }
+        }
+
         console.log('Tweet posted successfully:', result);
 
         // Update last tweet time
@@ -87,7 +101,7 @@ export class TwitterManager {
             message: error.message,
             code: error.code,
             stack: error.stack,
-            details: error.response?.data // Capture Twitter API error details
+            details: error.response?.data
         });
 
         if (error instanceof TwitterDataError) {
@@ -577,12 +591,11 @@ public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> 
 private getEngagementBasedDelay(): number {
   const hour = new Date().getHours();
   
-  // Get base delay (between 15-45 minutes)
-  const minDelay = 15 * 60 * 1000;
-  const maxDelay = 45 * 60 * 1000;
+  // Increase base delay to avoid rate limits
+  const minDelay = 60 * 60 * 1000;  // 60 minutes
+  const maxDelay = 120 * 60 * 1000; // 120 minutes
   const baseDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
   
-  // Use engagement weight or default to 0.5 if no data
   const weight = this.hourlyEngagementWeights[hour] || 0.5;
   const adjustedDelay = baseDelay * (1 + (1 - weight));
   
