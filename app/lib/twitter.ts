@@ -186,27 +186,29 @@ private async handleReply(tweet: any): Promise<void> {
   const lastCheck = await this.getLastInteractionTime();
   const replyTime = new Date(tweet.created_at);
 
-  if (replyTime > lastCheck && this.shouldReplyToTweet(tweet, {
-    id: '',
-    username: tweet.author_id,
-    last_interaction: null,
-    relationship_level: 'new',
-    topics: [],
-    reply_probability: 1,
-    preferred_style: 'neutral',
-    created_at: new Date().toISOString()
-  })) {
+  if (replyTime > lastCheck) {
       const context = {
-          type: 'reply',
-          content: tweet.text,
-          user: tweet.author_id
+          platform: 'twitter' as const,
+          environmentalFactors: {
+              timeOfDay: this.getTimeOfDay(),
+              platformActivity: 0.5,
+              socialContext: ['casual'],
+              platform: 'twitter'
+          },
+          style: 'casual' as TweetStyle,
+          additionalContext: JSON.stringify({
+              originalTweet: tweet.text,
+              replyingTo: tweet.author_id
+          })
       };
 
-      const reply = await this.generateReply(context);
+      const reply = await this.personality.processInput(
+          `Generate a reply to: ${tweet.text}`,
+          context
+      );
+
       if (reply) {
-          await this.client.v2.tweet(reply, {
-              reply: { in_reply_to_tweet_id: tweet.id }
-          });
+          await this.postTweet(reply, tweet.id);
       }
   }
 }
