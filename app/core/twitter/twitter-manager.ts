@@ -17,7 +17,7 @@ interface QueuedTweet {
 
 
 export class TwitterManager {
-  private client: TwitterClient;
+private client: TwitterClient;
   private supabase: SupabaseClient;
   private queuedTweets: QueuedTweet[] = [];
   private isAutoMode: boolean = false;
@@ -29,6 +29,7 @@ export class TwitterManager {
   private stats: TweetStats;
   private trainingService: any;
   private is24HourMode = false;
+  private monitoringInterval?: NodeJS.Timeout;
   
 
   constructor(
@@ -819,7 +820,7 @@ private async handleReply(tweet: any): Promise<void> {
     }
   }
 
-  getRecentTweets() {
+public getRecentTweets() {
     return this.recentTweets;
   }
 
