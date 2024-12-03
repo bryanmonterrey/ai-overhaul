@@ -10,30 +10,30 @@ try {
    throw e;
 }
 
-const RATE_LIMITS = {
-  '/2/tweets': {  // This matches ENDPOINTS.TWEETS
-      WINDOW: 24 * 60 * 60 * 1000, // 24 hours
+const RATE_LIMITS: Record<string, { WINDOW: number; LIMIT: number; MIN_DELAY: number }> = {
+  '/2/tweets': {
+      WINDOW: 24 * 60 * 60 * 1000,  // 24 hours
       LIMIT: 100,  // 100 tweets per day per user
       MIN_DELAY: 60 * 1000
   },
-  '/2/users/:id/tweets': {  // This matches ENDPOINTS.USER_TIMELINE
+  '/2/users/:id/tweets': {
       WINDOW: 15 * 60 * 1000,
       LIMIT: 5,  // 5 requests per 15 min per user
       MIN_DELAY: 30 * 1000
   },
-  '/2/users/:id/mentions': {  // This matches ENDPOINTS.USER_MENTIONS
+  '/2/users/:id/mentions': {
       WINDOW: 15 * 60 * 1000,
       LIMIT: 5,  // 5 requests per 15 min per user
       MIN_DELAY: 30 * 1000
   },
-  '/2/users/me': {  // This matches ENDPOINTS.USER_ME
+  '/2/users/me': {
       WINDOW: 24 * 60 * 60 * 1000,
       LIMIT: 250,  // 250 requests per 24 hours
       MIN_DELAY: 5 * 1000
   },
-  '/2/users/by/username/:username': {  // This matches ENDPOINTS.USER_BY_USERNAME
+  '/2/users/by/username/:username': {
       WINDOW: 24 * 60 * 60 * 1000,
-      LIMIT: 100,  // 100 requests per 24 hours
+      LIMIT: 100,  // 100 per 24 hours
       MIN_DELAY: 5 * 1000
   }
 } as const;
@@ -75,54 +75,12 @@ export class TwitterApiClient implements TwitterClient {
             accessSecret: credentials.accessSecret,
         });
 
-        // Initialize rate limits for each endpoint
         Object.values(ENDPOINTS).forEach(endpoint => {
-            let limits;
-            
-            // Determine which rate limit to use based on endpoint
-            if (endpoint === '/2/tweets') {
-                limits = {
-                    WINDOW: 24 * 60 * 60 * 1000, // 24 hours
-                    LIMIT: 100,  // 100 tweets per day per user
-                    MIN_DELAY: 60 * 1000
-                };
-            } else if (endpoint === '/2/users/:id/tweets') {
-                limits = {
-                    WINDOW: 15 * 60 * 1000,
-                    LIMIT: 5,  // 5 requests per 15 min per user
-                    MIN_DELAY: 30 * 1000
-                };
-            } else if (endpoint === '/2/users/:id/mentions') {
-                limits = {
-                    WINDOW: 15 * 60 * 1000,
-                    LIMIT: 5,  // 5 requests per 15 min per user
-                    MIN_DELAY: 30 * 1000
-                };
-            } else if (endpoint === '/2/users/me') {
-                limits = {
-                    WINDOW: 24 * 60 * 60 * 1000,
-                    LIMIT: 250,  // 250 requests per 24 hours
-                    MIN_DELAY: 5 * 1000
-                };
-            } else if (endpoint === '/2/users/by/username/:username') {
-                limits = {
-                    WINDOW: 24 * 60 * 60 * 1000,
-                    LIMIT: 100,  // 100 per 24 hours
-                    MIN_DELAY: 5 * 1000
-                };
-            } else {
-                // Default rate limits for other endpoints
-                limits = {
-                    WINDOW: 15 * 60 * 1000,
-                    LIMIT: 15,  // Conservative default
-                    MIN_DELAY: 30 * 1000
-                };
-            }
-
-            if (!limits) {
-                console.warn(`No rate limit configuration for endpoint: ${endpoint}`);
-                return;
-            }
+            const limits = RATE_LIMITS[endpoint] || {
+                WINDOW: 15 * 60 * 1000,
+                LIMIT: 15,  // Conservative default
+                MIN_DELAY: 30 * 1000
+            };
 
             this.endpointRateLimits.set(endpoint, {
                 limit: limits.LIMIT,
@@ -132,12 +90,6 @@ export class TwitterApiClient implements TwitterClient {
                 window: limits.WINDOW,
                 minDelay: limits.MIN_DELAY
             });
-
-            console.log(`Initialized rate limits for ${endpoint}:`, {
-                limit: limits.LIMIT,
-                window: `${limits.WINDOW/1000}s`,
-                minDelay: `${limits.MIN_DELAY/1000}s`
-            });
         });
     } catch (e) {
         console.error('Failed to initialize Twitter client:', e);
@@ -145,16 +97,19 @@ export class TwitterApiClient implements TwitterClient {
     }
 }
 
-   private async enforceMinDelay(endpoint: string): Promise<void> {
-       const rateLimit = this.endpointRateLimits.get(endpoint);
-       if (!rateLimit?.lastRequest) return;
+private enforceMinDelay(endpoint: string): Promise<void> {
+  const rateLimit = this.endpointRateLimits.get(endpoint);
+  const defaultMinDelay = RATE_LIMITS[endpoint]?.MIN_DELAY || 30 * 1000;
+  
+  if (!rateLimit?.lastRequest) return Promise.resolve();
 
-       const timeSinceLastRequest = Date.now() - rateLimit.lastRequest;
-       if (timeSinceLastRequest < rateLimit.minDelay) {
-           const delayNeeded = rateLimit.minDelay - timeSinceLastRequest;
-           await new Promise(resolve => setTimeout(resolve, delayNeeded));
-       }
-   }
+  const timeSinceLastRequest = Date.now() - rateLimit.lastRequest;
+  if (timeSinceLastRequest < defaultMinDelay) {
+      const delayNeeded = defaultMinDelay - timeSinceLastRequest;
+      return new Promise(resolve => setTimeout(resolve, delayNeeded));
+  }
+  return Promise.resolve();
+}
 
    private async checkRateLimit(endpoint: string): Promise<void> {
     const rateLimit = this.endpointRateLimits.get(endpoint);
@@ -211,36 +166,37 @@ private updateRateLimit(endpoint: string, rateLimit: any) {
   });
 }
 
-   private async handleRateLimit(error: any, endpoint: string) {
-       try {
-           console.log('Rate limit error details:', { endpoint, error });
+private async handleRateLimit(error: any, endpoint: string) {
+  try {
+      console.log('Rate limit error details:', { endpoint, error });
 
-           let resetTime: Date;
-           if (error.rateLimit?.reset) {
-               resetTime = new Date(error.rateLimit.reset * 1000);
-           } else {
-               const currentLimit = this.endpointRateLimits.get(endpoint);
-               resetTime = new Date(Date.now() + (currentLimit?.window || 15 * 60 * 1000));
-           }
+      let resetTime: Date;
+      if (error.rateLimit?.reset) {
+          resetTime = new Date(error.rateLimit.reset * 1000);
+      } else {
+          const currentLimit = this.endpointRateLimits.get(endpoint);
+          const window = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
+          resetTime = new Date(Date.now() + window);
+      }
 
-           const maxResetTime = new Date(Date.now() + 15 * 60 * 1000);
-           if (resetTime > maxResetTime) {
-               console.warn('Reset time too far in future, using 15 minute default');
-               resetTime = maxResetTime;
-           }
+      const maxResetTime = new Date(Date.now() + 15 * 60 * 1000);
+      if (resetTime > maxResetTime) {
+          console.warn('Reset time too far in future, using 15 minute default');
+          resetTime = maxResetTime;
+      }
 
-           const waitTime = Math.max(0, resetTime.getTime() - Date.now()) + 2000;
-           console.log(`Rate limit hit for ${endpoint}:`, {
-               resetTime: resetTime.toISOString(),
-               waitTimeSeconds: Math.round(waitTime / 1000)
-           });
+      const waitTime = Math.max(0, resetTime.getTime() - Date.now()) + 2000;
+      console.log(`Rate limit hit for ${endpoint}:`, {
+          resetTime: resetTime.toISOString(),
+          waitTimeSeconds: Math.round(waitTime / 1000)
+      });
 
-           await new Promise(resolve => setTimeout(resolve, waitTime));
-       } catch (e) {
-           console.error('Error handling rate limit:', e);
-           await new Promise(resolve => setTimeout(resolve, 5 * 60 * 1000));
-       }
-   }
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+  } catch (e) {
+      console.error('Error handling rate limit:', e);
+      await new Promise(resolve => setTimeout(resolve, 5 * 60 * 1000));
+  }
+}
 
    private async getUserIdByUsername(username: string): Promise<string> {
        try {
