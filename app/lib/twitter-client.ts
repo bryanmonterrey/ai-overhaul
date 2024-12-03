@@ -111,22 +111,24 @@ private enforceMinDelay(endpoint: string): Promise<void> {
   return Promise.resolve();
 }
 
-   private async checkRateLimit(endpoint: string): Promise<void> {
-    const rateLimit = this.endpointRateLimits.get(endpoint);
-    if (!rateLimit) return;
+private async checkRateLimit(endpoint: string): Promise<void> {
+  const rateLimit = this.endpointRateLimits.get(endpoint);
+  if (!rateLimit) return;
 
-    if (rateLimit.remaining <= 1) {
-        const now = Date.now();
-        if (rateLimit.reset > now) {
-            const waitTime = Math.min(rateLimit.reset - now + 1000, 15 * 60 * 1000);
-            console.log(`Rate limit pause for ${endpoint}:`, {
-                waitTimeMs: waitTime,
-                remaining: rateLimit.remaining,
-                resetTime: new Date(rateLimit.reset).toISOString()
-            });
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-    }
+  if (rateLimit.remaining <= 1) {
+      const now = Date.now();
+      if (rateLimit.reset > now) {
+          // Check endpoint-specific window
+          const window = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
+          const waitTime = Math.min(rateLimit.reset - now + 1000, window);
+          console.log(`Rate limit pause for ${endpoint}:`, {
+              waitTimeMs: waitTime,
+              remaining: rateLimit.remaining,
+              resetTime: new Date(rateLimit.reset).toISOString()
+          });
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+  }
 }
 
 private updateRateLimit(endpoint: string, rateLimit: any) {
@@ -134,35 +136,24 @@ private updateRateLimit(endpoint: string, rateLimit: any) {
   if (!currentLimit) return;
 
   const currentTime = Date.now();
-
-  // Get limits based on endpoint type
-  let defaultLimit;
-  if (endpoint === '/2/tweets') {
-      defaultLimit = 100;  // 100 tweets per day per user
-  } else if (endpoint === '/2/users/:id/tweets') {
-      defaultLimit = 5;    // 5 requests per 15 min per user
-  } else if (endpoint === '/2/users/:id/mentions') {
-      defaultLimit = 5;    // 5 requests per 15 min per user
-  } else if (endpoint === '/2/users/me') {
-      defaultLimit = 250;  // 250 requests per 24 hours
-  } else if (endpoint === '/2/users/by/username/:username') {
-      defaultLimit = 100;  // 100 per 24 hours
-  } else {
-      defaultLimit = 15;   // Conservative default
-  }
+  const limits = RATE_LIMITS[endpoint] || {
+      WINDOW: 15 * 60 * 1000,
+      LIMIT: 15,  // Conservative default
+      MIN_DELAY: 30 * 1000
+  };
 
   this.endpointRateLimits.set(endpoint, {
       ...currentLimit,
-      limit: rateLimit?.limit || defaultLimit,
+      limit: rateLimit?.limit || limits.LIMIT,
       remaining: rateLimit?.remaining || 0,
-      reset: rateLimit?.reset ? (rateLimit.reset * 1000) : (currentTime + currentLimit.window),
+      reset: rateLimit?.reset ? (rateLimit.reset * 1000) : (currentTime + limits.WINDOW),
       lastRequest: currentTime
   });
 
   console.log(`Rate limit updated for ${endpoint}:`, {
-      limit: rateLimit?.limit || defaultLimit,
+      limit: rateLimit?.limit || limits.LIMIT,
       remaining: rateLimit?.remaining || 0,
-      resetIn: Math.round((rateLimit?.reset ? rateLimit.reset * 1000 : currentTime + currentLimit.window - currentTime) / 1000)
+      resetIn: Math.round((rateLimit?.reset ? rateLimit.reset * 1000 : currentTime + limits.WINDOW - currentTime) / 1000)
   });
 }
 
@@ -174,14 +165,15 @@ private async handleRateLimit(error: any, endpoint: string) {
       if (error.rateLimit?.reset) {
           resetTime = new Date(error.rateLimit.reset * 1000);
       } else {
-          const currentLimit = this.endpointRateLimits.get(endpoint);
           const window = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
           resetTime = new Date(Date.now() + window);
       }
 
-      const maxResetTime = new Date(Date.now() + 15 * 60 * 1000);
+      const maxWindow = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
+      const maxResetTime = new Date(Date.now() + maxWindow);
+      
       if (resetTime > maxResetTime) {
-          console.warn('Reset time too far in future, using 15 minute default');
+          console.warn('Reset time too far in future, using default window');
           resetTime = maxResetTime;
       }
 
