@@ -41,12 +41,16 @@ export interface ReplyContext {
   user: string;
 }
 
+// app/core/twitter/types.ts
 export interface TwitterClient {
   tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse>;
-  userTimeline(): Promise<TwitterTimelineResponse>;
+  userTimeline(options?: {
+      user_id?: string;
+      max_results?: number;
+      exclude?: string[];
+  }): Promise<TwitterTimelineResponse>;
   userMentionTimeline(): Promise<TwitterTimelineResponse>;
 }
-
 export interface TwitterMetrics {
   like_count: number;
   retweet_count: number;

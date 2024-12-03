@@ -743,7 +743,7 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
                         console.error('Error updating engagement stats:', dbError);
                         // Don't throw here - we successfully sent the reply
                     }
-                } catch (tweetError) {
+                } catch (tweetError: any) {
                     console.error('Failed to send reply:', tweetError);
                     throw new Error(`Failed to send reply: ${tweetError.message}`);
                 }
@@ -896,12 +896,12 @@ public async startMonitoring(): Promise<void> {
     // Run first cycle immediately
     await this.runMonitoringCycle();
 
-    // Then set up interval - increased to 2 minutes
+    // Then set up interval - increase to 5 minutes
     this.monitoringInterval = setInterval(async () => {
         await this.runMonitoringCycle();
-    }, 2 * 60 * 1000); // Check every 2 minutes instead of 30 seconds
+    }, 5 * 60 * 1000); // Check every 5 minutes
 
-    console.log('Monitoring initialized with 2-minute interval');
+    console.log('Monitoring initialized with 5-minute interval');
 }
 
 private async runMonitoringCycle(): Promise<void> {

@@ -71,53 +71,54 @@ export class TwitterApiClient implements TwitterClient {
     }
 }
 
-  async userTimeline(options?: any): Promise<TwitterTimelineResponse> {
-    try {
-        console.log('Fetching user timeline...', options);
-        if (this.isRateLimited()) {
-            await this.waitForRateLimit();
-        }
+async userTimeline(options?: {
+  user_id?: string;
+  max_results?: number;
+  exclude?: string[];
+}): Promise<TwitterTimelineResponse> {
+  try {
+      if (this.remainingRequests <= 5) {
+          await this.waitForRateLimit();
+      }
 
-        const timeline = await this.client.v2.userTimeline(
-            options?.user_id || await this.getCurrentUserId(), 
-            {
-                max_results: options?.max_results || 10,
-                "tweet.fields": ["created_at", "public_metrics"]
-            }
-        );
+      console.log('Fetching user timeline...', options);
+      const userId = options?.user_id || await this.getCurrentUserId();
+      
+      const timeline = await this.client.v2.userTimeline(
+          userId,
+          {
+              max_results: options?.max_results || 10,
+              "tweet.fields": ["created_at", "public_metrics"],
+              exclude: (options?.exclude || []) as ("retweets" | "replies")[]
+          }
+      );
 
-        const tweets = timeline.data.data || [];
-        console.log('Timeline response:', {
-            tweetsFound: tweets.length,
-            firstTweet: tweets[0]?.text
-        });
+      this.remainingRequests = timeline.rateLimit?.remaining || this.remainingRequests - 1;
+      this.lastReset = (timeline.rateLimit?.reset || 0) * 1000;
 
-        // Update rate limit info
-        this.updateRateLimitInfo(timeline.rateLimit);
-
-        return {
-            data: {
-                data: tweets.map((tweet: any) => ({
-                    id: tweet.id,
-                    text: tweet.text,
-                    created_at: tweet.created_at,
-                    public_metrics: {
-                        like_count: tweet.public_metrics?.like_count || 0,
-                        retweet_count: tweet.public_metrics?.retweet_count || 0,
-                        reply_count: tweet.public_metrics?.reply_count || 0
-                    }
-                }))
-            }
-        };
-    } catch (error: any) {
-        if (error.code === 429) {
-            console.log('Rate limit hit, waiting before retry...');
-            await this.handleRateLimit(error);
-            return this.userTimeline(options); // Retry after waiting
-        }
-        console.error('Error fetching user timeline:', error);
-        throw new Error(error.message || 'Failed to fetch user timeline');
-    }
+      const tweets = timeline.data.data || [];
+      return {
+          data: {
+              data: tweets.map((tweet: any) => ({
+                  id: tweet.id,
+                  text: tweet.text,
+                  created_at: tweet.created_at,
+                  public_metrics: {
+                      like_count: tweet.public_metrics?.like_count || 0,
+                      retweet_count: tweet.public_metrics?.retweet_count || 0,
+                      reply_count: tweet.public_metrics?.reply_count || 0
+                  }
+              }))
+          }
+      };
+  } catch (error: any) {
+      if (error.code === 429) {
+          await this.handleRateLimit(error);
+          return this.userTimeline(options);
+      }
+      console.error('Error fetching user timeline:', error);
+      throw new Error(error.message || 'Failed to fetch user timeline');
+  }
 }
 
 private lastReset: number = 0;
@@ -135,19 +136,33 @@ private updateRateLimitInfo(rateLimit: any) {
 }
 
 private async handleRateLimit(error: any) {
-    const resetTime = error.rateLimit?.reset ? error.rateLimit.reset * 1000 : Date.now() + (15 * 60 * 1000);
-    const waitTime = Math.max(resetTime - Date.now(), 0) + 1000; // Add 1 second buffer
-    console.log(`Rate limit reached. Waiting ${Math.round(waitTime/1000)} seconds...`);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
+  try {
+      const resetTimeStr = error.rateLimit?.reset;
+      let waitTime: number;
+      
+      if (resetTimeStr) {
+          const resetTime = parseInt(resetTimeStr) * 1000;
+          waitTime = Math.max(resetTime - Date.now(), 0) + 1000;
+      } else {
+          waitTime = 15 * 60 * 1000;
+      }
+
+      waitTime = Math.min(waitTime, 15 * 60 * 1000);
+      console.log(`Rate limit reached. Waiting ${Math.round(waitTime/1000)} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+  } catch (e) {
+      console.error('Error calculating rate limit wait time:', e);
+      await new Promise(resolve => setTimeout(resolve, 5 * 60 * 1000));
+  }
 }
 
 private async waitForRateLimit() {
-    const now = Date.now();
-    if (this.lastReset > now) {
-        const waitTime = this.lastReset - now + 1000;
-        console.log(`Waiting for rate limit reset: ${Math.round(waitTime/1000)} seconds`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
+  const now = Date.now();
+  if (this.lastReset > now) {
+      const waitTime = Math.min(this.lastReset - now + 1000, 15 * 60 * 1000);
+      console.log(`Waiting for rate limit reset: ${Math.round(waitTime/1000)} seconds`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
 }
 
 
