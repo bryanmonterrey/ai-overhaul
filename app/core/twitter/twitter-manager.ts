@@ -602,12 +602,13 @@ private getEngagementBasedDelay(): number {
         
         const timelineResponse = await this.client.userTimeline({
             user_id: target.username, 
-            max_results: 10, 
-            exclude: ['retweets', 'replies']  // Only get their original tweets
+            max_results: 5, 
+            exclude: ['retweets']  // Allow replies but exclude retweets
         });
         
         const timeline = timelineResponse.data.data || [];
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
+        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
         console.log(`Found ${timeline.length} tweets from ${target.username}`, {
             lastCheck: lastCheck.toISOString()
@@ -618,28 +619,22 @@ private getEngagementBasedDelay(): number {
             return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
         });
 
-        // Only process tweets that are newer than last interaction and within last hour
-        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        
         for (const tweet of sortedTweets) {
             const tweetDate = new Date(tweet.created_at || '');
             
             if (tweetDate > lastCheck && tweetDate > hourAgo) {
                 console.log(`Processing tweet from ${target.username}:`, {
                     tweetText: tweet.text,
-                    tweetDate: tweetDate.toISOString(),
-                    probability: target.reply_probability
+                    tweetDate: tweetDate.toISOString()
                 });
 
-                // Check if we should reply based on probability
-                if (Math.random() < target.reply_probability) {
+                // Use shouldReplyToTweet method instead of inline probability check
+                if (this.shouldReplyToTweet(tweet, target)) {
                     await this.generateAndSendReply(tweet, target);
                     
                     // Add some random delay between 15-45 seconds before next reply
                     const delay = 15000 + Math.random() * 30000;
                     await new Promise(resolve => setTimeout(resolve, delay));
-                } else {
-                    console.log(`Skipped replying to tweet due to probability check`);
                 }
             }
         }
@@ -648,6 +643,7 @@ private getEngagementBasedDelay(): number {
     }
 }
 
+private backoffDelay = 1000; // Start with 1 second
 
 private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
     // Log the decision making process
@@ -870,18 +866,20 @@ public async startMonitoring(): Promise<void> {
     // Run first cycle immediately
     await this.runMonitoringCycle();
 
-    // Then set up interval
+    // Then set up interval - increased to 2 minutes
     this.monitoringInterval = setInterval(async () => {
         await this.runMonitoringCycle();
-    }, 30 * 1000); // Check every 30 seconds
+    }, 2 * 60 * 1000); // Check every 2 minutes instead of 30 seconds
 
-    console.log('Monitoring initialized with 30-second interval');
+    console.log('Monitoring initialized with 2-minute interval');
 }
 
 private async runMonitoringCycle(): Promise<void> {
     try {
         this.lastMonitoringCheck = new Date();
         console.log('Starting monitoring cycle at:', this.lastMonitoringCheck);
+
+        this.backoffDelay = 1000;
 
         // Monitor engagement targets
         const { data: targets, error: targetsError } = await this.supabase
@@ -943,6 +941,10 @@ private async runMonitoringCycle(): Promise<void> {
     } catch (error) {
         console.error('Error in monitoring cycle:', error);
         this.monitoringStats.lastError = error as Error;
+
+        // Implement exponential backoff
+        await new Promise(resolve => setTimeout(resolve, this.backoffDelay));
+        this.backoffDelay = Math.min(this.backoffDelay * 2, 5 * 60 * 1000); 
     }
 }
 
