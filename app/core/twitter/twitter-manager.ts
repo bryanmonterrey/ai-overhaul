@@ -666,20 +666,14 @@ private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
     return shouldReply;
 }
 
-  private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
+private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
     try {
-        // First log what we're trying to reply to
-        console.log('Attempting to generate reply:', {
-            tweet_text: tweet.text,
-            target_username: target.username
-        });
-
         const context = {
             platform: 'twitter' as const,
             environmentalFactors: {
                 timeOfDay: this.getTimeOfDay(),
                 platformActivity: 0.5,
-                socialContext: [target.relationship_level || 'casual'],
+                socialContext: [target.relationship_level || 'close'],
                 platform: 'twitter'
             },
             style: target.preferred_style || 'shitpost',
@@ -687,22 +681,27 @@ private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
                 originalTweet: tweet.text,
                 replyingTo: target.username,
                 topics: target.topics || [],
-                relationship: target.relationship_level || 'casual',
-                isEngagementTarget: true  // Add this flag
+                relationship: target.relationship_level || 'close',
+                isEngagementTarget: true
             }),
             trainingExamples: await this.trainingService.getTrainingExamples(3, 'replies')
         };
 
+        console.log('Generating reply with context:', {
+            tweet: tweet.text,
+            target: target.username,
+            context
+        });
+
         const reply = await this.personality.processInput(
-            `Reply to this tweet in your usual style: ${tweet.text}`, // Modified prompt
+            `Reply to this tweet in your usual style: ${tweet.text}`,
             context as unknown as Partial<Context>
         );
 
         if (reply) {
-            // Clean the reply to remove any safety messages
             let cleanReply = reply
-                .replace(/\[(\w+)_state\]$/, '')  // Remove state markers
-                .replace(/I cannot engage.*$/, '') // Remove safety messages
+                .replace(/\[(\w+)_state\]$/, '')
+                .replace(/I cannot engage.*$/, '')
                 .trim();
 
             if (cleanReply && cleanReply.length > 0) {
@@ -719,27 +718,25 @@ private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
                 });
 
                 this.monitoringStats.repliesSent++;
-                console.log(`Reply sent to ${target.username}:`, cleanReply);
 
-                // Update last interaction time and increment total_interactions
+                // Update the interaction count
                 await this.supabase
                     .from('engagement_targets')
                     .update({ 
                         last_interaction: new Date().toISOString(),
-                        total_interactions: target.total_interactions ? target.total_interactions + 1 : 1
+                        total_interactions: ((target.total_interactions || 0) + 1)
                     })
                     .eq('id', target.id);
-            } else {
-                console.log('Generated reply was empty after cleaning, skipping');
+                
+                console.log(`Reply sent to ${target.username}:`, cleanReply);
             }
-        } else {
-            console.log('No reply was generated');
         }
     } catch (error) {
         console.error(`Error generating reply for ${target.username}:`, error);
         throw error;
     }
 }
+
 private async generateReply(context: ReplyContext): Promise<string | null> {
     try {
         console.log('Generating reply with context:', context);

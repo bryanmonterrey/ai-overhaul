@@ -12,6 +12,7 @@ export interface EngagementTargetRow {
   relationship_level: 'new' | 'familiar' | 'close';
   preferred_style: string;
   created_at: string;
+  total_interactions: number;
 }
 
 export interface EngagementHistoryRow {
