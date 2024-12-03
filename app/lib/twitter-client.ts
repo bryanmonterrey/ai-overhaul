@@ -174,28 +174,42 @@ export class TwitterApiClient implements TwitterClient {
     }
 }
 
-   private updateRateLimit(endpoint: string, rateLimit: any) {
-       const currentLimit = this.endpointRateLimits.get(endpoint);
-       if (!currentLimit) return;
+private updateRateLimit(endpoint: string, rateLimit: any) {
+  const currentLimit = this.endpointRateLimits.get(endpoint);
+  if (!currentLimit) return;
 
-       const currentTime = Date.now();
-       const isPostEndpoint = endpoint.startsWith('/2/tweets');
-       const defaultLimit = isPostEndpoint ? RATE_LIMITS.TWEETS.LIMIT : RATE_LIMITS.TIMELINE.LIMIT;
+  const currentTime = Date.now();
 
-       this.endpointRateLimits.set(endpoint, {
-           ...currentLimit,
-           limit: rateLimit?.limit || defaultLimit,
-           remaining: rateLimit?.remaining || 0,
-           reset: rateLimit?.reset ? (rateLimit.reset * 1000) : (currentTime + currentLimit.window),
-           lastRequest: currentTime
-       });
+  // Get limits based on endpoint type
+  let defaultLimit;
+  if (endpoint === '/2/tweets') {
+      defaultLimit = 100;  // 100 tweets per day per user
+  } else if (endpoint === '/2/users/:id/tweets') {
+      defaultLimit = 5;    // 5 requests per 15 min per user
+  } else if (endpoint === '/2/users/:id/mentions') {
+      defaultLimit = 5;    // 5 requests per 15 min per user
+  } else if (endpoint === '/2/users/me') {
+      defaultLimit = 250;  // 250 requests per 24 hours
+  } else if (endpoint === '/2/users/by/username/:username') {
+      defaultLimit = 100;  // 100 per 24 hours
+  } else {
+      defaultLimit = 15;   // Conservative default
+  }
 
-       console.log(`Rate limit updated for ${endpoint}:`, {
-           limit: rateLimit?.limit || defaultLimit,
-           remaining: rateLimit?.remaining || 0,
-           resetIn: Math.round((rateLimit?.reset ? rateLimit.reset * 1000 : currentTime + currentLimit.window - currentTime) / 1000)
-       });
-   }
+  this.endpointRateLimits.set(endpoint, {
+      ...currentLimit,
+      limit: rateLimit?.limit || defaultLimit,
+      remaining: rateLimit?.remaining || 0,
+      reset: rateLimit?.reset ? (rateLimit.reset * 1000) : (currentTime + currentLimit.window),
+      lastRequest: currentTime
+  });
+
+  console.log(`Rate limit updated for ${endpoint}:`, {
+      limit: rateLimit?.limit || defaultLimit,
+      remaining: rateLimit?.remaining || 0,
+      resetIn: Math.round((rateLimit?.reset ? rateLimit.reset * 1000 : currentTime + currentLimit.window - currentTime) / 1000)
+  });
+}
 
    private async handleRateLimit(error: any, endpoint: string) {
        try {
