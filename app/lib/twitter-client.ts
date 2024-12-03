@@ -11,26 +11,31 @@ try {
 }
 
 const RATE_LIMITS = {
-  TWEETS: {
-    WINDOW: 24 * 60 * 60 * 1000, // 24 hours
-    LIMIT: 100, // 100 per 24h per user, 1667 per 24h per app
-    MIN_DELAY: 60 * 1000 
-},
-USER_TIMELINE: {
-    WINDOW: 15 * 60 * 1000,
-    LIMIT: 5, // 5 per 15min per user, 10 per 15min per app
-    MIN_DELAY: 180 * 1000
-},
-MENTIONS: {
-    WINDOW: 15 * 60 * 1000,
-    LIMIT: 5, // 5 per 15min per user
-    MIN_DELAY: 180 * 1000
-},
-USER_LOOKUP: {
-    WINDOW: 24 * 60 * 60 * 1000,
-    LIMIT: 100, // 100 per 24h per user, 500 per 24h per app
-    MIN_DELAY: 120 * 1000
-}
+  '/2/tweets': {  // This matches ENDPOINTS.TWEETS
+      WINDOW: 24 * 60 * 60 * 1000, // 24 hours
+      LIMIT: 100,  // 100 tweets per day per user
+      MIN_DELAY: 60 * 1000
+  },
+  '/2/users/:id/tweets': {  // This matches ENDPOINTS.USER_TIMELINE
+      WINDOW: 15 * 60 * 1000,
+      LIMIT: 5,  // 5 requests per 15 min per user
+      MIN_DELAY: 30 * 1000
+  },
+  '/2/users/:id/mentions': {  // This matches ENDPOINTS.USER_MENTIONS
+      WINDOW: 15 * 60 * 1000,
+      LIMIT: 5,  // 5 requests per 15 min per user
+      MIN_DELAY: 30 * 1000
+  },
+  '/2/users/me': {  // This matches ENDPOINTS.USER_ME
+      WINDOW: 24 * 60 * 60 * 1000,
+      LIMIT: 250,  // 250 requests per 24 hours
+      MIN_DELAY: 5 * 1000
+  },
+  '/2/users/by/username/:username': {  // This matches ENDPOINTS.USER_BY_USERNAME
+      WINDOW: 24 * 60 * 60 * 1000,
+      LIMIT: 100,  // 100 requests per 24 hours
+      MIN_DELAY: 5 * 1000
+  }
 } as const;
 
 const ENDPOINTS = {
@@ -57,37 +62,88 @@ export class TwitterApiClient implements TwitterClient {
    }> = new Map();
 
    constructor(private credentials: {
-       apiKey: string;
-       apiSecret: string;
-       accessToken: string;
-       accessSecret: string;
-   }) {
-       try {
-           this.client = new TwitterApi({
-               appKey: credentials.apiKey,
-               appSecret: credentials.apiSecret,
-               accessToken: credentials.accessToken,
-               accessSecret: credentials.accessSecret,
-           });
+    apiKey: string;
+    apiSecret: string;
+    accessToken: string;
+    accessSecret: string;
+}) {
+    try {
+        this.client = new TwitterApi({
+            appKey: credentials.apiKey,
+            appSecret: credentials.apiSecret,
+            accessToken: credentials.accessToken,
+            accessSecret: credentials.accessSecret,
+        });
 
-           Object.values(ENDPOINTS).forEach(endpoint => {
-               const isPostEndpoint = endpoint.startsWith('/2/tweets');
-               const limits = isPostEndpoint ? RATE_LIMITS.TWEETS : RATE_LIMITS.TIMELINE;
+        // Initialize rate limits for each endpoint
+        Object.values(ENDPOINTS).forEach(endpoint => {
+            let limits;
+            
+            // Determine which rate limit to use based on endpoint
+            if (endpoint === '/2/tweets') {
+                limits = {
+                    WINDOW: 24 * 60 * 60 * 1000, // 24 hours
+                    LIMIT: 100,  // 100 tweets per day per user
+                    MIN_DELAY: 60 * 1000
+                };
+            } else if (endpoint === '/2/users/:id/tweets') {
+                limits = {
+                    WINDOW: 15 * 60 * 1000,
+                    LIMIT: 5,  // 5 requests per 15 min per user
+                    MIN_DELAY: 30 * 1000
+                };
+            } else if (endpoint === '/2/users/:id/mentions') {
+                limits = {
+                    WINDOW: 15 * 60 * 1000,
+                    LIMIT: 5,  // 5 requests per 15 min per user
+                    MIN_DELAY: 30 * 1000
+                };
+            } else if (endpoint === '/2/users/me') {
+                limits = {
+                    WINDOW: 24 * 60 * 60 * 1000,
+                    LIMIT: 250,  // 250 requests per 24 hours
+                    MIN_DELAY: 5 * 1000
+                };
+            } else if (endpoint === '/2/users/by/username/:username') {
+                limits = {
+                    WINDOW: 24 * 60 * 60 * 1000,
+                    LIMIT: 100,  // 100 per 24 hours
+                    MIN_DELAY: 5 * 1000
+                };
+            } else {
+                // Default rate limits for other endpoints
+                limits = {
+                    WINDOW: 15 * 60 * 1000,
+                    LIMIT: 15,  // Conservative default
+                    MIN_DELAY: 30 * 1000
+                };
+            }
 
-               this.endpointRateLimits.set(endpoint, {
-                   limit: limits.LIMIT,
-                   remaining: limits.LIMIT,
-                   reset: Date.now() + limits.WINDOW,
-                   lastRequest: undefined,
-                   window: limits.WINDOW,
-                   minDelay: limits.MIN_DELAY
-               });
-           });
-       } catch (e) {
-           console.error('Failed to initialize Twitter client:', e);
-           throw e;
-       }
-   }
+            if (!limits) {
+                console.warn(`No rate limit configuration for endpoint: ${endpoint}`);
+                return;
+            }
+
+            this.endpointRateLimits.set(endpoint, {
+                limit: limits.LIMIT,
+                remaining: limits.LIMIT,
+                reset: Date.now() + limits.WINDOW,
+                lastRequest: undefined,
+                window: limits.WINDOW,
+                minDelay: limits.MIN_DELAY
+            });
+
+            console.log(`Initialized rate limits for ${endpoint}:`, {
+                limit: limits.LIMIT,
+                window: `${limits.WINDOW/1000}s`,
+                minDelay: `${limits.MIN_DELAY/1000}s`
+            });
+        });
+    } catch (e) {
+        console.error('Failed to initialize Twitter client:', e);
+        throw e;
+    }
+}
 
    private async enforceMinDelay(endpoint: string): Promise<void> {
        const rateLimit = this.endpointRateLimits.get(endpoint);
