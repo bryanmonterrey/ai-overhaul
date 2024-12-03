@@ -90,6 +90,24 @@ export class TwitterApiClient implements TwitterClient {
        }
    }
 
+   private async checkRateLimit(endpoint: string): Promise<void> {
+    const rateLimit = this.endpointRateLimits.get(endpoint);
+    if (!rateLimit) return;
+
+    if (rateLimit.remaining <= 1) {
+        const now = Date.now();
+        if (rateLimit.reset > now) {
+            const waitTime = Math.min(rateLimit.reset - now + 1000, 15 * 60 * 1000);
+            console.log(`Rate limit pause for ${endpoint}:`, {
+                waitTimeMs: waitTime,
+                remaining: rateLimit.remaining,
+                resetTime: new Date(rateLimit.reset).toISOString()
+            });
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+    }
+}
+
    private updateRateLimit(endpoint: string, rateLimit: any) {
        const currentLimit = this.endpointRateLimits.get(endpoint);
        if (!currentLimit) return;
