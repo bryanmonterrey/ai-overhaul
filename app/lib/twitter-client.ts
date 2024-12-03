@@ -1,7 +1,8 @@
 // app/lib/twitter-client.ts
 
 import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '@/app/core/twitter/types';
-import type { TwitterApi as TwitterApiType } from 'twitter-api-v2';
+import type { TwitterApi as TwitterApiType, TTweetv2Expansion } from 'twitter-api-v2';
+
 
 let TwitterApi: typeof TwitterApiType;
 try {
@@ -96,53 +97,58 @@ export class TwitterApiClient implements TwitterClient {
 
   async userTimeline(options?: { user_id?: string; max_results?: number; exclude?: Array<'retweets' | 'replies'> }): Promise<TwitterTimelineResponse> {
     try {
-        console.log('Fetching user timeline...', options);
+        console.log('Starting userTimeline request with options:', options);
 
+        // Add rate limit check
         if (this.remainingRequests <= 5) {
             await this.waitForRateLimit();
         }
 
         // Get user ID (either from username or directly)
         let userId: string;
-        if (options?.user_id) {
-            if (!options.user_id.match(/^\d+$/)) {
-                userId = await this.getUserIdByUsername(options.user_id);
+        try {
+            if (options?.user_id) {
+                // If it's not a numeric ID, try to get the ID from username
+                if (!options.user_id.match(/^\d+$/)) {
+                    const user = await this.client.v2.userByUsername(options.user_id);
+                    if (!user.data) {
+                        throw new Error(`User not found: ${options.user_id}`);
+                    }
+                    userId = user.data.id;
+                } else {
+                    userId = options.user_id;
+                }
             } else {
-                userId = options.user_id;
+                userId = await this.getCurrentUserId();
             }
-        } else {
-            userId = await this.getCurrentUserId();
+        } catch (userError) {
+            console.error('Error getting user ID:', userError);
+            throw userError;
         }
 
         console.log('Fetching timeline for user ID:', userId);
 
-        const timeline = await this.client.v2.userTimeline(
-            userId,
-            {
-                max_results: options?.max_results || 10,
-                "tweet.fields": ["created_at", "public_metrics", "conversation_id"],
-                exclude: options?.exclude || []
-            }
-        );
+        const timelineParams = {
+          "max_results": options?.max_results || 10,
+          "tweet.fields": ["created_at", "public_metrics", "author_id"],
+          "user.fields": ["username", "name"],
+          "expansions": ["author_id"] as TTweetv2Expansion[]  // Add the type assertion here
+      };
 
-        // Update rate limit info
-        if (timeline.rateLimit) {
-            this.remainingRequests = timeline.rateLimit.remaining || 0;
-            const resetTimestamp = timeline.rateLimit.reset;
-            if (resetTimestamp) {
-                this.lastReset = new Date(resetTimestamp * 1000).getTime();
-            }
-        }
+        console.log('Timeline parameters:', timelineParams);
+
+        const timeline = await this.client.v2.userTimeline(userId, timelineParams);
+
+        // Log the raw response for debugging
+        console.log('Raw timeline response:', JSON.stringify(timeline, null, 2));
 
         const tweets = timeline.data.data || [];
-        console.log('Timeline response:', {
+        
+        console.log('Processed timeline:', {
             userId,
             tweetsFound: tweets.length,
             firstTweet: tweets[0]?.text,
-            rateLimit: {
-                remaining: this.remainingRequests,
-                resetIn: Math.round((this.lastReset - Date.now()) / 1000) + ' seconds'
-            }
+            rateLimit: timeline.rateLimit
         });
 
         return {
@@ -160,15 +166,32 @@ export class TwitterApiClient implements TwitterClient {
             }
         };
     } catch (error: any) {
+        console.error('Timeline fetch error:', {
+            message: error.message,
+            code: error.code,
+            data: error.data,
+            type: error.type,
+            rateLimit: error.rateLimit
+        });
+
         if (error.code === 429) {
-            console.log('Hit rate limit, waiting before retry...');
             await this.handleRateLimit(error);
             return this.userTimeline(options);
         }
-        console.error('Error fetching user timeline:', error);
-        throw new Error(error.message || 'Failed to fetch user timeline');
+
+        // Return empty response in development to avoid crashing
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Returning empty response in development mode');
+            return {
+                data: {
+                    data: []
+                }
+            };
+        }
+
+        throw error;
     }
-  }
+}
 
   async userMentionTimeline(): Promise<TwitterTimelineResponse> {
     try {
@@ -222,22 +245,25 @@ export class TwitterApiClient implements TwitterClient {
 
   private async handleRateLimit(error: any) {
     try {
-        let waitTime = 2 * 60 * 1000;  // Default 2 minutes
+        // Get reset time from response headers
+        const resetTime = error.rateLimit?.reset 
+            ? new Date(error.rateLimit.reset * 1000)
+            : new Date(Date.now() + 15 * 60 * 1000); // Default to 15 minutes
 
-        if (error.rateLimit) {
-            const resetDate = new Date(error.rateLimit.reset * 1000);
-            const now = new Date();
-            const secondsUntilReset = Math.max(1, Math.floor((resetDate.getTime() - now.getTime()) / 1000));
-            waitTime = Math.min((secondsUntilReset + 5) * 1000, 15 * 60 * 1000);
-        }
+        const waitTime = Math.max(0, resetTime.getTime() - Date.now()) + 1000; // Add 1 second buffer
+        
+        console.log('Rate limit details:', {
+            resetTime: resetTime.toISOString(),
+            waitTimeSeconds: Math.round(waitTime / 1000)
+        });
 
-        console.log(`Rate limit reached. Waiting ${Math.round(waitTime/1000)} seconds before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
     } catch (e) {
-        console.error('Error handling rate limit:', e);
-        await new Promise(resolve => setTimeout(resolve, 2 * 60 * 1000));
+        console.error('Error in rate limit handler:', e);
+        // Default wait of 5 minutes
+        await new Promise(resolve => setTimeout(resolve, 5 * 60 * 1000));
     }
-  }
+}
 
   private async waitForRateLimit() {
     try {
