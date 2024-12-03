@@ -16,6 +16,11 @@ export class TwitterApiClient implements TwitterClient {
   private client: TwitterApiType;
   private lastReset: number = 0;
   private remainingRequests: number = 300;
+  private endpointRateLimits: Map<string, {
+    limit: number;
+    remaining: number;
+    reset: number;
+  }> = new Map();
 
   constructor(private credentials: {
     apiKey: string;
@@ -33,6 +38,32 @@ export class TwitterApiClient implements TwitterClient {
     } catch (e) {
       console.error('Failed to initialize Twitter client:', e);
       throw e;
+    }
+  }
+
+  private updateRateLimit(endpoint: string, rateLimit: any) {
+    if (rateLimit) {
+      this.endpointRateLimits.set(endpoint, {
+        limit: rateLimit.limit,
+        remaining: rateLimit.remaining,
+        reset: rateLimit.reset
+      });
+    }
+  }
+
+  private async checkRateLimit(endpoint: string): Promise<void> {
+    const rateLimit = this.endpointRateLimits.get(endpoint);
+    if (rateLimit && rateLimit.remaining <= 1) {
+      const resetTime = new Date(rateLimit.reset * 1000);
+      const now = new Date();
+      const waitTime = Math.max(0, resetTime.getTime() - now.getTime()) + 1000;
+      
+      console.log(`Rate limit precaution for ${endpoint}:`, {
+        resetTime: resetTime.toISOString(),
+        waitTimeSeconds: Math.floor(waitTime / 1000)
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
 
@@ -54,6 +85,8 @@ export class TwitterApiClient implements TwitterClient {
   async tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse> {
     try {
         console.log('Posting tweet:', { content, options });
+        await this.checkRateLimit('2/tweets'); 
+
 
         // Add delay between tweet attempts
         const MIN_TWEET_INTERVAL = 30 * 1000; // 30 seconds minimum between tweets
@@ -70,6 +103,7 @@ export class TwitterApiClient implements TwitterClient {
                 });
             } else {
                 tweet = await this.client.v2.tweet(content);
+              
             }
         } catch (tweetError: any) {
             if (tweetError.code === 429) {
