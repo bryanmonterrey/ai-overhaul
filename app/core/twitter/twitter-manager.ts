@@ -6,6 +6,7 @@ import { Context, TweetStyle } from '../personality/types';
 import { TweetStats } from './TweetStats';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { aiService } from '@/app/lib/services/ai';
+import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
 
 
 interface QueuedTweet {
