@@ -511,19 +511,55 @@ public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> 
     return results;
   }
 
-  async getEnvironmentalFactors(): Promise<{ platformActivity: number; socialContext: string[] }> {
+  async getEnvironmentalFactors(): Promise<{ platformActivity: number; socialContext: string[]; marketConditions: any }> {
     try {
-      const timeline = await this.client.userTimeline();
-      const mentions = await this.client.userMentionTimeline();
-      
-      return {
-        platformActivity: 0.5,
-        socialContext: []
-      };
+        // Get timeline with error handling
+        let timeline;
+        try {
+            timeline = await this.client.userTimeline();
+        } catch (timelineError) {
+            console.warn('Timeline fetch failed:', timelineError);
+            timeline = { data: { data: [] } };
+        }
+
+        // Get mentions with error handling
+        let mentions;
+        try {
+            mentions = await this.client.userMentionTimeline();
+        } catch (mentionsError) {
+            console.warn('Mentions fetch failed:', mentionsError);
+            mentions = { data: { data: [] } };
+        }
+
+        // Calculate activity based on available data
+        const timelineCount = timeline.data.data?.length || 0;
+        const mentionsCount = mentions.data.data?.length || 0;
+        
+        return {
+            platformActivity: (timelineCount + mentionsCount) > 0 ? 0.5 : 0.3,
+            socialContext: [],
+            marketConditions: {
+                sentiment: 0.5,
+                volatility: 0.3,
+                momentum: 0.4,
+                trends: []
+            }
+        };
     } catch (error) {
-      throw new TwitterNetworkError('Failed to fetch environmental factors');
+        console.error('Failed to fetch environmental factors:', error);
+        // Return default values instead of throwing
+        return {
+            platformActivity: 0.3,
+            socialContext: [],
+            marketConditions: {
+                sentiment: 0.5,
+                volatility: 0.3,
+                momentum: 0.4,
+                trends: []
+            }
+        };
     }
-  }
+}
 
   // Add this method after getEnvironmentalFactors
   private async trackEngagement() {
