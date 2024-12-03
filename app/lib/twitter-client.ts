@@ -53,47 +53,72 @@ export class TwitterApiClient implements TwitterClient {
 
   async tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse> {
     try {
-      console.log('Posting tweet:', { content, options });
+        console.log('Posting tweet:', { content, options });
 
-      if (this.remainingRequests <= 5) {
-        await this.waitForRateLimit();
-      }
+        // Add delay between tweet attempts
+        const MIN_TWEET_INTERVAL = 30 * 1000; // 30 seconds minimum between tweets
+        await new Promise(resolve => setTimeout(resolve, MIN_TWEET_INTERVAL));
 
-      let tweet;
-      if (options?.reply) {
-        tweet = await this.client.v2.tweet({
-          text: content,
-          reply: {
-            in_reply_to_tweet_id: options.reply.in_reply_to_tweet_id
-          }
-        });
-        console.log('Posted reply tweet:', { id: tweet.data.id, inReplyTo: options.reply.in_reply_to_tweet_id });
-      } else {
-        tweet = await this.client.v2.tweet(content);
-        console.log('Posted new tweet:', { id: tweet.data.id });
-      }
-      
-      return {
-        data: {
-          id: tweet.data.id,
-          text: tweet.data.text,
-          created_at: new Date().toISOString(),
-          public_metrics: {
-            like_count: 0,
-            retweet_count: 0,
-            reply_count: 0
-          }
+        let tweet;
+        try {
+            if (options?.reply) {
+                tweet = await this.client.v2.tweet({
+                    text: content,
+                    reply: {
+                        in_reply_to_tweet_id: options.reply.in_reply_to_tweet_id
+                    }
+                });
+            } else {
+                tweet = await this.client.v2.tweet(content);
+            }
+        } catch (tweetError: any) {
+            if (tweetError.code === 429) {
+                const resetTime = tweetError.rateLimit?.reset 
+                    ? new Date(tweetError.rateLimit.reset * 1000)
+                    : new Date(Date.now() + 15 * 60 * 1000);
+
+                const waitTime = Math.max(0, resetTime.getTime() - Date.now()) + 2000;
+                
+                console.log('Tweet rate limit hit:', {
+                    resetTime: resetTime.toISOString(),
+                    waitTimeSeconds: Math.floor(waitTime / 1000),
+                    endpoint: 'POST /2/tweets'
+                });
+
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return this.tweet(content, options); // Retry after waiting
+            }
+            throw tweetError;
         }
-      };
+      
+        console.log('Tweet posted successfully:', {
+            id: tweet.data.id,
+            text: tweet.data.text
+        });
+
+        return {
+            data: {
+                id: tweet.data.id,
+                text: tweet.data.text,
+                created_at: new Date().toISOString(),
+                public_metrics: {
+                    like_count: 0,
+                    retweet_count: 0,
+                    reply_count: 0
+                }
+            }
+        };
     } catch (error: any) {
-      if (error.code === 429) {
-        await this.handleRateLimit(error);
-        return this.tweet(content, options);
-      }
-      console.error('Error posting tweet:', error);
-      throw new Error(error.message || 'Failed to post tweet');
+        console.error('Error posting tweet:', {
+            error,
+            code: error.code,
+            message: error.message,
+            rateLimit: error.rateLimit,
+            data: error.data
+        });
+        throw error;
     }
-  }
+}
 
   async userTimeline(options?: { user_id?: string; max_results?: number; exclude?: Array<'retweets' | 'replies'> }): Promise<TwitterTimelineResponse> {
     try {
