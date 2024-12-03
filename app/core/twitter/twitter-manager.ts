@@ -602,8 +602,8 @@ private getEngagementBasedDelay(): number {
         
         const timelineResponse = await this.client.userTimeline({
             user_id: target.username, 
-            max_results: 5, 
-            exclude: ['retweets']  // Allow replies but exclude retweets
+            max_results: 5,
+            exclude: ['retweets']
         });
         
         const timeline = timelineResponse.data.data || [];
@@ -623,18 +623,15 @@ private getEngagementBasedDelay(): number {
             const tweetDate = new Date(tweet.created_at || '');
             
             if (tweetDate > lastCheck && tweetDate > hourAgo) {
-                console.log(`Processing tweet from ${target.username}:`, {
-                    tweetText: tweet.text,
-                    tweetDate: tweetDate.toISOString()
+                console.log(`Processing tweet:`, {
+                    id: tweet.id,  // Make sure this exists
+                    text: tweet.text,
+                    date: tweetDate.toISOString()
                 });
 
-                // Use shouldReplyToTweet method instead of inline probability check
                 if (this.shouldReplyToTweet(tweet, target)) {
                     await this.generateAndSendReply(tweet, target);
-                    
-                    // Add some random delay between 15-45 seconds before next reply
-                    const delay = 15000 + Math.random() * 30000;
-                    await new Promise(resolve => setTimeout(resolve, delay));
+                    await new Promise(resolve => setTimeout(resolve, 5000));
                 }
             }
         }
@@ -664,6 +661,12 @@ private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
 
 private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
     try {
+        console.log('Starting reply generation for tweet:', {
+            tweetId: tweet.id,
+            tweetText: tweet.text,
+            target: target.username
+        });
+
         const context = {
             platform: 'twitter' as const,
             environmentalFactors: {
@@ -678,57 +681,84 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
                 replyingTo: target.username,
                 topics: target.topics || [],
                 relationship: target.relationship_level || 'close',
-                isEngagementTarget: true
+                isEngagementTarget: true,
+                isReply: true  // Flag to indicate this is a reply
             }),
+            recentInteractions: [],
+            activeNarratives: [],
             trainingExamples: await this.trainingService.getTrainingExamples(3, 'replies')
         };
 
-        console.log('Generating reply with context:', {
-            tweet: tweet.text,
+        console.log('Generated context for reply:', {
             target: target.username,
-            context
+            style: context.style,
+            timeOfDay: context.environmentalFactors.timeOfDay
         });
 
         const reply = await this.personality.processInput(
-            `Reply to this tweet in your usual style: ${tweet.text}`,
+            `Reply to this tweet from ${target.username}: ${tweet.text}`,
             context as unknown as Partial<Context>
         );
 
         if (reply) {
             let cleanReply = reply
-                .replace(/\[(\w+)_state\]$/, '')
-                .replace(/I cannot engage.*$/, '')
+                .replace(/\[(\w+)_state\]$/, '')  // Remove state markers
+                .replace(/I cannot engage.*$/, '') // Remove safety messages
+                .replace(/^@\w+\s*/, '')          // Remove any auto-added @ mentions
                 .trim();
 
             if (cleanReply && cleanReply.length > 0) {
-                console.log('Sending reply:', {
-                    to: target.username,
-                    replyText: cleanReply,
-                    originalTweet: tweet.id
+                console.log('Attempting to send reply:', {
+                    toTweetId: tweet.id,
+                    toUser: target.username,
+                    replyText: cleanReply
                 });
 
-                await this.client.tweet(cleanReply, {
-                    reply: {
-                        in_reply_to_tweet_id: tweet.id
+                try {
+                    // Send the reply
+                    await this.client.tweet(cleanReply, {
+                        reply: {
+                            in_reply_to_tweet_id: tweet.id
+                        }
+                    });
+
+                    console.log('Reply sent successfully');
+                    this.monitoringStats.repliesSent++;
+
+                    // Update interaction stats in database
+                    try {
+                        await this.supabase
+                            .from('engagement_targets')
+                            .update({ 
+                                last_interaction: new Date().toISOString(),
+                                total_interactions: ((target.total_interactions || 0) + 1)
+                            })
+                            .eq('id', target.id);
+
+                        console.log('Updated engagement stats for target:', {
+                            username: target.username,
+                            newTotalInteractions: (target.total_interactions || 0) + 1
+                        });
+                    } catch (dbError) {
+                        console.error('Error updating engagement stats:', dbError);
+                        // Don't throw here - we successfully sent the reply
                     }
-                });
-
-                this.monitoringStats.repliesSent++;
-
-                // Update the interaction count
-                await this.supabase
-                    .from('engagement_targets')
-                    .update({ 
-                        last_interaction: new Date().toISOString(),
-                        total_interactions: ((target.total_interactions || 0) + 1)
-                    })
-                    .eq('id', target.id);
-                
-                console.log(`Reply sent to ${target.username}:`, cleanReply);
+                } catch (tweetError) {
+                    console.error('Failed to send reply:', tweetError);
+                    throw new Error(`Failed to send reply: ${tweetError.message}`);
+                }
+            } else {
+                console.log('Generated reply was empty after cleaning, skipping');
             }
+        } else {
+            console.log('No reply was generated by personality system');
         }
     } catch (error) {
-        console.error(`Error generating reply for ${target.username}:`, error);
+        console.error(`Error in generateAndSendReply for ${target.username}:`, {
+            error,
+            tweetId: tweet.id,
+            targetUser: target.username
+        });
         throw error;
     }
 }

@@ -34,27 +34,42 @@ export class TwitterApiClient implements TwitterClient {
     }
   }
 
-  async tweet(content: string): Promise<TwitterResponse> {
+  async tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse> {
     try {
-      const tweet = await this.client.v2.tweet(content);
-      
-      return {
-        data: {
-          id: tweet.data.id,
-          text: tweet.data.text,
-          created_at: new Date().toISOString(),
-          public_metrics: {
-            like_count: 0,
-            retweet_count: 0,
-            reply_count: 0
-          }
+        console.log('Posting tweet:', { content, options });
+        
+        let tweetData;
+        if (options?.reply) {
+            tweetData = await this.client.v2.reply(
+                content,
+                options.reply.in_reply_to_tweet_id
+            );
+            console.log('Posted reply:', {
+                content,
+                inReplyTo: options.reply.in_reply_to_tweet_id,
+                result: tweetData
+            });
+        } else {
+            tweetData = await this.client.v2.tweet(content);
         }
-      };
+      
+        return {
+            data: {
+                id: tweetData.data.id,
+                text: tweetData.data.text,
+                created_at: new Date().toISOString(),
+                public_metrics: {
+                    like_count: 0,
+                    retweet_count: 0,
+                    reply_count: 0
+                }
+            }
+        };
     } catch (error: any) {
-      console.error('Error posting tweet:', error);
-      throw new Error(error.message || 'Failed to post tweet');
+        console.error('Error posting tweet:', error);
+        throw new Error(error.message || 'Failed to post tweet');
     }
-  }
+}
 
   async userTimeline(options?: any): Promise<TwitterTimelineResponse> {
     try {

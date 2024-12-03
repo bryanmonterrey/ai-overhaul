@@ -42,9 +42,9 @@ export interface ReplyContext {
 }
 
 export interface TwitterClient {
-  tweet: (content: string, options?: { reply?: { in_reply_to_tweet_id: string } }) => Promise<TwitterResponse>;
-  userTimeline: (options?: { user_id: string; max_results?: number; exclude?: string[] }) => Promise<TwitterTimelineResponse>;
-  userMentionTimeline: (options?: { max_results?: number }) => Promise<TwitterTimelineResponse>;
+  tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse>;
+  userTimeline(): Promise<TwitterTimelineResponse>;
+  userMentionTimeline(): Promise<TwitterTimelineResponse>;
 }
 
 export interface TwitterMetrics {
