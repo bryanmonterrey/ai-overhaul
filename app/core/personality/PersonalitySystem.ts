@@ -187,7 +187,7 @@ import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
       this.adaptTraitsToEmotionalState(state);
     }
   
-    private async generateResponse(input: string): Promise<string> {
+    public async generateResponse(input: string): Promise<string> {
       const { emotionalState } = this.state.consciousness;
       const traits = Object.fromEntries(this.traits);
       

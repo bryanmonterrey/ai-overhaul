@@ -11,16 +11,26 @@ try {
 }
 
 const RATE_LIMITS = {
-   TWEETS: {
-       WINDOW: 15 * 60 * 1000,
-       LIMIT: 50,
-       MIN_DELAY: 30 * 1000
-   },
-   TIMELINE: {
-       WINDOW: 15 * 60 * 1000,
-       LIMIT: 180,
-       MIN_DELAY: 5 * 1000
-   }
+  TWEETS: {
+    WINDOW: 24 * 60 * 60 * 1000, // 24 hours
+    LIMIT: 100, // 100 per 24h per user, 1667 per 24h per app
+    MIN_DELAY: 60 * 1000 
+},
+USER_TIMELINE: {
+    WINDOW: 15 * 60 * 1000,
+    LIMIT: 5, // 5 per 15min per user, 10 per 15min per app
+    MIN_DELAY: 180 * 1000
+},
+MENTIONS: {
+    WINDOW: 15 * 60 * 1000,
+    LIMIT: 5, // 5 per 15min per user
+    MIN_DELAY: 180 * 1000
+},
+USER_LOOKUP: {
+    WINDOW: 24 * 60 * 60 * 1000,
+    LIMIT: 100, // 100 per 24h per user, 500 per 24h per app
+    MIN_DELAY: 120 * 1000
+}
 } as const;
 
 const ENDPOINTS = {
