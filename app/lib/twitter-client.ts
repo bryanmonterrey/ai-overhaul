@@ -23,7 +23,7 @@ const RATE_LIMITS: Record<string, { WINDOW: number; LIMIT: number; MIN_DELAY: nu
   },
   '/2/users/:id/mentions': {
       WINDOW: 15 * 60 * 1000,
-      LIMIT: 5,  // 5 requests per 15 min per user
+      LIMIT: 5,  // 5 requests per 15 min per user  
       MIN_DELAY: 30 * 1000
   },
   '/2/users/me': {
