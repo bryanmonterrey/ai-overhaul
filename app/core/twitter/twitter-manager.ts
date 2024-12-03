@@ -705,6 +705,8 @@ private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
 
 private async generateReply(context: ReplyContext): Promise<string | null> {
     try {
+        console.log('Generating reply with context:', context);
+        
         const reply = await this.personality.processInput(
             `Generate a reply to: ${context.content}`,
             {
@@ -715,6 +717,8 @@ private async generateReply(context: ReplyContext): Promise<string | null> {
                 })
             }
         );
+
+        console.log('Generated reply content:', reply);
         return reply;
     } catch (error) {
         console.error('Error generating reply:', error);
@@ -727,22 +731,56 @@ private async handleMention(mention: {
     text?: string;
     id: string;
 }): Promise<void> {
-    const lastCheck = await this.getLastInteractionTime();
-    const mentionTime = new Date(mention.created_at || '');
-  
-    if (mentionTime > lastCheck) {
-        // Remove unused context object and directly pass the required data
-        const reply = await this.generateReply({
-            type: 'mention',
-            content: mention.text,
-            user: mention.id
+    try {
+        console.log('Processing mention:', {
+            id: mention.id,
+            text: mention.text,
+            created_at: mention.created_at
         });
 
-        if (reply) {
-            await this.client.tweet(reply, {
-                reply: { in_reply_to_tweet_id: mention.id }
+        const lastCheck = await this.getLastInteractionTime();
+        const mentionTime = new Date(mention.created_at || '');
+  
+        console.log('Time comparison:', {
+            mentionTime: mentionTime.toISOString(),
+            lastCheck: lastCheck.toISOString(),
+            shouldReply: mentionTime > lastCheck
+        });
+
+        if (mentionTime > lastCheck) {
+            console.log('Generating reply to mention...');
+            // Remove unused context object and directly pass the required data
+            const reply = await this.generateReply({
+                type: 'mention',
+                content: mention.text,
+                user: mention.id
             });
+
+            console.log('Generated reply:', { reply });
+
+            if (reply) {
+                console.log('Attempting to send reply...');
+                await this.client.tweet(reply, {
+                    reply: { in_reply_to_tweet_id: mention.id }
+                });
+                console.log('Reply sent successfully');
+                
+                // Update last interaction time
+                await this.supabase
+                    .from('last_interaction')
+                    .upsert({
+                        id: 1, // Use a constant ID for the single row
+                        timestamp: new Date().toISOString()
+                    });
+            } else {
+                console.log('No reply was generated');
+            }
+        } else {
+            console.log('Skipping mention - older than last check');
         }
+    } catch (error) {
+        console.error('Error handling mention:', error);
+        throw error;
     }
 }
 
@@ -902,13 +940,25 @@ private async schedule24Hours() {
 }
 
 private async getLastInteractionTime(): Promise<Date> {
-    const { data } = await this.supabase
-      .from('last_interaction')
-      .select('timestamp')
-      .single();
-    
-    return data ? new Date(data.timestamp) : new Date(0);
-  }
+    try {
+        const { data, error } = await this.supabase
+            .from('last_interaction')
+            .select('timestamp')
+            .single();
+        
+        if (error) {
+            console.error('Error fetching last interaction time:', error);
+            // If there's an error, return a very old date to ensure we process messages
+            return new Date(0);
+        }
+        
+        console.log('Last interaction time from DB:', data?.timestamp);
+        return data ? new Date(data.timestamp) : new Date(0);
+    } catch (error) {
+        console.error('Error in getLastInteractionTime:', error);
+        return new Date(0);
+    }
+}
 
   public getRecentTweets() {
     return this.recentTweets;
