@@ -938,16 +938,20 @@ private async handleMention(mention: {
     author_id?: string;
 }): Promise<void> {
     try {
-        console.log('Processing mention:', {
-            id: mention.id,
-            text: mention.text,
-            created_at: mention.created_at
-        });
 
         if (mention.author_id === process.env.TWITTER_USER_ID) {
             console.log('Skipping own mention');
             return;
         }
+
+        console.log('Processing mention:', {
+            id: mention.id,
+            text: mention.text,
+            created_at: mention.created_at,
+            author_id: mention.author_id
+        });
+
+        
 
         const lastCheck = await this.getLastInteractionTime();
         const mentionTime = new Date(mention.created_at || '');
