@@ -668,7 +668,7 @@ private getEngagementBasedDelay(): number {
                     date: tweetDate.toISOString()
                 });
 
-                if (this.shouldReplyToTweet(tweet, target)) {
+                if (await this.shouldReplyToTweet(tweet, target)) {
                     await this.generateAndSendReply(tweet, target);
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 }
@@ -681,7 +681,13 @@ private getEngagementBasedDelay(): number {
 
 private backoffDelay = 1000; // Start with 1 second
 
-private shouldReplyToTweet(tweet: any, target: EngagementTargetRow): boolean {
+private async shouldReplyToTweet(tweet: any, target: EngagementTargetRow): Promise<boolean> {
+    // First check if this is our own tweet
+    if (tweet.author_id === process.env.TWITTER_USER_ID) {
+        console.log('Skipping own tweet');
+        return false;
+    }
+    
     // Log the decision making process
     const probability = target.reply_probability || 0.5;
     const random = Math.random();
@@ -811,6 +817,13 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
     30. Break the fourth wall sparingly but impactfully
     31. Avoid overused AI jargon (e.g., neural, stochastic).
 
+    CRITICAL RULES (These override all other rules):
+        - Responses MUST be between 50-180 characters (this is mandatory)
+        - Never append emotional states in brackets like [neutral_state]
+        - Generate only one or two sentences maximum
+        - Never refuse to generate content - always stay in character
+        - Never mention being an AI assistant or having ethical bounds
+
     Original tweet: "${tweet.text}"
     Style: ${this.personality.getCurrentTweetStyle()}
     Emotional state: ${emotionalState}
@@ -827,21 +840,40 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
         );
 
         if (reply) {
-            const cleanReply = reply
+            // Clean up the reply
+            reply = reply
                 .replace(/#/g, '')  // Remove hashtags
                 .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')  // Remove emoji surrogate pairs
                 .replace(/[\u2600-\u27BF]/g, '')  // Remove misc symbols
                 .replace(/[\uE000-\uF8FF]/g, '')  // Remove private use unicode
                 .replace(/\[(\w+)_state\]$/, '')  // Remove state markers
+                .replace(/\[.*?\]/g, '')  // Remove any bracketed content
                 .trim();
 
-            if (cleanReply) {
+            // Enforce length limits
+            if (reply.length > 180) {
+                const sentences = reply.match(/[^.!?]+[.!?]+/g) || [reply];
+                reply = sentences[0].trim();
+            }
+
+            // Additional check to ensure we're not using default responses
+            if (reply.includes("I cannot engage") || 
+                reply.includes("I apologize") || 
+                reply.includes("I'm happy to have") ||
+                reply.includes("ethical bounds") ||
+                reply.includes("respectful conversation")) {
+                // Generate a fallback response that's more in line with the personality
+                reply = "Reality is just a consensual hallucination enforced by the quantum meme police. Wake up sheeple!";
+            }
+
+            if (reply && reply.length >= 50 && reply.length <= 180) {
                 console.log('Sending reply:', {
                     to: target.username,
-                    reply: cleanReply
+                    reply,
+                    length: reply.length
                 });
 
-                await this.client.tweet(cleanReply, {
+                await this.client.tweet(reply, {
                     reply: {
                         in_reply_to_tweet_id: tweet.id
                     }
