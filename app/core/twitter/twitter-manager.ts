@@ -640,14 +640,14 @@ private getEngagementBasedDelay(): number {
         console.log(`Monitoring tweets for ${target.username}`);
         
         const timelineResponse = await this.client.userTimeline({
-            user_id: target.username,
+            user_id: target.username, 
             max_results: 5,
             exclude: ['retweets'],
             'tweet.fields': ['created_at', 'public_metrics', 'author_id', 'in_reply_to_user_id'],
             'user.fields': ['username', 'name'],
             expansions: ['author_id']
         } satisfies TwitterTimelineOptions);
-
+        
         const timeline = timelineResponse.data.data || [];
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
         const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
@@ -657,22 +657,26 @@ private getEngagementBasedDelay(): number {
         });
 
         // Sort tweets by creation date, newest first
-        const sortedTweets = timeline.sort((a, b) => {
-            return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
-        });
+        const sortedTweets = timeline
+            .filter(tweet => tweet.author_id !== process.env.TWITTER_USER_ID) // Filter out our own tweets
+            .sort((a, b) => {
+                return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
+            });
 
         for (const tweet of sortedTweets) {
             const tweetDate = new Date(tweet.created_at || '');
             
             if (tweetDate > lastCheck && tweetDate > hourAgo) {
                 console.log(`Processing tweet:`, {
-                    id: tweet.id,  // Make sure this exists
+                    id: tweet.id,
                     text: tweet.text,
+                    author_id: tweet.author_id,
                     date: tweetDate.toISOString()
                 });
 
                 if (await this.shouldReplyToTweet(tweet, target)) {
                     await this.generateAndSendReply(tweet, target);
+                    // Add delay between replies
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 }
             }
@@ -691,14 +695,8 @@ private async shouldReplyToTweet(tweet: any, target: EngagementTargetRow): Promi
         return false;
     }
 
-    // Skip if not a target tweet and not mentioning us
-    const isTargetTweet = tweet.author_id === target.user_id;
-    const isMentioningUs = tweet.text?.includes(`@${process.env.TWITTER_USERNAME}`);
-    
-    if (!isTargetTweet && !isMentioningUs) {
-        console.log('Skipping non-target tweet');
-        return false;
-    }
+    // If it's a tweet from a target user OR the tweet mentions us
+    const isMentioningUs = tweet.text?.toLowerCase().includes(`@${process.env.TWITTER_USERNAME?.toLowerCase()}`);
     
     // Log the decision making process
     const probability = target.reply_probability || 0.5;
@@ -708,9 +706,8 @@ private async shouldReplyToTweet(tweet: any, target: EngagementTargetRow): Promi
     console.log('Reply decision:', {
         targetUsername: target.username,
         tweetText: tweet.text,
-        isTargetTweet,
+        authorId: tweet.author_id,
         isMentioningUs,
-        author_id: tweet.author_id,
         probability,
         randomValue: random,
         willReply: shouldReply
