@@ -115,18 +115,34 @@ private async checkRateLimit(endpoint: string): Promise<void> {
   const rateLimit = this.endpointRateLimits.get(endpoint);
   if (!rateLimit) return;
 
-  if (rateLimit.remaining <= 1) {
-      const now = Date.now();
-      if (rateLimit.reset > now) {
-          // Check endpoint-specific window
-          const window = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
-          const waitTime = Math.min(rateLimit.reset - now + 1000, window);
-          console.log(`Rate limit pause for ${endpoint}:`, {
-              waitTimeMs: waitTime,
-              remaining: rateLimit.remaining,
-              resetTime: new Date(rateLimit.reset).toISOString()
-          });
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+  // For tweet posting endpoint, special daily limit handling
+  if (endpoint === '/2/tweets') {
+      // Only pause if we've definitely hit our limit
+      if (rateLimit.remaining === 0) {
+          const now = Date.now();
+          if (rateLimit.reset > now) {
+              console.log('Tweet daily limit stats:', {
+                  remaining: rateLimit.remaining,
+                  resetTime: new Date(rateLimit.reset).toISOString(),
+                  waitTime: Math.round((rateLimit.reset - now) / 1000) + ' seconds'
+              });
+              await new Promise(resolve => setTimeout(resolve, rateLimit.reset - now));
+          }
+      }
+  } else {
+      // For other endpoints, keep existing 15-min window logic
+      if (rateLimit.remaining <= 1) {
+          const now = Date.now();
+          if (rateLimit.reset > now) {
+              const window = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
+              const waitTime = Math.min(rateLimit.reset - now + 1000, window);
+              console.log(`Rate limit pause for ${endpoint}:`, {
+                  waitTimeMs: waitTime,
+                  remaining: rateLimit.remaining,
+                  resetTime: new Date(rateLimit.reset).toISOString()
+              });
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
       }
   }
 }
@@ -138,9 +154,19 @@ private updateRateLimit(endpoint: string, rateLimit: any) {
   const currentTime = Date.now();
   const limits = RATE_LIMITS[endpoint] || {
       WINDOW: 15 * 60 * 1000,
-      LIMIT: 15,  // Conservative default
+      LIMIT: 15,
       MIN_DELAY: 30 * 1000
   };
+
+  // Log the incoming rate limit data
+  console.log('Updating rate limit:', {
+      endpoint,
+      currentRemaining: currentLimit.remaining,
+      newRemaining: rateLimit?.remaining,
+      currentReset: new Date(currentLimit.reset).toISOString(),
+      newReset: rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : 'none',
+      actualLimitFromTwitter: rateLimit?.limit
+  });
 
   this.endpointRateLimits.set(endpoint, {
       ...currentLimit,
@@ -148,12 +174,6 @@ private updateRateLimit(endpoint: string, rateLimit: any) {
       remaining: rateLimit?.remaining || 0,
       reset: rateLimit?.reset ? (rateLimit.reset * 1000) : (currentTime + limits.WINDOW),
       lastRequest: currentTime
-  });
-
-  console.log(`Rate limit updated for ${endpoint}:`, {
-      limit: rateLimit?.limit || limits.LIMIT,
-      remaining: rateLimit?.remaining || 0,
-      resetIn: Math.round((rateLimit?.reset ? rateLimit.reset * 1000 : currentTime + limits.WINDOW - currentTime) / 1000)
   });
 }
 
