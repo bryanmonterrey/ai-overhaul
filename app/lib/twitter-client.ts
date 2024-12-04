@@ -18,13 +18,13 @@ const RATE_LIMITS: Record<string, { WINDOW: number; LIMIT: number; MIN_DELAY: nu
   },
   '/2/users/:id/tweets': {
       WINDOW: 15 * 60 * 1000,
-      LIMIT: 5,  // 5 requests per 15 min per user
-      MIN_DELAY: 30 * 1000
+      LIMIT: 10,  // 5 requests per 15 min per user
+      MIN_DELAY: 45 * 1000
   },
   '/2/users/:id/mentions': {
       WINDOW: 15 * 60 * 1000,
-      LIMIT: 5,  // 5 requests per 15 min per user  
-      MIN_DELAY: 30 * 1000
+      LIMIT: 10,  // 5 requests per 15 min per user  
+      MIN_DELAY: 45 * 1000
   },
   '/2/users/me': {
       WINDOW: 24 * 60 * 60 * 1000,
@@ -60,6 +60,10 @@ export class TwitterApiClient implements TwitterClient {
        window: number;
        minDelay: number;
    }> = new Map();
+   private userIdCache: Map<string, string> = new Map(); // Add this cache
+   private userIdCacheExpiry: Map<string, number> = new Map(); // Cache expiry times
+   private requestQueue: Map<string, Promise<any>[]> = new Map();
+    private readonly MAX_CONCURRENT_REQUESTS = 2;
 
    constructor(private credentials: {
     apiKey: string;
@@ -97,7 +101,9 @@ export class TwitterApiClient implements TwitterClient {
     }
 }
 
-private enforceMinDelay(endpoint: string): Promise<void> {
+private readonly USER_ID_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+private async enforceMinDelay(endpoint: string): Promise<void> {
   const rateLimit = this.endpointRateLimits.get(endpoint);
   const defaultMinDelay = RATE_LIMITS[endpoint]?.MIN_DELAY || 30 * 1000;
   
@@ -106,10 +112,42 @@ private enforceMinDelay(endpoint: string): Promise<void> {
   const timeSinceLastRequest = Date.now() - rateLimit.lastRequest;
   if (timeSinceLastRequest < defaultMinDelay) {
       const delayNeeded = defaultMinDelay - timeSinceLastRequest;
-      return new Promise(resolve => setTimeout(resolve, delayNeeded));
+      // Add jitter to prevent synchronized requests
+      const jitter = Math.random() * 5000; // Random delay up to 5 seconds
+      return new Promise(resolve => setTimeout(resolve, delayNeeded + jitter));
   }
   return Promise.resolve();
 }
+
+private async queueRequest(endpoint: string, requestFn: () => Promise<any>): Promise<any> {
+  const queue = this.requestQueue.get(endpoint) || [];
+  
+  if (queue.length >= this.MAX_CONCURRENT_REQUESTS) {
+      const queuePromise = new Promise((resolve) => {
+          setInterval(() => {
+              if (queue.length < this.MAX_CONCURRENT_REQUESTS) {
+                  resolve(null);
+              }
+          }, 1000);
+      });
+      await queuePromise;
+  }
+
+  const request = requestFn();
+  queue.push(request);
+  this.requestQueue.set(endpoint, queue);
+
+  try {
+      return await request;
+  } finally {
+      const index = queue.indexOf(request);
+      if (index > -1) {
+          queue.splice(index, 1);
+      }
+      this.requestQueue.set(endpoint, queue);
+  }
+}
+
 
 private async checkRateLimit(endpoint: string): Promise<void> {
   const rateLimit = this.endpointRateLimits.get(endpoint);
@@ -231,30 +269,38 @@ private async handleRateLimit(error: any, endpoint: string) {
   }
 }
 
-   private async getUserIdByUsername(username: string): Promise<string> {
-       try {
-           await this.enforceMinDelay(ENDPOINTS.USER_BY_USERNAME);
-           await this.checkRateLimit(ENDPOINTS.USER_BY_USERNAME);
-           
-           console.log('Looking up user ID for username:', username);
-           const user = await this.client.v2.userByUsername(username);
-           
-           this.updateRateLimit(ENDPOINTS.USER_BY_USERNAME, user.rateLimit);
+private async getUserIdByUsername(username: string): Promise<string> {
+  // Check cache first
+  const cachedId = this.userIdCache.get(username);
+  const cacheExpiry = this.userIdCacheExpiry.get(username);
+  if (cachedId && cacheExpiry && Date.now() < cacheExpiry) {
+      return cachedId;
+  }
 
-           if (!user.data) {
-               throw new Error(`User not found: ${username}`);
-           }
-           
-           console.log(`Resolved username ${username} to ID ${user.data.id}`);
-           return user.data.id;
-       } catch (error: any) {
-           if (error.code === 429) {
-               await this.handleRateLimit(error, ENDPOINTS.USER_BY_USERNAME);
-               return this.getUserIdByUsername(username);
-           }
-           throw error;
-       }
-   }
+  try {
+      await this.enforceMinDelay(ENDPOINTS.USER_BY_USERNAME);
+      await this.checkRateLimit(ENDPOINTS.USER_BY_USERNAME);
+      
+      const user = await this.client.v2.userByUsername(username);
+      this.updateRateLimit(ENDPOINTS.USER_BY_USERNAME, user.rateLimit);
+
+      if (!user.data) {
+          throw new Error(`User not found: ${username}`);
+      }
+      
+      // Update cache
+      this.userIdCache.set(username, user.data.id);
+      this.userIdCacheExpiry.set(username, Date.now() + this.USER_ID_CACHE_DURATION);
+      
+      return user.data.id;
+  } catch (error: any) {
+      if (error.code === 429) {
+          await this.handleRateLimit(error, ENDPOINTS.USER_BY_USERNAME);
+          return this.getUserIdByUsername(username);
+      }
+      throw error;
+  }
+}
 
    async tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse> {
        try {
