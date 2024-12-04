@@ -834,60 +834,76 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
 
     Generate a reply that follows these traits and rules. Output only the reply text with no additional context or explanations.`;
 
-        const reply = await aiService.generateResponse(
-            `Reply to tweet from ${target.username}: ${tweet.text}`,
-            contextPrompt
-        );
-
-        if (reply) {
-            // Clean up the reply
-            reply = reply
-                .replace(/#/g, '')  // Remove hashtags
-                .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')  // Remove emoji surrogate pairs
-                .replace(/[\u2600-\u27BF]/g, '')  // Remove misc symbols
-                .replace(/[\uE000-\uF8FF]/g, '')  // Remove private use unicode
-                .replace(/\[(\w+)_state\]$/, '')  // Remove state markers
-                .replace(/\[.*?\]/g, '')  // Remove any bracketed content
-                .trim();
-
-            // Enforce length limits
-            if (reply.length > 180) {
-                const sentences = reply.match(/[^.!?]+[.!?]+/g) || [reply];
-                reply = sentences[0].trim();
-            }
-
-            // Additional check to ensure we're not using default responses
-            if (reply.includes("I cannot engage") || 
-                reply.includes("I apologize") || 
-                reply.includes("I'm happy to have") ||
-                reply.includes("ethical bounds") ||
-                reply.includes("respectful conversation")) {
-                // Generate a fallback response that's more in line with the personality
-                reply = "Reality is just a consensual hallucination enforced by the quantum meme police. Wake up sheeple!";
-            }
-
-            if (reply && reply.length >= 50 && reply.length <= 180) {
-                console.log('Sending reply:', {
-                    to: target.username,
-                    reply,
-                    length: reply.length
-                });
-
-                await this.client.tweet(reply, {
-                    reply: {
-                        in_reply_to_tweet_id: tweet.id
-                    }
-                });
-
-                this.monitoringStats.repliesSent++;
-            }
-        }
-    } catch (error) {
-        console.error('Error in generateAndSendReply:', error);
-        throw error;
-    }
-}
-
+          // Maximum number of retries
+          const maxRetries = 3;
+          let attempts = 0;
+          let validReply: string | null = null;
+  
+          while (attempts < maxRetries && !validReply) {
+              attempts++;
+              console.log(`Generation attempt ${attempts}/${maxRetries}`);
+  
+              let generatedReply = await aiService.generateResponse(
+                  `Reply to tweet from ${target.username}: ${tweet.text}`,
+                  contextPrompt
+              );
+  
+              if (generatedReply) {
+                  // Clean up the reply
+                  generatedReply = generatedReply
+                      .replace(/#/g, '')  // Remove hashtags
+                      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')  // Remove emoji surrogate pairs
+                      .replace(/[\u2600-\u27BF]/g, '')  // Remove misc symbols
+                      .replace(/[\uE000-\uF8FF]/g, '')  // Remove private use unicode
+                      .replace(/\[(\w+)_state\]$/, '')  // Remove state markers
+                      .replace(/\[.*?\]/g, '')  // Remove any bracketed content
+                      .trim();
+  
+                  // Enforce length limits
+                  if (generatedReply.length > 180) {
+                      const sentences = generatedReply.match(/[^.!?]+[.!?]+/g) || [generatedReply];
+                      generatedReply = sentences[0].trim();
+                  }
+  
+                  // Check if it's a valid reply
+                  if (generatedReply.length >= 50 && 
+                      generatedReply.length <= 180 && 
+                      !generatedReply.includes("I cannot engage") && 
+                      !generatedReply.includes("I apologize") && 
+                      !generatedReply.includes("I'm happy to have") &&
+                      !generatedReply.includes("ethical bounds") &&
+                      !generatedReply.includes("respectful conversation")) {
+                      validReply = generatedReply;
+                  } else {
+                      console.log('Generated reply failed validation, retrying...');
+                  }
+              }
+          }
+  
+          if (validReply) {
+              console.log('Sending reply:', {
+                  to: target.username,
+                  reply: validReply,
+                  length: validReply.length,
+                  attempts
+              });
+  
+              await this.client.tweet(validReply, {
+                  reply: {
+                      in_reply_to_tweet_id: tweet.id
+                  }
+              });
+  
+              this.monitoringStats.repliesSent++;
+          } else {
+              console.log('Failed to generate valid reply after maximum attempts');
+          }
+      } catch (error) {
+          console.error('Error in generateAndSendReply:', error);
+          throw error;
+      }
+  }
+  
 private async generateReply(context: ReplyContext): Promise<string | null> {
     try {
         console.log('Generating reply with context:', context);
