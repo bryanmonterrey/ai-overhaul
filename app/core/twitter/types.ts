@@ -60,6 +60,7 @@ export interface TwitterMetrics {
 export interface TwitterData {
   id: string;
   text: string;
+  author_id?: string;
   public_metrics?: TwitterMetrics;
   created_at?: string;
 }

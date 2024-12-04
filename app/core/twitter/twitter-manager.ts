@@ -1429,7 +1429,9 @@ private async runMonitoringCycle(): Promise<void> {
             this.client.userTimeline({
                 user_id: process.env.TWITTER_USER_ID!,
                 max_results: 10,
-                "tweet.fields": ["created_at", "public_metrics", "author_id"] 
+                "tweet.fields": ["created_at", "public_metrics", "author_id"],
+                'user.fields': ['username', 'name'],
+                expansions: ['author_id']
             } satisfies TwitterTimelineOptions)
         ]);
 
