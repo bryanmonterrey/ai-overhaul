@@ -639,29 +639,46 @@ private getEngagementBasedDelay(): number {
     try {
         console.log(`Monitoring tweets for ${target.username}`);
         
+        // Add proper fields to request
         const timelineResponse = await this.client.userTimeline({
             user_id: target.username, 
             max_results: 5,
             exclude: ['retweets'],
-            'tweet.fields': ['created_at', 'public_metrics', 'author_id', 'in_reply_to_user_id'],
+            'tweet.fields': ['created_at', 'public_metrics', 'author_id', 'in_reply_to_user_id', 'referenced_tweets'],
             'user.fields': ['username', 'name'],
-            expansions: ['author_id']
+            expansions: ['author_id', 'referenced_tweets.id']
         } satisfies TwitterTimelineOptions);
+
+        // Log the raw response for debugging
+        console.log('Timeline response:', {
+            target: target.username,
+            tweets: timelineResponse.data.data?.map(t => ({
+                id: t.id,
+                author_id: t.author_id,
+                text: t.text?.substring(0, 50) + '...'
+            }))
+        });
         
         const timeline = timelineResponse.data.data || [];
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
         const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-        console.log(`Found ${timeline.length} tweets from ${target.username}`, {
-            lastCheck: lastCheck.toISOString()
-        });
-
         // Sort tweets by creation date, newest first
         const sortedTweets = timeline
-            .filter(tweet => tweet.author_id !== process.env.TWITTER_USER_ID) // Filter out our own tweets
+            .filter(tweet => {
+                console.log('Filtering tweet:', {
+                    tweet_id: tweet.id,
+                    author_id: tweet.author_id,
+                    our_id: process.env.TWITTER_USER_ID,
+                    isOurs: tweet.author_id === process.env.TWITTER_USER_ID
+                });
+                return tweet.author_id !== process.env.TWITTER_USER_ID;
+            })
             .sort((a, b) => {
                 return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
             });
+
+        console.log(`Found ${sortedTweets.length} valid tweets from ${target.username} after filtering`);
 
         for (const tweet of sortedTweets) {
             const tweetDate = new Date(tweet.created_at || '');
@@ -669,14 +686,13 @@ private getEngagementBasedDelay(): number {
             if (tweetDate > lastCheck && tweetDate > hourAgo) {
                 console.log(`Processing tweet:`, {
                     id: tweet.id,
-                    text: tweet.text,
                     author_id: tweet.author_id,
+                    text: tweet.text,
                     date: tweetDate.toISOString()
                 });
 
                 if (await this.shouldReplyToTweet(tweet, target)) {
                     await this.generateAndSendReply(tweet, target);
-                    // Add delay between replies
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 }
             }
