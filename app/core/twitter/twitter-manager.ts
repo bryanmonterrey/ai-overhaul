@@ -935,6 +935,7 @@ private async handleMention(mention: {
     created_at?: string;
     text?: string;
     id: string;
+    author_id?: string;
 }): Promise<void> {
     try {
         console.log('Processing mention:', {
@@ -942,6 +943,11 @@ private async handleMention(mention: {
             text: mention.text,
             created_at: mention.created_at
         });
+
+        if (mention.author_id === process.env.TWITTER_USER_ID) {
+            console.log('Skipping own mention');
+            return;
+        }
 
         const lastCheck = await this.getLastInteractionTime();
         const mentionTime = new Date(mention.created_at || '');
@@ -1420,7 +1426,7 @@ private async runMonitoringCycle(): Promise<void> {
                 user_id: process.env.TWITTER_USER_ID!,
                 max_results: 10,
                 "tweet.fields": ["created_at", "public_metrics", "author_id"] 
-            })
+            } as TwitterTimelineOptions)
         ]);
 
         console.log('Processing mentions and replies:', {
