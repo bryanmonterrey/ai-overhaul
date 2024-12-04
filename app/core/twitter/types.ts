@@ -61,6 +61,7 @@ export interface TwitterData {
   id: string;
   text: string;
   author_id?: string;
+  author_username?: string;
   public_metrics?: TwitterMetrics;
   created_at?: string;
   in_reply_to_user_id?: string;
