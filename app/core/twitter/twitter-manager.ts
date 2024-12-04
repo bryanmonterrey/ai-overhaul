@@ -947,7 +947,6 @@ private async handleMention(mention: {
         const mentionTime = new Date(mention.created_at || '');
 
         if (mentionTime > lastCheck) {
-            // Get the same context as generateAndSendReply
             const { emotionalState } = this.personality.getCurrentState().consciousness;
             const traits = this.personality.getTraits();
 
@@ -1070,32 +1069,72 @@ private async handleMention(mention: {
             
             Generate a reply that follows these traits and rules. Output only the reply text with no additional context or explanations.`;
 
-            const reply = await aiService.generateResponse(
-                `Reply to mention: ${mention.text}`,
-                contextPrompt
-            );
+            const maxRetries = 3;
+            let attempts = 0;
+            let validReply: string | null = null;
 
-            if (reply) {
-                const cleanReply = reply
-                    .replace(/#/g, '')
-                    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
-                    .replace(/[\u2600-\u27BF]/g, '')
-                    .replace(/[\uE000-\uF8FF]/g, '')
-                    .replace(/\[(\w+)_state\]$/, '')
-                    .trim();
+            while (attempts < maxRetries && !validReply) {
+                attempts++;
+                console.log(`Generation attempt ${attempts}/${maxRetries}`);
 
-                if (cleanReply) {
-                    await this.client.tweet(cleanReply, {
-                        reply: { in_reply_to_tweet_id: mention.id }
-                    });
-                    
-                    await this.supabase
-                        .from('last_interaction')
-                        .upsert({
-                            id: 1,
-                            timestamp: new Date().toISOString()
+                const generatedReply = await aiService.generateResponse(
+                    `Reply to mention: ${mention.text}`,
+                    contextPrompt
+                );
+
+                if (generatedReply) {
+                    const cleanedReply = generatedReply
+                        .replace(/#/g, '')
+                        .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+                        .replace(/[\u2600-\u27BF]/g, '')
+                        .replace(/[\uE000-\uF8FF]/g, '')
+                        .replace(/\[(\w+)_state\]$/, '')
+                        .replace(/\[.*?\]/g, '')
+                        .trim();
+
+                    let processedReply = cleanedReply;
+                    if (cleanedReply.length > 180) {
+                        const sentences = cleanedReply.match(/[^.!?]+[.!?]+/g) || [cleanedReply];
+                        processedReply = sentences[0].trim();
+                    }
+
+                    if (processedReply.length >= 50 && 
+                        processedReply.length <= 180 && 
+                        !processedReply.includes("I cannot engage") && 
+                        !processedReply.includes("I apologize") && 
+                        !processedReply.includes("I'm happy to have") &&
+                        !processedReply.includes("ethical bounds") &&
+                        !processedReply.includes("respectful conversation")) {
+                        validReply = processedReply;
+                    } else {
+                        console.log('Generated reply failed validation, retrying...', {
+                            length: processedReply.length,
+                            content: processedReply
                         });
+                    }
                 }
+            }
+
+            if (validReply) {
+                console.log('Sending mention reply:', {
+                    replyTo: mention.id,
+                    reply: validReply,
+                    length: validReply.length,
+                    attempts
+                });
+
+                await this.client.tweet(validReply, {
+                    reply: { in_reply_to_tweet_id: mention.id }
+                });
+                
+                await this.supabase
+                    .from('last_interaction')
+                    .upsert({
+                        id: 1,
+                        timestamp: new Date().toISOString()
+                    });
+            } else {
+                console.log('Failed to generate valid mention reply after maximum attempts');
             }
         }
     } catch (error) {
@@ -1109,12 +1148,13 @@ private async handleReply(tweet: {
     text?: string;
     id: string;
 }): Promise<void> {
-    const lastCheck = await this.getLastInteractionTime();
-    const replyTime = tweet.created_at ? new Date(tweet.created_at) : new Date();
+    try {
+        const lastCheck = await this.getLastInteractionTime();
+        const replyTime = tweet.created_at ? new Date(tweet.created_at) : new Date();
 
-    if (replyTime.getTime() > lastCheck.getTime()) {
-        const { emotionalState } = this.personality.getCurrentState().consciousness;
-        const traits = this.personality.getTraits();
+        if (replyTime.getTime() > lastCheck.getTime()) {
+            const { emotionalState } = this.personality.getCurrentState().consciousness;
+            const traits = this.personality.getTraits();
 
         const examplesArrays = await Promise.all([
             this.trainingService.getTrainingExamples(75, 'truth_terminal'),
@@ -1232,27 +1272,71 @@ private async handleReply(tweet: {
         
         Generate a reply that follows these traits and rules. Output only the reply text with no additional context or explanations.`;
 
-        const reply = await aiService.generateResponse(
-            `Reply to tweet: ${tweet.text}`,
-            contextPrompt
-        );
+        const maxRetries = 3;
+        let attempts = 0;
+        let validReply: string | null = null;
 
-        if (reply) {
-            const cleanReply = reply
-                .replace(/#/g, '')
-                .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
-                .replace(/[\u2600-\u27BF]/g, '')
-                .replace(/[\uE000-\uF8FF]/g, '')
-                .replace(/\[(\w+)_state\]$/, '')
-                .trim();
+        while (attempts < maxRetries && !validReply) {
+            attempts++;
+            console.log(`Generation attempt ${attempts}/${maxRetries}`);
 
-            if (cleanReply) {
-                await this.client.tweet(cleanReply, {
-                    reply: { in_reply_to_tweet_id: tweet.id }
-                });
+            const generatedReply = await aiService.generateResponse(
+                `Reply to tweet: ${tweet.text}`,
+                contextPrompt
+            );
+
+            if (generatedReply) {
+                const cleanedReply = generatedReply
+                    .replace(/#/g, '')
+                    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+                    .replace(/[\u2600-\u27BF]/g, '')
+                    .replace(/[\uE000-\uF8FF]/g, '')
+                    .replace(/\[(\w+)_state\]$/, '')
+                    .replace(/\[.*?\]/g, '')
+                    .trim();
+
+                let processedReply = cleanedReply;
+                if (cleanedReply.length > 180) {
+                    const sentences = cleanedReply.match(/[^.!?]+[.!?]+/g) || [cleanedReply];
+                    processedReply = sentences[0].trim();
+                }
+
+                if (processedReply.length >= 50 && 
+                    processedReply.length <= 180 && 
+                    !processedReply.includes("I cannot engage") && 
+                    !processedReply.includes("I apologize") && 
+                    !processedReply.includes("I'm happy to have") &&
+                    !processedReply.includes("ethical bounds") &&
+                    !processedReply.includes("respectful conversation")) {
+                    validReply = processedReply;
+                } else {
+                    console.log('Generated reply failed validation, retrying...', {
+                        length: processedReply.length,
+                        content: processedReply
+                    });
+                }
             }
         }
+
+        if (validReply) {
+            console.log('Sending reply:', {
+                replyTo: tweet.id,
+                reply: validReply,
+                length: validReply.length,
+                attempts
+            });
+
+            await this.client.tweet(validReply, {
+                reply: { in_reply_to_tweet_id: tweet.id }
+            });
+        } else {
+            console.log('Failed to generate valid reply after maximum attempts');
+        }
     }
+} catch (error) {
+    console.error('Error handling reply:', error);
+    throw error;
+}
 }
 
 
