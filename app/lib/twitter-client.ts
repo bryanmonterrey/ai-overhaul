@@ -158,25 +158,45 @@ private updateRateLimit(endpoint: string, rateLimit: any) {
       MIN_DELAY: 30 * 1000
   };
 
-  // If Twitter doesn't provide rate limit info, use our local tracking
-  const newLimit = {
+  // Log the incoming data
+  console.log('Raw rate limit data:', {
+      endpoint,
+      rateLimit,
+      currentLimit
+  });
+
+  // Handle undefined rate limits from Twitter
+  let newRemaining: number;
+  if (rateLimit?.remaining !== undefined) {
+      newRemaining = rateLimit.remaining;
+  } else {
+      // If no rate info provided, decrement current remaining
+      newRemaining = Math.max(0, currentLimit.remaining - 1);
+  }
+
+  const newReset = rateLimit?.reset 
+      ? new Date(rateLimit.reset * 1000)
+      : new Date(currentLimit.reset);
+
+  const newLimits = {
       ...currentLimit,
       limit: rateLimit?.limit || currentLimit.limit,
-      remaining: rateLimit?.remaining !== undefined ? rateLimit.remaining : currentLimit.remaining - 1, // Decrement if no info
-      reset: rateLimit?.reset ? (rateLimit.reset * 1000) : currentLimit.reset,
+      remaining: newRemaining,
+      reset: newReset.getTime(),
       lastRequest: currentTime
   };
 
-  this.endpointRateLimits.set(endpoint, newLimit);
+  this.endpointRateLimits.set(endpoint, newLimits);
 
   console.log(`Rate limit updated for ${endpoint}:`, {
-      limit: newLimit.limit,
-      remaining: newLimit.remaining,
-      resetTime: new Date(newLimit.reset).toISOString(),
-      fromTwitter: rateLimit?.remaining !== undefined ? 'yes' : 'no',
-      lastRequest: new Date(newLimit.lastRequest).toISOString()
+      limit: newLimits.limit,
+      remaining: newLimits.remaining,
+      resetTime: new Date(newLimits.reset).toISOString(),
+      source: rateLimit?.remaining !== undefined ? 'Twitter API' : 'Local tracking',
+      lastRequest: new Date(newLimits.lastRequest).toISOString()
   });
 }
+
 
 private async handleRateLimit(error: any, endpoint: string) {
   try {
