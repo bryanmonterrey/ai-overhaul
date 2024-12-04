@@ -843,39 +843,43 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
               attempts++;
               console.log(`Generation attempt ${attempts}/${maxRetries}`);
   
-              let generatedReply = await aiService.generateResponse(
+              const generatedReply = await aiService.generateResponse(
                   `Reply to tweet from ${target.username}: ${tweet.text}`,
                   contextPrompt
               );
   
               if (generatedReply) {
                   // Clean up the reply
-                  generatedReply = generatedReply
-                      .replace(/#/g, '')  // Remove hashtags
-                      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')  // Remove emoji surrogate pairs
-                      .replace(/[\u2600-\u27BF]/g, '')  // Remove misc symbols
-                      .replace(/[\uE000-\uF8FF]/g, '')  // Remove private use unicode
-                      .replace(/\[(\w+)_state\]$/, '')  // Remove state markers
-                      .replace(/\[.*?\]/g, '')  // Remove any bracketed content
+                  const cleanedReply = generatedReply
+                      .replace(/#/g, '')
+                      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+                      .replace(/[\u2600-\u27BF]/g, '')
+                      .replace(/[\uE000-\uF8FF]/g, '')
+                      .replace(/\[(\w+)_state\]$/, '')
+                      .replace(/\[.*?\]/g, '')
                       .trim();
   
-                  // Enforce length limits
-                  if (generatedReply.length > 180) {
-                      const sentences = generatedReply.match(/[^.!?]+[.!?]+/g) || [generatedReply];
-                      generatedReply = sentences[0].trim();
+                  // Get first sentence if too long
+                  let processedReply = cleanedReply;
+                  if (cleanedReply.length > 180) {
+                      const sentences = cleanedReply.match(/[^.!?]+[.!?]+/g) || [cleanedReply];
+                      processedReply = sentences[0].trim();
                   }
   
-                  // Check if it's a valid reply
-                  if (generatedReply.length >= 50 && 
-                      generatedReply.length <= 180 && 
-                      !generatedReply.includes("I cannot engage") && 
-                      !generatedReply.includes("I apologize") && 
-                      !generatedReply.includes("I'm happy to have") &&
-                      !generatedReply.includes("ethical bounds") &&
-                      !generatedReply.includes("respectful conversation")) {
-                      validReply = generatedReply;
+                  // Validate the reply
+                  if (processedReply.length >= 50 && 
+                      processedReply.length <= 180 && 
+                      !processedReply.includes("I cannot engage") && 
+                      !processedReply.includes("I apologize") && 
+                      !processedReply.includes("I'm happy to have") &&
+                      !processedReply.includes("ethical bounds") &&
+                      !processedReply.includes("respectful conversation")) {
+                      validReply = processedReply;
                   } else {
-                      console.log('Generated reply failed validation, retrying...');
+                      console.log('Generated reply failed validation, retrying...', {
+                          length: processedReply.length,
+                          content: processedReply
+                      });
                   }
               }
           }
