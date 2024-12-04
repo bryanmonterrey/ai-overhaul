@@ -1155,8 +1155,15 @@ private async handleReply(tweet: {
     created_at?: string;
     text?: string;
     id: string;
+    author_id?: string;
 }): Promise<void> {
     try {
+
+        if (tweet.author_id === process.env.TWITTER_USER_ID) {
+            console.log('Skipping own reply');
+            return;
+        }
+
         const lastCheck = await this.getLastInteractionTime();
         const replyTime = tweet.created_at ? new Date(tweet.created_at) : new Date();
 
@@ -1411,7 +1418,8 @@ private async runMonitoringCycle(): Promise<void> {
             this.client.userMentionTimeline(),
             this.client.userTimeline({
                 user_id: process.env.TWITTER_USER_ID!,
-                max_results: 10
+                max_results: 10,
+                "tweet.fields": ["created_at", "public_metrics", "author_id"] 
             })
         ]);
 

@@ -48,6 +48,9 @@ export interface TwitterClient {
       user_id?: string;
       max_results?: number;
       exclude?: string[];
+      'tweet.fields'?: string[];
+      'user.fields'?: string[];
+      expansions?: string[];
   }): Promise<TwitterTimelineResponse>;
   userMentionTimeline(): Promise<TwitterTimelineResponse>;
 }
