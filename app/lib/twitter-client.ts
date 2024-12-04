@@ -153,6 +153,9 @@ private async checkRateLimit(endpoint: string): Promise<void> {
   const rateLimit = this.endpointRateLimits.get(endpoint);
   if (!rateLimit) return;
 
+  // Add proactive rate limit management
+  const remainingThreshold = Math.ceil(rateLimit.limit * 0.2); // 20% threshold
+
   if (endpoint === '/2/tweets') {
       // For tweets, only pause if completely out of requests
       if (rateLimit.remaining === 0) {
@@ -169,7 +172,7 @@ private async checkRateLimit(endpoint: string): Promise<void> {
       }
   } else {
       // For other endpoints, use a more conservative approach
-      if (rateLimit.remaining === 0) { // Changed from <= 1 to === 0
+      if (rateLimit.remaining <= remainingThreshold) {
           const now = Date.now();
           if (rateLimit.reset > now) {
               const window = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
@@ -177,6 +180,7 @@ private async checkRateLimit(endpoint: string): Promise<void> {
               console.log(`Rate limit pause for ${endpoint}:`, {
                   waitTimeMs: waitTime,
                   remaining: rateLimit.remaining,
+                  threshold: remainingThreshold,
                   resetTime: new Date(rateLimit.reset).toISOString()
               });
               await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -355,58 +359,70 @@ private async getUserIdByUsername(username: string): Promise<string> {
        }
    }
 
-   async userTimeline(options?: { 
-       user_id?: string; 
-       max_results?: number; 
-       exclude?: Array<'retweets' | 'replies'> 
-   }): Promise<TwitterTimelineResponse> {
-       try {
-           await this.enforceMinDelay(ENDPOINTS.USER_TIMELINE);
-           await this.checkRateLimit(ENDPOINTS.USER_TIMELINE);
+   private async _userTimeline(options?: { 
+    user_id?: string; 
+    max_results?: number; 
+    exclude?: Array<'retweets' | 'replies'> 
+}): Promise<TwitterTimelineResponse> {
+    try {
+        await this.enforceMinDelay(ENDPOINTS.USER_TIMELINE);
+        await this.checkRateLimit(ENDPOINTS.USER_TIMELINE);
 
-           let userId: string;
-           if (options?.user_id) {
-               if (!options.user_id.match(/^\d+$/)) {
-                   userId = await this.getUserIdByUsername(options.user_id);
-               } else {
-                   userId = options.user_id;
-               }
-           } else {
-               userId = await this.getCurrentUserId();
-           }
+        let userId: string;
+        if (options?.user_id) {
+            if (!options.user_id.match(/^\d+$/)) {
+                userId = await this.getUserIdByUsername(options.user_id);
+            } else {
+                userId = options.user_id;
+            }
+        } else {
+            userId = await this.getCurrentUserId();
+        }
 
-           const timelineParams = {
-               max_results: options?.max_results || 10,
-               "tweet.fields": ["created_at", "public_metrics", "author_id", "conversation_id"],
-               "user.fields": ["username", "name"],
-               "expansions": ["author_id"] as TTweetv2Expansion[]
-           };
+        const timelineParams = {
+            max_results: options?.max_results || 10,
+            "tweet.fields": ["created_at", "public_metrics", "author_id", "conversation_id"],
+            "user.fields": ["username", "name"],
+            "expansions": ["author_id"] as TTweetv2Expansion[]
+        };
 
-           const timeline = await this.client.v2.userTimeline(userId, timelineParams);
-           this.updateRateLimit(ENDPOINTS.USER_TIMELINE, timeline.rateLimit);
+        const timeline = await this.client.v2.userTimeline(userId, timelineParams);
+        this.updateRateLimit(ENDPOINTS.USER_TIMELINE, timeline.rateLimit);
 
-           return {
-               data: {
-                   data: (timeline.data.data || []).map(tweet => ({
-                       id: tweet.id,
-                       text: tweet.text,
-                       created_at: tweet.created_at,
-                       public_metrics: {
-                           like_count: tweet.public_metrics?.like_count || 0,
-                           retweet_count: tweet.public_metrics?.retweet_count || 0,
-                           reply_count: tweet.public_metrics?.reply_count || 0
-                       }
-                   }))
-               }
-           };
-       } catch (error: any) {
-           if (error.code === 429) {
-               await this.handleRateLimit(error, ENDPOINTS.USER_TIMELINE);
-               return this.userTimeline(options);
-           }
-           throw error;
-       }
-   }
+        return {
+            data: {
+                data: (timeline.data.data || []).map(tweet => ({
+                    id: tweet.id,
+                    text: tweet.text,
+                    created_at: tweet.created_at,
+                    public_metrics: {
+                        like_count: tweet.public_metrics?.like_count || 0,
+                        retweet_count: tweet.public_metrics?.retweet_count || 0,
+                        reply_count: tweet.public_metrics?.reply_count || 0
+                    }
+                }))
+            }
+        };
+    } catch (error: any) {
+        if (error.code === 429) {
+            await this.handleRateLimit(error, ENDPOINTS.USER_TIMELINE);
+            return this._userTimeline(options);
+        }
+        throw error;
+    }
+}
+
+
+async userTimeline(options?: { 
+  user_id?: string; 
+  max_results?: number; 
+  exclude?: Array<'retweets' | 'replies'> 
+}): Promise<TwitterTimelineResponse> {
+  return this.queueRequest(
+      ENDPOINTS.USER_TIMELINE, 
+      () => this._userTimeline(options)
+  );
+}
 
    async userMentionTimeline(): Promise<TwitterTimelineResponse> {
        try {
