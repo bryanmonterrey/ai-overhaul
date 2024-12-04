@@ -640,11 +640,14 @@ private getEngagementBasedDelay(): number {
         console.log(`Monitoring tweets for ${target.username}`);
         
         const timelineResponse = await this.client.userTimeline({
-            user_id: target.username, 
+            user_id: target.username,
             max_results: 5,
-            exclude: ['retweets']
-        });
-        
+            exclude: ['retweets'],
+            'tweet.fields': ['created_at', 'public_metrics', 'author_id', 'in_reply_to_user_id'],
+            'user.fields': ['username', 'name'],
+            expansions: ['author_id']
+        } satisfies TwitterTimelineOptions);
+
         const timeline = timelineResponse.data.data || [];
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
         const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
@@ -682,9 +685,18 @@ private getEngagementBasedDelay(): number {
 private backoffDelay = 1000; // Start with 1 second
 
 private async shouldReplyToTweet(tweet: any, target: EngagementTargetRow): Promise<boolean> {
-    // First check if this is our own tweet
+    // Skip our own tweets
     if (tweet.author_id === process.env.TWITTER_USER_ID) {
         console.log('Skipping own tweet');
+        return false;
+    }
+
+    // Skip if not a target tweet and not mentioning us
+    const isTargetTweet = tweet.author_id === target.user_id;
+    const isMentioningUs = tweet.text?.includes(`@${process.env.TWITTER_USERNAME}`);
+    
+    if (!isTargetTweet && !isMentioningUs) {
+        console.log('Skipping non-target tweet');
         return false;
     }
     
@@ -696,6 +708,9 @@ private async shouldReplyToTweet(tweet: any, target: EngagementTargetRow): Promi
     console.log('Reply decision:', {
         targetUsername: target.username,
         tweetText: tweet.text,
+        isTargetTweet,
+        isMentioningUs,
+        author_id: tweet.author_id,
         probability,
         randomValue: random,
         willReply: shouldReply
@@ -1429,7 +1444,7 @@ private async runMonitoringCycle(): Promise<void> {
             this.client.userTimeline({
                 user_id: process.env.TWITTER_USER_ID!,
                 max_results: 10,
-                "tweet.fields": ["created_at", "public_metrics", "author_id"],
+                'tweet.fields': ['created_at', 'public_metrics', 'author_id', 'in_reply_to_user_id'],
                 'user.fields': ['username', 'name'],
                 expansions: ['author_id']
             } satisfies TwitterTimelineOptions)
