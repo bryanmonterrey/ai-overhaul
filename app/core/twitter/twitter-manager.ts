@@ -1,5 +1,5 @@
 import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkError, TwitterDataError } from './twitter-errors';
-import type { TwitterClient, TwitterData } from './types';
+import type { TwitterClient, TwitterData, TwitterTimelineOptions } from './types';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { Context, TweetStyle } from '../personality/types';
@@ -1426,7 +1426,7 @@ private async runMonitoringCycle(): Promise<void> {
                 user_id: process.env.TWITTER_USER_ID!,
                 max_results: 10,
                 "tweet.fields": ["created_at", "public_metrics", "author_id"] 
-            } as TwitterTimelineOptions)
+            } satisfies TwitterTimelineOptions)
         ]);
 
         console.log('Processing mentions and replies:', {

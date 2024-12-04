@@ -1,12 +1,3 @@
-// Types for Twitter API requests
-interface TwitterTimelineOptions {
-  user_id?: string;
-  max_results?: number;
-  exclude?: string[];
-  'tweet.fields'?: string[];
-  'user.fields'?: string[];
-  expansions?: string[];
-}
 
 interface TweetOptions {
   reply?: {
@@ -57,6 +48,9 @@ export interface TwitterClient {
   }): Promise<TwitterTimelineResponse>;
   userMentionTimeline(): Promise<TwitterTimelineResponse>;
 }
+
+export type TwitterTimelineOptions = Parameters<TwitterClient['userTimeline']>[0];
+
 export interface TwitterMetrics {
   like_count: number;
   retweet_count: number;
