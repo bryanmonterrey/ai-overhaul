@@ -689,28 +689,39 @@ private getEngagementBasedDelay(): number {
 private backoffDelay = 1000; // Start with 1 second
 
 private async shouldReplyToTweet(tweet: any, target: EngagementTargetRow): Promise<boolean> {
+    console.log('Evaluating tweet for reply:', {
+        tweet_author_id: tweet.author_id,
+        our_id: process.env.TWITTER_USER_ID,
+        target_username: target.username,
+        tweet_text: tweet.text?.substring(0, 50) + '...' // First 50 chars for brevity
+    });
+
     // Skip our own tweets
     if (tweet.author_id === process.env.TWITTER_USER_ID) {
-        console.log('Skipping own tweet');
+        console.log('Skipping own tweet - IDs match:', {
+            tweet_author_id: tweet.author_id,
+            our_id: process.env.TWITTER_USER_ID
+        });
         return false;
     }
 
     // If it's a tweet from a target user OR the tweet mentions us
     const isMentioningUs = tweet.text?.toLowerCase().includes(`@${process.env.TWITTER_USERNAME?.toLowerCase()}`);
     
-    // Log the decision making process
+    // Log the decision making process with more detail
     const probability = target.reply_probability || 0.5;
     const random = Math.random();
     const shouldReply = random < probability;
     
-    console.log('Reply decision:', {
+    console.log('Reply decision details:', {
         targetUsername: target.username,
-        tweetText: tweet.text,
-        authorId: tweet.author_id,
+        tweet_author_id: tweet.author_id,
+        our_id: process.env.TWITTER_USER_ID,
         isMentioningUs,
         probability,
         randomValue: random,
-        willReply: shouldReply
+        willReply: shouldReply,
+        tweet_text: tweet.text?.substring(0, 50) + '...' // First 50 chars for brevity
     });
     
     return shouldReply;
