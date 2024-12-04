@@ -115,23 +115,23 @@ private async checkRateLimit(endpoint: string): Promise<void> {
   const rateLimit = this.endpointRateLimits.get(endpoint);
   if (!rateLimit) return;
 
-  // For tweet posting endpoint, special daily limit handling
   if (endpoint === '/2/tweets') {
-      // Only pause if we've definitely hit our limit
+      // For tweets, only pause if completely out of requests
       if (rateLimit.remaining === 0) {
           const now = Date.now();
           if (rateLimit.reset > now) {
-              console.log('Tweet daily limit stats:', {
+              console.log(`Tweet rate limit stats for ${endpoint}:`, {
                   remaining: rateLimit.remaining,
-                  resetTime: new Date(rateLimit.reset).toISOString(),
-                  waitTime: Math.round((rateLimit.reset - now) / 1000) + ' seconds'
+                  limit: rateLimit.limit,
+                  resetTime: new Date(rateLimit.reset).toISOString()
               });
+              // Only wait until reset if we're actually out of tweets
               await new Promise(resolve => setTimeout(resolve, rateLimit.reset - now));
           }
       }
   } else {
-      // For other endpoints, keep existing 15-min window logic
-      if (rateLimit.remaining <= 1) {
+      // For other endpoints, use a more conservative approach
+      if (rateLimit.remaining === 0) { // Changed from <= 1 to === 0
           const now = Date.now();
           if (rateLimit.reset > now) {
               const window = RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000;
