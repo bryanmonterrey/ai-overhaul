@@ -44,6 +44,26 @@ export interface EngagementRules {
 export type Database = BaseDatabase & {
   public: {
     Tables: {
+      replied_tweets: {
+        Row: {
+            tweet_id: string;
+            target_id: string;
+            replied_at: string;
+            reply_tweet_id: string;
+        };
+        Insert: {
+            tweet_id: string;
+            target_id: string;
+            replied_at?: string;
+            reply_tweet_id: string;
+        };
+        Update: {
+            tweet_id?: string;
+            target_id?: string;
+            replied_at?: string;
+            reply_tweet_id?: string;
+        };
+    };
       engagement_targets: {
         Row: EngagementTargetRow
         Insert: Omit<EngagementTargetRow, 'id' | 'created_at'>

@@ -142,15 +142,3 @@ export interface RepliedTweet {
   reply_tweet_id: string;
 }
 
-export interface Database {
-  public: {
-      Tables: {
-          replied_tweets: {
-              Row: RepliedTweet;
-              Insert: Omit<RepliedTweet, 'replied_at'> & { replied_at?: string };
-              Update: Partial<RepliedTweet>;
-          };
-          // Add other tables as needed
-      };
-  };
-}

@@ -1,6 +1,6 @@
 import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkError, TwitterDataError } from './twitter-errors';
-import type { RepliedTweet, TwitterClient, TwitterData, TwitterTimelineOptions, TwitterUser } from './types';
-import type { Database } from './types';
+import type { RepliedTweet, TwitterResponse, TwitterClient, TwitterData, TwitterTimelineOptions, TwitterUser } from './types';
+import type { Database } from '@/app/types/supabase';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { Context, TweetStyle } from '../personality/types';
@@ -765,9 +765,10 @@ private getEngagementBasedDelay(): number {
         
                 const shouldReply = await this.shouldReplyToTweet(tweet, target);
                 if (shouldReply) {
+                    const shouldReply = await this.shouldReplyToTweet(tweet, target);
+                if (shouldReply) {
                     const replyTweet = await this.generateAndSendReply(tweet, target);
-                    if (replyTweet && replyTweet.id) {  // Type-safe check for replyTweet
-                        // Track the reply
+                    if (replyTweet) { // Now TypeScript knows replyTweet is TwitterData | null
                         await this.trackReply(tweet.id, target.twitter_id, replyTweet.id);
                     }
                     // Add delay between replies
@@ -1073,14 +1074,16 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
             });
 
             this.monitoringStats.repliesSent++;
-            return result.data;  // Return the tweet data
-        } else {
-            console.log('Failed to generate valid reply after maximum attempts');
-            return null;
+            return result.data;  // Return the TwitterData
         }
+
+        console.log('Failed to generate valid reply after maximum attempts');
+        return null;
+
     } catch (error) {
         console.error('Error in generateAndSendReply:', error);
-        throw error;
+        // Instead of throwing, return null for error cases
+        return null;
     }
 }
 
