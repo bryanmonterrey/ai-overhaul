@@ -1,5 +1,6 @@
 import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkError, TwitterDataError } from './twitter-errors';
 import type { RepliedTweet, TwitterClient, TwitterData, TwitterTimelineOptions, TwitterUser } from './types';
+import type { Database } from './types';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { Context, TweetStyle } from '../personality/types';
@@ -30,7 +31,7 @@ interface ExtendedTweetData extends TwitterData {
 
 export class TwitterManager {
 private client: TwitterClient;
-  private supabase: SupabaseClient;
+  private supabase: SupabaseClient<Database>;
   private queuedTweets: QueuedTweet[] = [];
   private isAutoMode: boolean = false;
   private nextTweetTimeout?: NodeJS.Timeout;
@@ -807,7 +808,7 @@ private backoffDelay = 1000; // Start with 1 second
 
 private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
     const { data, error } = await this.supabase
-        .from<RepliedTweet>('replied_tweets')
+        .from('replied_tweets')
         .select('tweet_id')
         .eq('tweet_id', tweetId)
         .single();
@@ -822,7 +823,7 @@ private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
 
 private async trackReply(originalTweetId: string, targetId: string, replyTweetId: string): Promise<void> {
     const { error } = await this.supabase
-        .from<RepliedTweet>('replied_tweets')
+        .from('replied_tweets')
         .insert({
             tweet_id: originalTweetId,
             target_id: targetId,
