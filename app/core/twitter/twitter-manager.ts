@@ -684,6 +684,13 @@ private getEngagementBasedDelay(): number {
         // Transform tweets to include author username
         const extendedTweets: ExtendedTweetData[] = timeline.map(tweet => {
             const author = tweet.author_id ? userMap.get(tweet.author_id) : undefined;
+            console.log('Tweet author mapping:', {
+                tweet_id: tweet.id,
+                author_id: tweet.author_id,
+                found_author: !!author,
+                author_username: author?.username,
+                target_id: target.twitter_id
+            });
             return {
                 ...tweet,
                 author_username: author?.username || undefined
@@ -778,32 +785,20 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
         tweet_author_id: tweet.author_id,
         tweet_author_username: tweet.author_username,
         target_username: target.username,
+        target_id: target.twitter_id, // Add this for better debugging
         our_id: process.env.TWITTER_USER_ID,
         text: tweet.text?.substring(0, 50)
     });
 
     // Double check that this isn't our own tweet
-    const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
-    if (isOurTweet) {
-        console.log('Skipping our own tweet:', {
-            tweet_id: tweet.id,
-            author_id: tweet.author_id,
-            our_id: process.env.TWITTER_USER_ID
-        });
+    if (tweet.author_id === process.env.TWITTER_USER_ID) {
+        console.log('Skipping our own tweet');
         return false;
     }
 
-    // Check if this is a target's tweet
-    const isTargetTweet = tweet.author_username?.toLowerCase() === target.username.toLowerCase();
-    if (!isTargetTweet) {
-        console.log('Skipping non-target tweet:', {
-            tweet_id: tweet.id,
-            author: tweet.author_username,
-            target: target.username
-        });
-        return false;
-    }
-
+    // Check if this is a target's tweet using ID instead of username
+    const isTargetTweet = tweet.author_id === target.twitter_id;
+    
     if (isTargetTweet) {
         const probability = target.reply_probability || 0.5;
         const random = Math.random();
@@ -811,7 +806,7 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
         
         console.log('Target tweet found - Reply decision:', {
             target_username: target.username,
-            author_username: tweet.author_username,
+            target_id: target.twitter_id,
             probability,
             random,
             shouldReply
@@ -822,7 +817,8 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
 
     console.log('Skipping non-target tweet:', {
         target: target.username,
-        author: tweet.author_username
+        target_id: target.twitter_id,
+        author_id: tweet.author_id
     });
     return false;
 }
