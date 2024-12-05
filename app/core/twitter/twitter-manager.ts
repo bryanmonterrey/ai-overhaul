@@ -1,5 +1,5 @@
 import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkError, TwitterDataError } from './twitter-errors';
-import type { TwitterClient, TwitterData, TwitterTimelineOptions } from './types';
+import type { TwitterClient, TwitterData, TwitterTimelineOptions, TwitterUser } from './types';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { Context, TweetStyle } from '../personality/types';
@@ -41,14 +41,14 @@ private client: TwitterClient;
   private trainingService: any;
   private is24HourMode = false;
   private monitoringInterval?: NodeJS.Timeout;
-private lastTweetTime: Date | null = null;
-private isMonitoring: boolean = false;
-    private lastMonitoringCheck: Date | null = null;
-    private monitoringStats = {
-        targetsChecked: 0,
-        repliesSent: 0,
-        lastError: null as Error | null
-    };
+  private lastTweetTime: Date | null = null;
+  private isMonitoring: boolean = false;
+  private lastMonitoringCheck: Date | null = null;
+  private monitoringStats = {
+      targetsChecked: 0,
+      repliesSent: 0,
+      lastError: null as Error | null
+  };
   
 
   constructor(
@@ -61,6 +61,16 @@ private isMonitoring: boolean = false;
     this.supabase = supabase;
     this.stats = new TweetStats();
     this.trainingService = trainingService;
+}
+
+private async getUserIdByUsername(username: string): Promise<string | null> {
+    try {
+        const response = await this.client.v2.userByUsername(username);
+        return response.data.id;
+    } catch (error) {
+        console.error(`Error getting user ID for ${username}:`, error);
+        return null;
+    }
 }
 
   // Your existing methods
@@ -641,95 +651,191 @@ private getEngagementBasedDelay(): number {
   // Engagement-related methods
   async monitorTargetTweets(target: EngagementTargetRow): Promise<void> {
     try {
-        console.log(`Monitoring tweets for ${target.username}`);
+        console.log(`Starting to monitor ${target.username}'s timeline`);
+        
+        // First get the user's ID
+        const userId = await this.getUserIdByUsername(target.username);
+        if (!userId) {
+            console.error(`Could not find user ID for ${target.username}`);
+            return;
+        }
+
+        console.log(`Found user ID for ${target.username}:`, userId);
         
         const timelineResponse = await this.client.userTimeline({
-            user_id: target.username, 
+            user_id: userId,
             max_results: 5,
-            exclude: ['retweets'],
-            'tweet.fields': ['created_at', 'public_metrics', 'author_id', 'in_reply_to_user_id'],
-            'user.fields': ['username', 'name'],
-            expansions: ['author_id']
+            'tweet.fields': [
+                'created_at',
+                'public_metrics',
+                'author_id',
+                'in_reply_to_user_id',
+                'referenced_tweets'
+            ],
+            'user.fields': [
+                'username',
+                'name',
+                'id'
+            ],
+            expansions: [
+                'author_id',
+                'referenced_tweets.id',
+                'in_reply_to_user_id'
+            ]
         } satisfies TwitterTimelineOptions);
-        
-        // Get author info from includes
-        const users = timelineResponse.data.includes?.users || [];
-        const userMap = new Map(users.map(user => [user.id, user]));
+
+        // Get author info from includes with proper typing
+        const users: TwitterUser[] = timelineResponse.data.includes?.users || [];
+        const userMap = new Map<string, TwitterUser>(users.map(user => [user.id, user]));
         
         const timeline = timelineResponse.data.data || [];
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
         const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
- 
-        // Transform tweets to include author username
-        const extendedTweets: ExtendedTweetData[] = timeline.map(tweet => ({
-            ...tweet,
-            author_username: tweet.author_id ? userMap.get(tweet.author_id)?.username : undefined
-        }));
 
-        console.log(`Raw timeline data:`, {
+        console.log('Timeline processing details:', {
             target: target.username,
+            tweets_found: timeline.length,
+            users_found: users.length,
+            last_check: lastCheck.toISOString(),
+            hour_ago: hourAgo.toISOString()
+        });
+
+        // Transform tweets to include author username
+        const extendedTweets: ExtendedTweetData[] = timeline.map(tweet => {
+            const author = tweet.author_id ? userMap.get(tweet.author_id) : undefined;
+            return {
+                ...tweet,
+                author_username: author?.username || undefined
+            };
+        });
+
+        // Log the raw data for debugging
+        console.log(`Raw timeline data for ${target.username}:`, {
             tweets: extendedTweets.map(t => ({
                 id: t.id,
                 author_id: t.author_id,
                 author_username: t.author_username,
-                text: t.text?.substring(0, 50)
+                text: t.text?.substring(0, 50),
+                our_id: process.env.TWITTER_USER_ID
             }))
         });
 
         // Sort tweets by creation date, newest first
         const sortedTweets = extendedTweets
-            .filter(tweet => tweet.author_id !== process.env.TWITTER_USER_ID)
+            .filter(tweet => {
+                const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
+                console.log(`Tweet filter check:`, {
+                    tweet_id: tweet.id,
+                    author_id: tweet.author_id,
+                    our_id: process.env.TWITTER_USER_ID,
+                    is_our_tweet: isOurTweet
+                });
+                return !isOurTweet; // Filter out our own tweets
+            })
             .sort((a, b) => {
                 return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
             });
+
+        console.log(`Found ${sortedTweets.length} valid tweets from ${target.username} after filtering`);
 
         for (const tweet of sortedTweets) {
             const tweetDate = new Date(tweet.created_at || '');
             
             if (tweetDate > lastCheck && tweetDate > hourAgo) {
-                console.log(`Processing tweet:`, {
+                console.log(`Processing tweet from ${target.username}:`, {
                     id: tweet.id,
                     author_id: tweet.author_id,
                     author_username: tweet.author_username,
-                    text: tweet.text,
+                    text: tweet.text?.substring(0, 50),
                     date: tweetDate.toISOString()
                 });
 
-                if (await this.shouldReplyToTweet(tweet as ExtendedTweetData, target)) {
+                const shouldReply = await this.shouldReplyToTweet(tweet, target);
+                if (shouldReply) {
                     await this.generateAndSendReply(tweet, target);
+                    // Add delay between replies
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 }
+            } else {
+                console.log('Skipping tweet - outside time window:', {
+                    tweet_id: tweet.id,
+                    tweet_date: tweetDate.toISOString(),
+                    last_check: lastCheck.toISOString(),
+                    hour_ago: hourAgo.toISOString()
+                });
             }
         }
+
+        // Update last interaction time for this target
+        if (sortedTweets.length > 0) {
+            const { error } = await this.supabase
+                .from('last_interaction')
+                .upsert({
+                    id: 1,
+                    timestamp: new Date().toISOString()
+                });
+
+            if (error) {
+                console.error('Error updating last interaction time:', error);
+            }
+        }
+
     } catch (error) {
-        console.error(`Error monitoring tweets for ${target.username}:`, error);
+        console.error(`Error monitoring tweets for ${target.username}:`, {
+            error,
+            message: error instanceof Error ? error.message : 'Unknown error',
+            target: target.username
+        });
     }
 }
 
 private backoffDelay = 1000; // Start with 1 second
 
 private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTargetRow): Promise<boolean> {
-    // Skip our own tweets
+    console.log('Tweet evaluation details:', {
+        tweet_id: tweet.id,
+        tweet_author_id: tweet.author_id,
+        tweet_author_username: tweet.author_username,
+        target_username: target.username,
+        our_id: process.env.TWITTER_USER_ID,
+        text: tweet.text?.substring(0, 50)
+    });
+
+    // Double check that this isn't our own tweet
     if (tweet.author_id === process.env.TWITTER_USER_ID) {
-        console.log('Skipping own tweet');
+        console.log('Skipping our own tweet:', {
+            tweet_id: tweet.id,
+            author_id: tweet.author_id,
+            our_id: process.env.TWITTER_USER_ID
+        });
         return false;
     }
 
-    // Apply probability check
-    const probability = target.reply_probability || 0.5;
-    const random = Math.random();
-    const shouldReply = random < probability;
-    
-    console.log('Reply decision:', {
-        tweet_id: tweet.id,
-        probability,
-        random,
-        shouldReply
-    });
-    
-    return shouldReply;
-}
+    // Check if this is a target's tweet
+    const isTargetTweet = tweet.author_username?.toLowerCase() === target.username.toLowerCase();
 
+    if (isTargetTweet) {
+        const probability = target.reply_probability || 0.5;
+        const random = Math.random();
+        const shouldReply = random < probability;
+        
+        console.log('Target tweet found - Reply decision:', {
+            target_username: target.username,
+            author_username: tweet.author_username,
+            probability,
+            random,
+            shouldReply
+        });
+        
+        return shouldReply;
+    }
+
+    console.log('Skipping non-target tweet:', {
+        target: target.username,
+        author: tweet.author_username
+    });
+    return false;
+}
 private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
     try {
         const { emotionalState } = this.personality.getCurrentState().consciousness;

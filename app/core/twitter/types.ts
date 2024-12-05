@@ -11,6 +11,11 @@ export interface TweetStyle {
     formality?: 'casual' | 'formal';
 }
 
+export interface TwitterTimelineIncludes {
+  users?: TwitterUser[];
+  tweets?: TwitterData[];
+}
+
 export interface ContextData {
   platform: 'twitter';
   environmentalFactors: {
@@ -47,6 +52,7 @@ export interface TwitterClient {
       expansions?: string[];
   }): Promise<TwitterTimelineResponse>;
   userMentionTimeline(): Promise<TwitterTimelineResponse>;
+  v2: TwitterClientV2Methods;
 }
 
 export type TwitterTimelineOptions = Parameters<TwitterClient['userTimeline']>[0];
@@ -79,7 +85,8 @@ export interface TwitterManager {
 
 export interface TwitterTimelineResponse {
   data: {
-    data: TwitterData[];
+      data: TwitterData[];
+      includes?: TwitterTimelineIncludes;
   };
 }
 
@@ -87,6 +94,12 @@ export interface TweetStats {
   getStats(): any;
   reset(): void;
   increment(status: string): void;
+}
+
+export interface TwitterUser {
+  id: string;
+  username: string;
+  name: string;
 }
 
 export interface LastInteraction {
@@ -97,15 +110,17 @@ export interface TweetV2 extends TwitterData {
   edit_history_tweet_ids?: string[];
 }
 
-export interface TwitterClientV2 extends TwitterClient {
-  v2: {
-    tweet: (content: string | { text: string, reply?: { in_reply_to_tweet_id: string } }) => Promise<{ data: TweetV2 }>;
-    userTimeline: (userId: string, options?: any) => Promise<{ data: { data: TweetV2[] } }>;
-    userMentionTimeline: (userId: string, options?: any) => Promise<{ data: { data: TweetV2[] } }>;
-    me: () => Promise<{ data: { id: string } }>;
-  };
+export interface TwitterClientV2Methods {
+  tweet: (content: string | { text: string, reply?: { in_reply_to_tweet_id: string } }) => Promise<{ data: TweetV2 }>;
+  userTimeline: (userId: string, options?: any) => Promise<{ data: { data: TweetV2[] } }>;
+  userMentionTimeline: (userId: string, options?: any) => Promise<{ data: { data: TweetV2[] } }>;
+  me: () => Promise<{ data: { id: string } }>;
+  userByUsername: (username: string) => Promise<{ data: { id: string; username: string; name: string; } }>;
 }
 
+export interface TwitterClientV2 extends TwitterClient {
+  v2: TwitterClientV2Methods;
+}
 // Add interface for the third parameter in processInput
 export interface PersonalitySystem {
   processInput(
