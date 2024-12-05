@@ -679,12 +679,15 @@ private getEngagementBasedDelay(): number {
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
         const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
+        const effectiveCheckTime = lastCheck.getTime() > hourAgo.getTime() ? lastCheck : hourAgo;
+
         console.log('Timeline processing details:', {
             target: target.username,
             tweets_found: timeline.length,
             users_found: users.length,
             last_check: lastCheck.toISOString(),
-            hour_ago: hourAgo.toISOString()
+            hour_ago: hourAgo.toISOString(),
+            effective_check_time: effectiveCheckTime.toISOString()
         });
 
         // Transform tweets to include author username
@@ -716,31 +719,32 @@ private getEngagementBasedDelay(): number {
 
         // Sort tweets by creation date, newest first
         const sortedTweets = timeline
-    .filter(tweet => {
-        const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
-        const isTargetTweet = tweet.author_id === target.twitter_id;
-        
-        console.log('Tweet filter check:', {
-            tweet_id: tweet.id,
-            author_id: tweet.author_id,
-            target_id: target.twitter_id,
-            our_id: process.env.TWITTER_USER_ID,
-            is_our_tweet: isOurTweet,
-            is_target_tweet: isTargetTweet
-        });
-        
-        return !isOurTweet && isTargetTweet;
-    })
-    .sort((a, b) => {
-        return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
-    });
+            .filter(tweet => {
+                const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
+                const isTargetTweet = tweet.author_id === target.twitter_id;
+                
+                console.log('Tweet filter check:', {
+                    tweet_id: tweet.id,
+                    author_id: tweet.author_id,
+                    target_id: target.twitter_id,
+                    our_id: process.env.TWITTER_USER_ID,
+                    is_our_tweet: isOurTweet,
+                    is_target_tweet: isTargetTweet
+                });
+                
+                return !isOurTweet && isTargetTweet;
+            })
+            .sort((a, b) => {
+                return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
+            });
 
         console.log(`Found ${sortedTweets.length} valid tweets from ${target.username} after filtering`);
 
         for (const tweet of sortedTweets) {
             const tweetDate = new Date(tweet.created_at || '');
             
-            if (tweetDate > lastCheck && tweetDate > hourAgo) {
+            // Changed condition to use effectiveCheckTime
+            if (tweetDate > effectiveCheckTime) {
                 console.log(`Processing tweet from ${target.username}:`, {
                     id: tweet.id,
                     author_id: tweet.author_id,
@@ -759,8 +763,7 @@ private getEngagementBasedDelay(): number {
                 console.log('Skipping tweet - outside time window:', {
                     tweet_id: tweet.id,
                     tweet_date: tweetDate.toISOString(),
-                    last_check: lastCheck.toISOString(),
-                    hour_ago: hourAgo.toISOString()
+                    effective_check_time: effectiveCheckTime.toISOString()
                 });
             }
         }
@@ -768,17 +771,16 @@ private getEngagementBasedDelay(): number {
         // Update last interaction time for this target
         if (sortedTweets.length > 0) {
             const { error } = await this.supabase
-                .from('last_interaction')
-                .upsert({
-                    id: 1,
-                    timestamp: new Date().toISOString()
-                });
+                .from('engagement_targets')  // Changed from last_interaction to engagement_targets
+                .update({
+                    last_interaction: new Date().toISOString()
+                })
+                .eq('twitter_id', target.twitter_id);  // Update specific target
 
             if (error) {
                 console.error('Error updating last interaction time:', error);
             }
         }
-
     } catch (error) {
         console.error(`Error monitoring tweets for ${target.username}:`, {
             error,
