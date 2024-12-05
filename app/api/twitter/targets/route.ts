@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     const target = {
       username: body.username,
       topics: body.topics,
+      twitter_id: body.twitter_id,
       reply_probability: body.replyProbability,
       relationship_level: 'new' as const,
       preferred_style: body.preferredStyle,
