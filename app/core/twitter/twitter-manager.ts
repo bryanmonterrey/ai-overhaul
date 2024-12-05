@@ -709,46 +709,25 @@ private getEngagementBasedDelay(): number {
 private backoffDelay = 1000; // Start with 1 second
 
 private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTargetRow): Promise<boolean> {
-    console.log('Tweet evaluation details:', {
-        tweet_id: tweet.id,
-        tweet_author_id: tweet.author_id,
-        tweet_author_username: tweet.author_username,
-        target_username: target.username,
-        our_id: process.env.TWITTER_USER_ID
-    });
-
     // Skip our own tweets
     if (tweet.author_id === process.env.TWITTER_USER_ID) {
         console.log('Skipping own tweet');
         return false;
     }
 
-    // Check if tweet author matches target
-    if (tweet.author_username?.toLowerCase() === target.username.toLowerCase()) {
-        console.log('Found tweet from target:', {
-            target: target.username,
-            author: tweet.author_username
-        });
-        
-        // Apply probability
-        const probability = target.reply_probability || 0.5;
-        const random = Math.random();
-        const shouldReply = random < probability;
-        
-        console.log('Reply decision:', {
-            probability,
-            random,
-            shouldReply
-        });
-        
-        return shouldReply;
-    }
-
-    console.log('Skipping non-target tweet:', {
-        target: target.username,
-        author: tweet.author_username
+    // Apply probability check
+    const probability = target.reply_probability || 0.5;
+    const random = Math.random();
+    const shouldReply = random < probability;
+    
+    console.log('Reply decision:', {
+        tweet_id: tweet.id,
+        probability,
+        random,
+        shouldReply
     });
-    return false;
+    
+    return shouldReply;
 }
 
 private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
