@@ -1062,6 +1062,22 @@ private async handleMention(mention: {
 }): Promise<void> {
     try {
 
+        // Get all targets first to check if mention is from a target
+        const { data: targets } = await this.supabase
+            .from('engagement_targets')
+            .select('*');
+
+        // Check if mention is from one of our targets
+        const isFromTarget = targets?.some(target => target.twitter_id === mention.author_id);
+        
+        // Log the check
+        console.log('Mention check:', {
+            mention_id: mention.id,
+            author_id: mention.author_id,
+            is_from_target: isFromTarget,
+            our_id: process.env.TWITTER_USER_ID
+        });
+
         if (mention.author_id === process.env.TWITTER_USER_ID) {
             console.log('Skipping own mention');
             return;
@@ -1292,11 +1308,19 @@ private async handleReply(tweet: {
 }): Promise<void> {
     try {
 
-        console.log('Checking reply:', {
+        const { data: targets } = await this.supabase
+            .from('engagement_targets')
+            .select('*');
+
+        // Check if reply is from one of our targets
+        const fromTarget = targets?.find(target => target.twitter_id === tweet.author_id);
+        
+        // Log the check
+        console.log('Reply check:', {
             tweet_id: tweet.id,
             author_id: tweet.author_id,
-            our_id: process.env.TWITTER_USER_ID,
-            text: tweet.text?.substring(0, 50)
+            from_target: fromTarget?.username || null,
+            our_id: process.env.TWITTER_USER_ID
         });
 
         const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
@@ -1306,6 +1330,20 @@ private async handleReply(tweet: {
                 author_id: tweet.author_id
             });
             return;
+        }
+
+        if (fromTarget) {
+            console.log(`Reply from target ${fromTarget.username} detected`);
+            const probability = fromTarget.reply_probability || 0.5;
+            const random = Math.random();
+            
+            if (random > probability) {
+                console.log('Skipping reply based on probability:', {
+                    probability,
+                    random
+                });
+                return;
+            }
         }
 
         const lastCheck = await this.getLastInteractionTime();
