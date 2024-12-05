@@ -765,10 +765,8 @@ private getEngagementBasedDelay(): number {
         
                 const shouldReply = await this.shouldReplyToTweet(tweet, target);
                 if (shouldReply) {
-                    const shouldReply = await this.shouldReplyToTweet(tweet, target);
-                if (shouldReply) {
                     const replyTweet = await this.generateAndSendReply(tweet, target);
-                    if (replyTweet) { // Now TypeScript knows replyTweet is TwitterData | null
+                    if (replyTweet && replyTweet.id) {  // Now TypeScript knows replyTweet can be TwitterData | null
                         await this.trackReply(tweet.id, target.twitter_id, replyTweet.id);
                     }
                     // Add delay between replies
@@ -879,7 +877,7 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
     return false;
 }
 
-private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
+private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<TwitterData | null> {
     try {
         const { emotionalState } = this.personality.getCurrentState().consciousness;
         const traits = this.personality.getTraits();
