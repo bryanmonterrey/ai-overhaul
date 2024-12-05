@@ -63,30 +63,6 @@ private client: TwitterClient;
     this.trainingService = trainingService;
 }
 
-private async getUserIdByUsername(username: string): Promise<string | null> {
-    try {
-        // First try to get the user ID from username
-        const response = await this.client.userTimeline({
-            user_id: username,
-            max_results: 1,
-            'user.fields': ['id', 'username']
-        });
-        
-        // Get the user ID from the response
-        const userId = response.data.includes?.users?.[0]?.id;
-        
-        if (!userId) {
-            console.log('Could not find user ID for username:', username);
-            return null;
-        }
-        
-        return userId;
-    } catch (error) {
-        console.error(`Error getting user ID for ${username}:`, error);
-        return null;
-    }
-}
-
   // Your existing methods
   async postTweet(content: string): Promise<TwitterData> {
     try {
@@ -667,17 +643,8 @@ private getEngagementBasedDelay(): number {
     try {
         console.log(`Starting to monitor ${target.username}'s timeline`);
         
-        // First get the user's ID
-        const userId = await this.getUserIdByUsername(target.username);
-        if (!userId) {
-            console.error(`Could not find user ID for ${target.username}`);
-            return;
-        }
-
-        console.log(`Found user ID for ${target.username}:`, userId);
-        
         const timelineResponse = await this.client.userTimeline({
-            user_id: userId,
+            user_id: target.twitter_id,
             max_results: 5,
             'tweet.fields': [
                 'created_at',
