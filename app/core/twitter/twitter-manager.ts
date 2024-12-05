@@ -677,10 +677,12 @@ private getEngagementBasedDelay(): number {
         const userMap = new Map<string, TwitterUser>(users.map(user => [user.id, user]));
         
         const timeline = timelineResponse.data.data || [];
-        const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
-        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const now = new Date();
+        const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const lastCheck = target.last_interaction ? new Date(target.last_interaction) : hourAgo;
+        
 
-        const effectiveCheckTime = lastCheck.getTime() > hourAgo.getTime() ? lastCheck : hourAgo;
+        const effectiveCheckTime = hourAgo;
 
         console.log('Timeline processing details:', {
             target: target.username,
@@ -810,7 +812,7 @@ private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
         .from('replied_tweets')
         .select('tweet_id')
         .eq('tweet_id', tweetId)
-        .single();
+        .maybeSingle();  // Use maybeSingle() instead of single()
         
     if (error) {
         console.error('Error checking replied tweets:', error);
