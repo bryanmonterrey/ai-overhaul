@@ -15,6 +15,7 @@ export default function EngagementTargets() {
   const [error, setError] = useState<string | null>(null);
   const [newTarget, setNewTarget] = useState({
     username: '',
+    twitter_id: '',  // Add this
     topics: '',
     replyProbability: 50,
     preferredStyle: 'casual' as TweetStyle
@@ -47,6 +48,7 @@ export default function EngagementTargets() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: newTarget.username,
+          twitter_id: newTarget.twitter_id, 
           topics: newTarget.topics.split(',').map(t => t.trim()),
           replyProbability: newTarget.replyProbability / 100,
           preferredStyle: newTarget.preferredStyle
@@ -57,6 +59,7 @@ export default function EngagementTargets() {
         await fetchTargets();
         setNewTarget({
           username: '',
+          twitter_id: '',
           topics: '',
           replyProbability: 50,
           preferredStyle: 'casual'
@@ -88,6 +91,12 @@ export default function EngagementTargets() {
             value={newTarget.username}
             className='bg-[#11111A] text-white'
             onChange={(e) => setNewTarget(prev => ({ ...prev, username: e.target.value }))}
+          />
+          <Input
+    placeholder="TWITTER_ID"
+    value={newTarget.twitter_id}
+    className='bg-[#11111A] text-white'
+            onChange={(e) => setNewTarget(prev => ({ ...prev, twitter_id: e.target.value }))}
           />
           <Input
             placeholder="TOPICS [COMMA_SEPARATED]"
@@ -137,6 +146,7 @@ export default function EngagementTargets() {
             <div key={target.id} className="flex items-center justify-between p-2 border border-white font-mono text-xs">
               <div>
                 <div>@{target.username}</div>
+                <div className="opacity-70">ID: {target.twitter_id}</div>
                 <div className="opacity-70">
                   TOPICS: {target.topics.join(', ')}
                 </div>

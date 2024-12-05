@@ -6,6 +6,7 @@ import { supabase } from '@/types/supabase';
 export interface EngagementTargetRow {
   id: string;
   username: string;
+  twitter_id: string;
   topics: string[];
   reply_probability: number;
   last_interaction: string | null;
