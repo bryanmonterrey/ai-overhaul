@@ -659,7 +659,7 @@ private getEngagementBasedDelay(): number {
         const timeline = timelineResponse.data.data || [];
         const lastCheck = target.last_interaction ? new Date(target.last_interaction) : new Date(0);
         const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
-
+ 
         // Transform tweets to include author username
         const extendedTweets: ExtendedTweetData[] = timeline.map(tweet => ({
             ...tweet,
