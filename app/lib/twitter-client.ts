@@ -381,9 +381,20 @@ private async getUserIdByUsername(username: string): Promise<string> {
 
         const timelineParams = {
             max_results: options?.max_results || 10,
-            "tweet.fields": ["created_at", "public_metrics", "author_id", "conversation_id"],
-            "user.fields": ["username", "name"],
-            "expansions": ["author_id"] as TTweetv2Expansion[]
+            "tweet.fields": [
+                "created_at",
+                "public_metrics",
+                "author_id",
+                "conversation_id",
+                "in_reply_to_user_id",
+                "referenced_tweets"
+            ],
+            "user.fields": ["username", "name", "id"],
+            "expansions": [
+                "author_id",
+                "referenced_tweets.id",
+                "in_reply_to_user_id"
+            ] as TTweetv2Expansion[]
         };
 
         const timeline = await this.client.v2.userTimeline(userId, timelineParams);
@@ -395,12 +406,14 @@ private async getUserIdByUsername(username: string): Promise<string> {
                     id: tweet.id,
                     text: tweet.text,
                     created_at: tweet.created_at,
+                    author_id: tweet.author_id, // Add this
                     public_metrics: {
                         like_count: tweet.public_metrics?.like_count || 0,
                         retweet_count: tweet.public_metrics?.retweet_count || 0,
                         reply_count: tweet.public_metrics?.reply_count || 0
                     }
-                }))
+                })),
+                includes: timeline.data.includes // Add this to pass through user data
             }
         };
     } catch (error: any) {

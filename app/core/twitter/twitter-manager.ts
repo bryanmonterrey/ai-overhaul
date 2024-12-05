@@ -715,20 +715,25 @@ private getEngagementBasedDelay(): number {
         });
 
         // Sort tweets by creation date, newest first
-        const sortedTweets = extendedTweets
-            .filter(tweet => {
-                const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
-                console.log(`Tweet filter check:`, {
-                    tweet_id: tweet.id,
-                    author_id: tweet.author_id,
-                    our_id: process.env.TWITTER_USER_ID,
-                    is_our_tweet: isOurTweet
-                });
-                return !isOurTweet; // Filter out our own tweets
-            })
-            .sort((a, b) => {
-                return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
-            });
+        const sortedTweets = timeline
+    .filter(tweet => {
+        const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
+        const isTargetTweet = tweet.author_id === target.twitter_id;
+        
+        console.log('Tweet filter check:', {
+            tweet_id: tweet.id,
+            author_id: tweet.author_id,
+            target_id: target.twitter_id,
+            our_id: process.env.TWITTER_USER_ID,
+            is_our_tweet: isOurTweet,
+            is_target_tweet: isTargetTweet
+        });
+        
+        return !isOurTweet && isTargetTweet;
+    })
+    .sort((a, b) => {
+        return new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime();
+    });
 
         console.log(`Found ${sortedTweets.length} valid tweets from ${target.username} after filtering`);
 
