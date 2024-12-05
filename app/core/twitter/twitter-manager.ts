@@ -65,8 +65,22 @@ private client: TwitterClient;
 
 private async getUserIdByUsername(username: string): Promise<string | null> {
     try {
-        const response = await this.client.v2.userByUsername(username);
-        return response.data.id;
+        // First try to get the user ID from username
+        const response = await this.client.userTimeline({
+            user_id: username,
+            max_results: 1,
+            'user.fields': ['id', 'username']
+        });
+        
+        // Get the user ID from the response
+        const userId = response.data.includes?.users?.[0]?.id;
+        
+        if (!userId) {
+            console.log('Could not find user ID for username:', username);
+            return null;
+        }
+        
+        return userId;
     } catch (error) {
         console.error(`Error getting user ID for ${username}:`, error);
         return null;
@@ -802,7 +816,8 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
     });
 
     // Double check that this isn't our own tweet
-    if (tweet.author_id === process.env.TWITTER_USER_ID) {
+    const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
+    if (isOurTweet) {
         console.log('Skipping our own tweet:', {
             tweet_id: tweet.id,
             author_id: tweet.author_id,
@@ -813,6 +828,14 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
 
     // Check if this is a target's tweet
     const isTargetTweet = tweet.author_username?.toLowerCase() === target.username.toLowerCase();
+    if (!isTargetTweet) {
+        console.log('Skipping non-target tweet:', {
+            tweet_id: tweet.id,
+            author: tweet.author_username,
+            target: target.username
+        });
+        return false;
+    }
 
     if (isTargetTweet) {
         const probability = target.reply_probability || 0.5;
@@ -836,6 +859,7 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
     });
     return false;
 }
+
 private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<void> {
     try {
         const { emotionalState } = this.personality.getCurrentState().consciousness;
@@ -1301,8 +1325,19 @@ private async handleReply(tweet: {
 }): Promise<void> {
     try {
 
-        if (tweet.author_id === process.env.TWITTER_USER_ID) {
-            console.log('Skipping own reply');
+        console.log('Checking reply:', {
+            tweet_id: tweet.id,
+            author_id: tweet.author_id,
+            our_id: process.env.TWITTER_USER_ID,
+            text: tweet.text?.substring(0, 50)
+        });
+
+        const isOurTweet = tweet.author_id === process.env.TWITTER_USER_ID;
+        if (isOurTweet) {
+            console.log('Skipping our own reply:', {
+                tweet_id: tweet.id,
+                author_id: tweet.author_id
+            });
             return;
         }
 
@@ -1527,6 +1562,11 @@ public async startMonitoring(): Promise<void> {
 
 private async runMonitoringCycle(): Promise<void> {
     try {
+        console.log('Bot configuration:', {
+            our_user_id: process.env.TWITTER_USER_ID,
+            monitoring_active: this.isMonitoring
+        });
+        
         this.lastMonitoringCheck = new Date();
         console.log('Starting monitoring cycle at:', this.lastMonitoringCheck);
 
