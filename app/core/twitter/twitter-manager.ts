@@ -808,32 +808,59 @@ private getEngagementBasedDelay(): number {
 private backoffDelay = 1000; // Start with 1 second
 
 private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
-    const { data, error } = await this.supabase
-        .from('replied_tweets')
-        .select('tweet_id')
-        .eq('tweet_id', tweetId)
-        .maybeSingle();  // Use maybeSingle() instead of single()
+    try {
+        // Use select count instead of single()
+        const { data, error } = await this.supabase
+            .from('replied_tweets')
+            .select('tweet_id')
+            .eq('tweet_id', tweetId);
+            
+        if (error) {
+            console.error('Error checking replied tweets:', {
+                error,
+                tweet_id: tweetId
+            });
+            return false;
+        }
         
-    if (error) {
-        console.error('Error checking replied tweets:', error);
+        return data.length > 0;
+    } catch (error) {
+        console.error('Error in hasRepliedToTweet:', error);
         return false;
     }
-    
-    return !!data;
 }
 
 private async trackReply(originalTweetId: string, targetId: string, replyTweetId: string): Promise<void> {
-    const { error } = await this.supabase
-        .from('replied_tweets')
-        .insert({
-            tweet_id: originalTweetId,
-            target_id: targetId,
-            reply_tweet_id: replyTweetId,
-            replied_at: new Date().toISOString()
-        });
+    try {
+        const { data: existing } = await this.supabase
+            .from('replied_tweets')
+            .select('tweet_id')
+            .eq('tweet_id', originalTweetId);
 
-    if (error) {
-        console.error('Error tracking reply:', error);
+        if (existing && existing.length > 0) {
+            console.log('Reply already tracked for tweet:', originalTweetId);
+            return;
+        }
+
+        const { error } = await this.supabase
+            .from('replied_tweets')
+            .insert({
+                tweet_id: originalTweetId,
+                target_id: targetId,
+                reply_tweet_id: replyTweetId,
+                replied_at: new Date().toISOString()
+            });
+
+        if (error) {
+            console.error('Error tracking reply:', {
+                error,
+                originalTweetId,
+                targetId,
+                replyTweetId
+            });
+        }
+    } catch (err) {
+        console.error('Exception in trackReply:', err);
     }
 }
 
