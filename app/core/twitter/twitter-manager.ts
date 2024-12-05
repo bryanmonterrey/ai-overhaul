@@ -1,5 +1,5 @@
 import { TwitterError, TwitterRateLimitError, TwitterAuthError, TwitterNetworkError, TwitterDataError } from './twitter-errors';
-import type { TwitterClient, TwitterData, TwitterTimelineOptions, TwitterUser } from './types';
+import type { RepliedTweet, TwitterClient, TwitterData, TwitterTimelineOptions, TwitterUser } from './types';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import { PersonalitySystem } from '../personality/PersonalitySystem';
 import { Context, TweetStyle } from '../personality/types';
@@ -743,7 +743,7 @@ private getEngagementBasedDelay(): number {
         for (const tweet of sortedTweets) {
             const tweetDate = new Date(tweet.created_at || '');
             
-            // Check if already replied first
+            // Check if already replied
             const alreadyReplied = await this.hasRepliedToTweet(tweet.id);
             if (alreadyReplied) {
                 console.log('Skipping previously replied tweet:', {
@@ -765,7 +765,7 @@ private getEngagementBasedDelay(): number {
                 const shouldReply = await this.shouldReplyToTweet(tweet, target);
                 if (shouldReply) {
                     const replyTweet = await this.generateAndSendReply(tweet, target);
-                    if (replyTweet) {
+                    if (replyTweet && replyTweet.id) {  // Type-safe check for replyTweet
                         // Track the reply
                         await this.trackReply(tweet.id, target.twitter_id, replyTweet.id);
                     }
@@ -807,7 +807,7 @@ private backoffDelay = 1000; // Start with 1 second
 
 private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
     const { data, error } = await this.supabase
-        .from('replied_tweets')
+        .from<RepliedTweet>('replied_tweets')
         .select('tweet_id')
         .eq('tweet_id', tweetId)
         .single();
@@ -822,7 +822,7 @@ private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
 
 private async trackReply(originalTweetId: string, targetId: string, replyTweetId: string): Promise<void> {
     const { error } = await this.supabase
-        .from('replied_tweets')
+        .from<RepliedTweet>('replied_tweets')
         .insert({
             tweet_id: originalTweetId,
             target_id: targetId,
@@ -1058,28 +1058,31 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
           }
   
           if (validReply) {
-              console.log('Sending reply:', {
-                  to: target.username,
-                  reply: validReply,
-                  length: validReply.length,
-                  attempts
-              });
-  
-              await this.client.tweet(validReply, {
-                  reply: {
-                      in_reply_to_tweet_id: tweet.id
-                  }
-              });
-  
-              this.monitoringStats.repliesSent++;
-          } else {
-              console.log('Failed to generate valid reply after maximum attempts');
-          }
-      } catch (error) {
-          console.error('Error in generateAndSendReply:', error);
-          throw error;
-      }
-  }
+            console.log('Sending reply:', {
+                to: target.username,
+                reply: validReply,
+                length: validReply.length,
+                attempts
+            });
+
+            const result = await this.client.tweet(validReply, {
+                reply: {
+                    in_reply_to_tweet_id: tweet.id
+                }
+            });
+
+            this.monitoringStats.repliesSent++;
+            return result.data;  // Return the tweet data
+        } else {
+            console.log('Failed to generate valid reply after maximum attempts');
+            return null;
+        }
+    } catch (error) {
+        console.error('Error in generateAndSendReply:', error);
+        throw error;
+    }
+}
+
   
 private async generateReply(context: ReplyContext): Promise<string | null> {
     try {

@@ -76,6 +76,7 @@ export interface TwitterData {
 
 export interface TwitterResponse {
   data: TwitterData;
+  includes?: TwitterTimelineIncludes;
 }
 
 export interface TwitterManager {
@@ -134,7 +135,7 @@ export interface TwitterClientWithV2 extends TwitterClient {
   tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse>;
 }
 
-interface RepliedTweet {
+export interface RepliedTweet {
   tweet_id: string;
   target_id: string;
   replied_at: string;
