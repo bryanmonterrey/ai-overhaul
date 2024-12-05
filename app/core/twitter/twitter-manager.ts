@@ -643,8 +643,14 @@ private getEngagementBasedDelay(): number {
     try {
         console.log(`Starting to monitor ${target.username}'s timeline`);
         
+        // Use twitter_id directly instead of trying to look it up
+        console.log('Request details:', {
+            username: target.username,
+            twitter_id: target.twitter_id
+        });
+
         const timelineResponse = await this.client.userTimeline({
-            user_id: target.twitter_id,
+            user_id: target.twitter_id, // Using the stored twitter_id
             max_results: 5,
             'tweet.fields': [
                 'created_at',
@@ -783,20 +789,18 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
     console.log('Tweet evaluation details:', {
         tweet_id: tweet.id,
         tweet_author_id: tweet.author_id,
-        tweet_author_username: tweet.author_username,
-        target_username: target.username,
-        target_id: target.twitter_id, // Add this for better debugging
+        target_id: target.twitter_id,
         our_id: process.env.TWITTER_USER_ID,
         text: tweet.text?.substring(0, 50)
     });
 
-    // Double check that this isn't our own tweet
+    // Skip our own tweets
     if (tweet.author_id === process.env.TWITTER_USER_ID) {
         console.log('Skipping our own tweet');
         return false;
     }
 
-    // Check if this is a target's tweet using ID instead of username
+    // Match using twitter_id
     const isTargetTweet = tweet.author_id === target.twitter_id;
     
     if (isTargetTweet) {
