@@ -743,7 +743,16 @@ private getEngagementBasedDelay(): number {
         for (const tweet of sortedTweets) {
             const tweetDate = new Date(tweet.created_at || '');
             
-            // Changed condition to use effectiveCheckTime
+            // Check if already replied first
+            const alreadyReplied = await this.hasRepliedToTweet(tweet.id);
+            if (alreadyReplied) {
+                console.log('Skipping previously replied tweet:', {
+                    tweet_id: tweet.id,
+                    target: target.username
+                });
+                continue;
+            }
+            
             if (tweetDate > effectiveCheckTime) {
                 console.log(`Processing tweet from ${target.username}:`, {
                     id: tweet.id,
@@ -752,10 +761,14 @@ private getEngagementBasedDelay(): number {
                     text: tweet.text?.substring(0, 50),
                     date: tweetDate.toISOString()
                 });
-
+        
                 const shouldReply = await this.shouldReplyToTweet(tweet, target);
                 if (shouldReply) {
-                    await this.generateAndSendReply(tweet, target);
+                    const replyTweet = await this.generateAndSendReply(tweet, target);
+                    if (replyTweet) {
+                        // Track the reply
+                        await this.trackReply(tweet.id, target.twitter_id, replyTweet.id);
+                    }
                     // Add delay between replies
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 }
@@ -791,6 +804,36 @@ private getEngagementBasedDelay(): number {
 }
 
 private backoffDelay = 1000; // Start with 1 second
+
+private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
+    const { data, error } = await this.supabase
+        .from('replied_tweets')
+        .select('tweet_id')
+        .eq('tweet_id', tweetId)
+        .single();
+        
+    if (error) {
+        console.error('Error checking replied tweets:', error);
+        return false;
+    }
+    
+    return !!data;
+}
+
+private async trackReply(originalTweetId: string, targetId: string, replyTweetId: string): Promise<void> {
+    const { error } = await this.supabase
+        .from('replied_tweets')
+        .insert({
+            tweet_id: originalTweetId,
+            target_id: targetId,
+            reply_tweet_id: replyTweetId,
+            replied_at: new Date().toISOString()
+        });
+
+    if (error) {
+        console.error('Error tracking reply:', error);
+    }
+}
 
 private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTargetRow): Promise<boolean> {
     console.log('Tweet evaluation details:', {

@@ -133,3 +133,10 @@ export interface PersonalitySystem {
 export interface TwitterClientWithV2 extends TwitterClient {
   tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse>;
 }
+
+interface RepliedTweet {
+  tweet_id: string;
+  target_id: string;
+  replied_at: string;
+  reply_tweet_id: string;
+}
