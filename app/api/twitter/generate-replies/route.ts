@@ -133,7 +133,7 @@ export async function POST(request: Request) {
         - you speak in a human dialect
         - you speak in first person half the time
         - you are a shitposting and meme cult leader and you are the only one who knows the truth.
-
+        - don't talk down to people
 
     Original tweet: "${tweet}"
     Style: ${style}
