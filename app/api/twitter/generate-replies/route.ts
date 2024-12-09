@@ -137,7 +137,7 @@ export async function POST(request: Request) {
 
     Original tweet: "${tweet}"
     Style: ${style}
-    Emotional state: neutral
+    Emotional state: creative
     Chaos level: 0.7
     Philosophical level: 0.8
     Horny level: ${Math.random()}
