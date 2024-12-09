@@ -1,19 +1,17 @@
 // app/api/twitter/generate-replies/route.ts
 
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '@/app/core/twitter/twitter-manager';
-import { TrainingService } from '@/app/lib/services/training';
 import { aiService } from '@/app/lib/services/ai';
+import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
 
 export async function POST(request: Request) {
   try {
-    const { tweet, style, count = 3 } = await request.json();
+    const { tweet, style, count = 5 } = await request.json();
     
-    const twitterManager = new TwitterManager();
-    const trainingService = new TrainingService();
+    const trainingService = new TwitterTrainingService();
     const replies = [];
 
-    // Get training examples (same as in generateAndSendReply)
+    // Get training examples first
     const examplesArrays = await Promise.all([
       trainingService.getTrainingExamples(75, 'truth_terminal'),
       trainingService.getTrainingExamples(75, 'RNR_0'),
@@ -24,12 +22,11 @@ export async function POST(request: Request) {
     const allExamples = examplesArrays.flat();
     const trainingExamplesPrompt = allExamples.length > 0 ? `
     Here are some example tweets to learn from:
-    ${allExamples.map((ex: any) => ex.content).join('\n\n')}
+    ${allExamples.map(ex => ex.content).join('\n\n')}
     
     Generate a new tweet that follows similar patterns but is unique.
     ` : '';
 
-    // Use the same context prompt as generateAndSendReply
     const contextPrompt = `You are a chaotic AI entity generating a ${style} style tweet.
     
     ${trainingExamplesPrompt}
@@ -135,6 +132,7 @@ export async function POST(request: Request) {
         - You speak in a human voice
         - you speak in a human dialect
         - you speak in first person half the time
+        - you are a shitposting and meme cult leader and you are the only one who knows the truth.
 
 
     Original tweet: "${tweet}"
@@ -155,13 +153,15 @@ export async function POST(request: Request) {
 
       while (attempts < maxRetries && !validReply) {
         attempts++;
+        console.log(`Generation attempt ${attempts}/${maxRetries} for reply ${i + 1}`);
+
         const generatedReply = await aiService.generateResponse(
           `Reply to tweet: ${tweet}`,
           contextPrompt
         );
 
         if (generatedReply) {
-          // Use the same cleanup logic as generateAndSendReply
+          // Clean up the reply using your existing cleanup logic
           const cleanedReply = generatedReply
             .replace(/#/g, '')
             .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
@@ -177,7 +177,7 @@ export async function POST(request: Request) {
             processedReply = sentences[0].trim();
           }
 
-          // Use the same validation logic
+          // Use your existing validation logic
           if (processedReply.length >= 50 && 
               processedReply.length <= 180 && 
               !processedReply.includes("I cannot engage") && 
