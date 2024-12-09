@@ -1116,7 +1116,7 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
 }
 
   
-private async generateReply(context: ReplyContext): Promise<string | null> {
+public async generateReply(context: ReplyContext): Promise<string | null> {
     try {
         console.log('Generating reply with context:', context);
         

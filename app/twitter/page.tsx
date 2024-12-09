@@ -12,6 +12,7 @@ import EngagementTargets from '../interfaces/twitter/components/EngagementTarget
 import AutoTweetManager from '../interfaces/twitter/components/AutoTweetManager';
 import { ErrorBoundary } from '@/app/components/common/ErrorBoundary';
 import TweetTraining from '@/app/interfaces/twitter/components/TweetTraining';
+import ReplyGenerator from '../interfaces/twitter/components/ReplyGenerator';
 
 
 export default function TwitterPage() {
@@ -40,6 +41,18 @@ export default function TwitterPage() {
       setIsLoading(false);
     }
   };
+
+  const handleReplySelect = async (content: string) => {
+    try {
+      // Handle posting the selected reply
+      await postTweet(content);
+      // Show success message or handle UI updates
+    } catch (error) {
+      // Handle error
+      console.error('Failed to post reply:', error);
+    }
+  };
+  
 
   const loadAnalytics = async () => {
     try {
@@ -111,6 +124,10 @@ export default function TwitterPage() {
         />
         <TweetStream tweets={tweets} onDelete={handleDelete} />
         <TweetTraining />
+        <ReplyGenerator
+          onReplySelect={handleReplySelect}
+          isLoading={false} // Add your loading state
+        />
       </div>
 
       <div className="space-y-4">
