@@ -14,7 +14,7 @@ interface MemoryRequest {
   export class MemGPTClient {
     private baseUrl: string;
   
-    constructor(baseUrl = 'http://localhost:3000') {
+    constructor(baseUrl = 'http://localhost:3001') {
       this.baseUrl = baseUrl;
     }
   
