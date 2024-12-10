@@ -9,7 +9,7 @@ export function createClient() {
             domain: 'terminal.goatse.app',
             path: '/',
             secure: true,
-            sameSite: 'lax'
+            sameSite: 'strict'  // Changed from 'lax' to 'strict' for Safari
         }
     });
 }
