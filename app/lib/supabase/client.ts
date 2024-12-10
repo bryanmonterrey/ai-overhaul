@@ -2,7 +2,6 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from '@/types/supabase.types';
 
-// Client-side only
 export function createClient() {
     return createClientComponentClient<Database>({
         cookieOptions: {

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { Database } from '@/types/supabase.types';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { getSupabaseClient } from '../supabase/singleton';
+import { getSupabaseClient } from '../supabase/server';
 
 export async function withAuth(handler: Function) {
     try {
