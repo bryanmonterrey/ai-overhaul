@@ -14,9 +14,9 @@ interface MemoryRequest {
   export class MemGPTClient {
     private baseUrl: string;
   
-    constructor(baseUrl = 'http://localhost:3001') {
-      this.baseUrl = baseUrl;
-    }
+    constructor(baseUrl = '/api/memory') {  // Change this to use the Next.js API
+        this.baseUrl = baseUrl;
+      }
   
     async storeMemory(request: MemoryRequest): Promise<MemoryResponse> {
       try {

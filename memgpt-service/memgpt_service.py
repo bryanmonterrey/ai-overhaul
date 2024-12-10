@@ -1,11 +1,20 @@
 # memgpt_service.py
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import memgpt
 import uvicorn
 from typing import Optional, Dict, Any
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Your Next.js app URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class MemoryRequest(BaseModel):
     key: str
