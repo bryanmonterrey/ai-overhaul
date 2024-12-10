@@ -13,6 +13,7 @@ export async function GET(
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError) throw userError
+    if (!user) throw new Error('User not authenticated')
 
     // Get from Supabase
     const { data, error } = await supabase

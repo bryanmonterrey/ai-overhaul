@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError) throw userError
+    if (!user) throw new Error('User not authenticated')
 
     // Store in Supabase
     const { data: memoryData, error } = await supabase

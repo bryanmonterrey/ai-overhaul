@@ -133,6 +133,7 @@ export const config = {
     '/api/chat/:path*',
     '/twitter/:path*',
     '/telegram/:path*',
-    '/((?!insufficient-tokens|login|api/auth).*)' // Exclude specific public routes
+    '/((?!insufficient-tokens|login|api/auth).*)',
+    '/api/memory/:path*', // Exclude specific public routes
   ],
 };
