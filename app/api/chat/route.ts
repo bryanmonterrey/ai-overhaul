@@ -66,27 +66,37 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const validatedInput = validateAIInput(chatInputSchema, body);
-    
-
-    // Get platform from context or default to 'chat'
     const platform = (validatedInput.context?.environmentalFactors?.platform as Platform) || 'chat';
 
+    // Fetch relevant memories before processing
     const memClient = new MemGPTClient();
     const recentMemories = await memClient.queryMemories('chat_history', {
-      // You can customize this query based on your needs
-      limit: 5  // Get last 5 interactions
+      limit: 5
     });
-
 
     // Use withRetry for the integration manager call
     const result = await withRetry(async () => {
-      // Pass memories as context to the integration manager
+      // Instead of passing memories directly, update the memory system first
+      if (recentMemories?.data?.memories) {
+        recentMemories.data.memories.forEach(memory => {
+          memory.data.messages.forEach(msg => {
+            memorySystem.addMemory(
+              msg.content,
+              'interaction',
+              result?.emotion?.state || EmotionalState.Neutral,
+              platform
+            );
+          });
+        });
+      }
+
+      // Now process with updated memory system
       const response = await integrationManager.processInput(
         validatedInput.message,
-        platform,
-        recentMemories?.data?.memories // Add this as context
+        platform
       );
-     
+
+      // Store new memory
       await memClient.storeMemory({
         key: `chat-${Date.now()}`,
         memory_type: 'chat_history',
@@ -110,6 +120,7 @@ export async function POST(request: Request) {
 
       return response;
     });
+
 
     // Ensure the response has all required fields
     return NextResponse.json({
