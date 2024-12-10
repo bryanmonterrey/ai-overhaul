@@ -1,13 +1,15 @@
-# memgpt_service.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Optional, Dict, Any, List
 import memgpt
-from memgpt.memory import MemoryStore
+from memgpt.config import LLMConfig, AgentConfig
+from memgpt.interface import CLIInterface  # Changed to CLIInterface
+from memgpt.agent import Agent
 import uvicorn
 from datetime import datetime
+import os
 
 class MemoryType(str, Enum):
     chat_history = "chat_history"
@@ -31,29 +33,68 @@ class MemoryResponse(BaseModel):
 
 class MemGPTService:
     def __init__(self):
-        self.store = MemoryStore()
-        self.memgpt = memgpt.MemGPT()
+        # Initialize configurations
+        self.llm_config = LLMConfig()
+        self.agent_config = AgentConfig(
+            name="memory_agent",
+            model=self.llm_config.model,
+            model_endpoint_type=self.llm_config.model_endpoint_type,
+            context_window=self.llm_config.context_window
+        )
+        
+        # Initialize agent with CLI interface
+        self.interface = CLIInterface()
+        self.agent = Agent(
+            agent_config=self.agent_config,
+            interface=self.interface,
+            model_endpoint_type=self.llm_config.model_endpoint_type,
+            model=self.llm_config.model
+        )
 
     async def store_memory(self, memory: BaseMemory):
         try:
-            # Store in MemGPT
-            await self.memgpt.store(
+            memory_data = {
+                "type": memory.memory_type,
+                "content": memory.data,
+                "metadata": memory.metadata,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            self.agent.archival_memory.insert(
                 memory.key,
-                memory.data,
-                memory_type=memory.memory_type,
-                metadata=memory.metadata
+                str(memory_data)
             )
-            return {"success": True, "data": memory.dict()}
+            
+            return {"success": True, "data": memory_data}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
     async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
         try:
-            memories = await self.memgpt.query(
-                memory_type=memory_type,
-                query=query
+            results = self.agent.archival_memory.search(
+                str(query),
+                limit=10
             )
-            return {"success": True, "data": {"memories": memories}}
+            
+            filtered_results = []
+            for result in results:
+                try:
+                    memory_data = eval(result.content)
+                    if memory_data.get("type") == memory_type:
+                        filtered_results.append(memory_data)
+                except:
+                    continue
+            
+            return {"success": True, "data": {"memories": filtered_results}}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_memory(self, key: str):
+        try:
+            memory = self.agent.archival_memory.get(key)
+            if memory:
+                return {"success": True, "data": eval(memory.content)}
+            return {"success": False, "error": "Memory not found"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -76,14 +117,12 @@ async def store_memory(memory: BaseMemory):
     return result
 
 @app.get("/{key}")
-async def get_memory(key: str, type: MemoryType):
-    try:
-        memory = await service.memgpt.get(key)
-        if not memory:
-            return MemoryResponse(success=False, error="Memory not found")
-        return MemoryResponse(success=True, data=memory)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def get_memory(key: str):
+    result = await service.get_memory(key)
+    if not result["success"]:
+        raise HTTPException(status_code=404 if "not found" in str(result["error"]).lower() else 500, 
+                          detail=result["error"])
+    return result
 
 @app.post("/query")
 async def query_memories(type: MemoryType, query: Dict[str, Any]):
@@ -93,4 +132,11 @@ async def query_memories(type: MemoryType, query: Dict[str, Any]):
     return result
 
 if __name__ == "__main__":
+    # Initialize NLTK data if needed
+    import nltk
+    try:
+        nltk.download('punkt', quiet=True)
+    except:
+        print("Warning: NLTK download failed, but service may still work")
+    
     uvicorn.run(app, host="0.0.0.0", port=3001)
