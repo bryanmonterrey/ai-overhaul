@@ -111,6 +111,7 @@ export interface Context {
   environmentalFactors: EnvironmentalFactors;
   activeNarratives: string[];
   style?: TweetStyle; 
+  memoryContext?: string;
 }
 
 export interface Interaction {

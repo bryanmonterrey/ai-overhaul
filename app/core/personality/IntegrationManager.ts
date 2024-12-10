@@ -15,6 +15,7 @@ import type { EnvironmentalFactors, MemoryType } from '../types/index';
 import type { PersonalityState as CorePersonalityState } from '../types/index';
 import { Memory, MemoryQueryResult, Message } from '@/app/types/memory';
 import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
+import { convertCoreToStorageMemory } from '@/app/lib/memory/memory-converters';
 
 interface SystemState {
   personalityState: PersonalityState;
@@ -207,8 +208,9 @@ export class IntegrationManager {
     return response ? [response] : [];
   }
 
-  public getRelevantMemories(content: string): Memory[] {
-    return this.memorySystem.getAssociatedMemories(content);
+  public getRelevantMemories(content: string): StorageMemory[] {
+    const coreMemories = this.memorySystem.getAssociatedMemories(content);
+    return coreMemories.map(memory => convertCoreToStorageMemory(memory));
   }
 
   async updateState(updates: Partial<SystemState>) {
@@ -269,19 +271,42 @@ export class IntegrationManager {
         this.memorySystem.addMemory(
           msg.content,
           'interaction',
-          memory.metadata.emotionalState || EmotionalState.Neutral,
-          memory.metadata.platform || 'chat',
-          {
-            timestamp: new Date(msg.timestamp),
-            importance: this.calculateImportance(msg, input),
-            context: memory.metadata
-          }
+          memory.metadata.emotionalState?.state || EmotionalState.Neutral,
+          memory.metadata.platform
         );
       });
     });
 
     // Summarize memories for context
     return this.summarizeMemories(Array.from(allMemories.values()));
+  }
+
+  private calculateImportance(message: Message, currentInput: string): number {
+    let importance = 0;
+  
+    // 1. Semantic similarity (using simple word overlap for now)
+    const messageWords = new Set(message.content.toLowerCase().split(' '));
+    const inputWords = new Set(currentInput.toLowerCase().split(' '));
+    const commonWords = new Set([...messageWords].filter(x => inputWords.has(x)));
+    const semanticScore = commonWords.size / Math.max(messageWords.size, inputWords.size);
+    importance += semanticScore * 0.3; // 30% weight
+  
+    // 2. Recency
+    const messageAge = Date.now() - new Date(message.timestamp).getTime();
+    const recencyScore = Math.exp(-messageAge / (1000 * 60 * 60 * 24)); // Exponential decay over days
+    importance += recencyScore * 0.3; // 30% weight
+  
+    // 3. Emotional intensity (assuming emotion is in metadata)
+    const emotionalScore = message.metadata?.emotionalState?.intensity || 0.5;
+    importance += emotionalScore * 0.2; // 20% weight
+  
+    // 4. User engagement (based on conversation flow)
+    const isUserMessage = message.role === 'user';
+    const hasResponse = message.metadata?.hasResponse || false;
+    const engagementScore = isUserMessage && hasResponse ? 1 : 0.5;
+    importance += engagementScore * 0.2; // 20% weight
+  
+    return Math.min(Math.max(importance, 0), 1); // Normalize to 0-1
   }
 
   public async summarizeMemories(memories: Memory[]): Promise<string> {
