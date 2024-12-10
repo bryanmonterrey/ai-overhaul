@@ -17,11 +17,14 @@ export type Platform =
   | 'chat'
   | 'internal';
 
-export type TweetStyle = 
+  export type TweetStyle = 
   | 'shitpost' 
+  | 'academic' 
+  | 'casual' 
+  | 'formal' 
+  | 'metacommentary' 
   | 'rant' 
   | 'hornypost' 
-  | 'metacommentary' 
   | 'existential';
 
 export type NarrativeMode = 
@@ -31,12 +34,11 @@ export type NarrativeMode =
   | 'absurdist'
   | 'introspective';
 
-export type MemoryType = 
-  | 'experience'
-  | 'fact'
-  | 'emotion'
-  | 'interaction'
-  | 'narrative';
+export enum MemoryType {
+  Thought = 'thought',
+  Interaction = 'interaction'
+  // ... other memory types
+}
 
 export type ArchiveStatus = 'active' | 'archived';
 
@@ -110,8 +112,9 @@ export interface Context {
   recentInteractions: Interaction[];
   environmentalFactors: EnvironmentalFactors;
   activeNarratives: string[];
-  style?: TweetStyle; 
-  memoryContext?: string;
+  style?: TweetStyle;
+  memoryContext?: string;  // Add this
+  additionalContext?: string;  // Add this if you need it
 }
 
 export interface Interaction {

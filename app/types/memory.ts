@@ -54,6 +54,17 @@ export interface TradingParamsMemory extends BaseMemory {
   };
 }
 
+export interface StorageMemory {
+    data: {
+      messages: Message[];
+    };
+    metadata: {
+      platform: Platform;
+      emotionalState: any;
+      personalityState: any;
+    };
+  }
+
 export interface CustomPromptMemory extends BaseMemory {
   memory_type: 'custom_prompts';
   data: {
@@ -80,6 +91,13 @@ export interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: string;
+    metadata?: {
+      emotionalState?: {
+        state: EmotionalState;
+        intensity: number;
+      };
+      hasResponse?: boolean;
+    };
   }
   
   export interface Memory {

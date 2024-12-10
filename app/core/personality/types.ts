@@ -60,6 +60,7 @@ export interface Context {
   };
   activeNarratives: string[];
   style?: TweetStyle;  
+  memoryContext?: string; 
   additionalContext?: string;
 }
 
@@ -96,6 +97,8 @@ export interface PersonalityConfig {
   responsePatterns: Record<EmotionalState, string[]>;
 }
 
+
+
 export interface MemoryPattern {
   type: MemoryType;
   importance: number;
@@ -119,4 +122,17 @@ export interface EngagementMetrics {
   replies: number;
   impressions: number;
   engagementRate: number;
+}
+
+export interface SystemState {
+  consciousness: {
+    currentThought: string;
+    shortTermMemory: string[];
+    longTermMemory: Memory[];
+    emotionalState: EmotionalState;
+    attentionFocus: string[];
+  };
+  personalityState: PersonalityState;
+  emotionalResponse: EmotionalResponse;
+  platform: Platform;
 }

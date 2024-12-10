@@ -9,18 +9,20 @@ import {
     Memory,
     NarrativeMode,
     Context,
-    PersonalityConfig
+    PersonalityConfig,
+    Platform,
   } from '@/app/core/personality/types';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
   
-  interface PersonalitySystemConfig {
-    baseTemperature: number;
-    creativityBias: number;
-    emotionalVolatility: number;
-    memoryRetention: number;
-    responsePatterns: Partial<ResponsePatterns>;
-  }
+interface PersonalitySystemConfig {
+  baseTemperature: number;
+  creativityBias: number;
+  emotionalVolatility: number;
+  memoryRetention: number;
+  responsePatterns: Record<EmotionalState, string[]>;
+  platform?: Platform;  // Add this with optional flag
+}
 
   type ResponsePattern = string[];
 

@@ -13,9 +13,10 @@ import {
 import { LLMManager } from '../llm/model_manager';
 import type { EnvironmentalFactors, MemoryType } from '../types/index';
 import type { PersonalityState as CorePersonalityState } from '../types/index';
-import { Memory, MemoryQueryResult, Message } from '@/app/types/memory';
+import { Memory, MemoryQueryResult, Message, StorageMemory } from '@/app/types/memory';
 import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
 import { convertCoreToStorageMemory } from '@/app/lib/memory/memory-converters';
+import { Memory as CoreMemory } from './types';
 
 interface SystemState {
   personalityState: PersonalityState;
@@ -38,7 +39,12 @@ export class IntegrationManager {
   private emotionalSystem: EmotionalSystem;
   private memorySystem: MemorySystem;
   private llmManager: LLMManager;
-  private currentState: SystemState;
+  private state: SystemState;  // Add this if missing
+  private currentState: {
+    personalityState: PersonalityState;
+    emotionalResponse: EmotionalResponse;
+    platform: Platform;
+  };
 
   constructor(
     personalitySystem: PersonalitySystem,
@@ -108,8 +114,9 @@ export class IntegrationManager {
 
     // Convert PersonalityState to core type for LLMManager
     const currentState = this.personalitySystem.getCurrentState();
+    const convertedState = this.convertPersonalityState(currentState);
     const llmPersonalityState: CorePersonalityState = {
-      ...currentState,
+      ...convertedState,
       currentContext: {
         ...currentState.currentContext,
         recentInteractions: currentState.currentContext.recentInteractions.map(interaction => 
@@ -210,7 +217,7 @@ export class IntegrationManager {
 
   public getRelevantMemories(content: string): StorageMemory[] {
     const coreMemories = this.memorySystem.getAssociatedMemories(content);
-    return coreMemories.map(memory => convertCoreToStorageMemory(memory));
+    return coreMemories.map(memory => this.convertCoreToStorageMemory(memory));
   }
 
   async updateState(updates: Partial<SystemState>) {
@@ -281,32 +288,42 @@ export class IntegrationManager {
     return this.summarizeMemories(Array.from(allMemories.values()));
   }
 
-  private calculateImportance(message: Message, currentInput: string): number {
+  private convertPersonalityState(state: PersonalityState): CorePersonalityState {
+    return {
+      ...state,
+      consciousness: {
+        ...state.consciousness,
+        longTermMemory: state.consciousness.longTermMemory.map(mem => 
+          typeof mem === 'string' ? {
+            id: crypto.randomUUID(),
+            content: mem,
+            type: 'interaction' as MemoryType, // Explicitly type as MemoryType
+            timestamp: new Date(),
+            emotionalContext: EmotionalState.Neutral,
+            importance: 0.5,
+            associations: []
+          } : mem
+        )
+      }
+    };
+  }
+  
+
+  private calculateImportance(message: Message & { metadata?: any }): number {
     let importance = 0;
   
-    // 1. Semantic similarity (using simple word overlap for now)
+    // Get current input from personality state
+    const currentInput = this.personalitySystem.getCurrentState().consciousness.currentThought;
+  
+    // Semantic similarity
     const messageWords = new Set(message.content.toLowerCase().split(' '));
     const inputWords = new Set(currentInput.toLowerCase().split(' '));
-    const commonWords = new Set([...messageWords].filter(x => inputWords.has(x)));
-    const semanticScore = commonWords.size / Math.max(messageWords.size, inputWords.size);
-    importance += semanticScore * 0.3; // 30% weight
+    const commonWords = [...messageWords].filter(x => inputWords.has(x));
+    const semanticScore = commonWords.length / Math.max(messageWords.size, inputWords.size);
+    importance += semanticScore * 0.3;
   
-    // 2. Recency
-    const messageAge = Date.now() - new Date(message.timestamp).getTime();
-    const recencyScore = Math.exp(-messageAge / (1000 * 60 * 60 * 24)); // Exponential decay over days
-    importance += recencyScore * 0.3; // 30% weight
-  
-    // 3. Emotional intensity (assuming emotion is in metadata)
-    const emotionalScore = message.metadata?.emotionalState?.intensity || 0.5;
-    importance += emotionalScore * 0.2; // 20% weight
-  
-    // 4. User engagement (based on conversation flow)
-    const isUserMessage = message.role === 'user';
-    const hasResponse = message.metadata?.hasResponse || false;
-    const engagementScore = isUserMessage && hasResponse ? 1 : 0.5;
-    importance += engagementScore * 0.2; // 20% weight
-  
-    return Math.min(Math.max(importance, 0), 1); // Normalize to 0-1
+    // Rest of the implementation...
+    return Math.min(Math.max(importance, 0), 1);
   }
 
   public async summarizeMemories(memories: Memory[]): Promise<string> {
@@ -338,5 +355,32 @@ export class IntegrationManager {
     );
 
     return summaries.join('\n\n');
+  }
+
+  private convertCoreToStorageMemory(coreMemory: CoreMemory): StorageMemory {
+    const defaultPlatform: Platform = 'chat';
+    return {
+      data: {
+        messages: [{
+          role: 'assistant',
+          content: coreMemory.content,
+          timestamp: coreMemory.timestamp.toISOString(),
+          metadata: {
+            emotionalState: {
+              state: coreMemory.emotionalContext || EmotionalState.Neutral,
+              intensity: 0.5
+            }
+          }
+        }]
+      },
+      metadata: {
+        platform: (coreMemory.platform as Platform) || defaultPlatform,
+        emotionalState: {
+          state: coreMemory.emotionalContext || EmotionalState.Neutral,
+          intensity: 0.5
+        },
+        personalityState: {}
+      }
+    };
   }
 }
