@@ -10,6 +10,8 @@ import {
     MemoryPattern,
     Context
 } from '@/app/core/personality/types';
+import { ChatMemory, TweetMemory } from '@/app/types/memory';
+
 
 interface ExtendedMemoryPattern extends MemoryPattern {
     frequency: number;
@@ -49,23 +51,30 @@ export class MemorySystem {
                 .from('memories')
                 .select('*')
                 .eq('archive_status', 'active');
-
+    
             if (error) throw error;
-
-            // Load from MemGPT
-            const memgptData = await this.memgpt.queryMemories('all', {
-                status: 'active'
-            });
-
+    
+            // Load from MemGPT - using Promise.all to fetch all memory types
+            const memgptQueries = [
+                this.memgpt.queryMemories('chat_history' as MemoryType, { status: 'active' }),
+                this.memgpt.queryMemories('user_interaction' as MemoryType, { status: 'active' }),
+                this.memgpt.queryMemories('tweet_history' as MemoryType, { status: 'active' })
+            ];
+    
+            const memgptResults = await Promise.all(memgptQueries);
+            const memgptData = memgptResults
+                .filter(result => result?.data)
+                .flatMap(result => result.data || []);
+    
             const allMemories = [
                 ...(supabaseData || []),
-                ...(memgptData?.data || [])
+                ...memgptData
             ];
-
+    
             if (allMemories.length > 0) {
                 const now = new Date();
                 const oneHour = 60 * 60 * 1000;
-
+    
                 // Sort memories into short-term and long-term
                 allMemories.forEach(dbMemory => {
                     const memory = this.mapDBMemoryToMemory(dbMemory);
@@ -81,6 +90,57 @@ export class MemorySystem {
         } catch (error) {
             console.error('Error loading memories:', error);
         }
+    }
+
+    private createMemGPTMemory(memory: Memory): ChatMemory | TweetMemory {
+        const baseMemory = {
+            key: memory.id,
+            metadata: {
+                emotionalState: {
+                    state: memory.emotionalContext,
+                    intensity: memory.importance
+                },
+                platform: memory.platform
+            }
+        };
+    
+        switch (memory.type) {
+            case 'tweet':
+                return {
+                    ...baseMemory,
+                    memory_type: 'tweet_history',
+                    data: {
+                        generated_tweets: [{
+                            content: memory.content,
+                            timestamp: memory.timestamp.toISOString()
+                        }]
+                    }
+                } as TweetMemory;
+    
+            default:
+                return {
+                    ...baseMemory,
+                    memory_type: 'chat_history',
+                    data: {
+                        messages: [{
+                            role: 'assistant',
+                            content: memory.content,
+                            timestamp: memory.timestamp.toISOString()
+                        }]
+                    }
+                } as ChatMemory;
+        }
+    }
+
+    private convertToMemGPTType(type: string): MemoryType {
+        const typeMapping: Record<string, MemoryType> = {
+            'experience': 'chat_history',
+            'interaction': 'user_interaction',
+            'tweet': 'tweet_history',
+            'insight': 'chat_history'
+        } as const;
+    
+        return typeMapping[type] || 'chat_history';
     }
 
     public async addMemory(
@@ -99,11 +159,13 @@ export class MemorySystem {
             importance: this.calculateImportance(content),
             associations: this.generateAssociations(content)
         };
-
+    
         // Add to local memory
         this.shortTermMemories.push(memory);
-
-        // Store in both Supabase and MemGPT
+    
+        // Map to appropriate MemGPT memory type
+        const memgptMemory = this.createMemGPTMemory(memory);
+    
         try {
             await Promise.all([
                 // Supabase storage
@@ -122,24 +184,24 @@ export class MemorySystem {
                     }),
                 
                 // MemGPT storage
-                this.memgpt.storeMemory({
-                    key: memory.id,
-                    memory_type: type,
-                    data: {
-                        content: memory.content,
-                        emotionalContext: memory.emotionalContext,
-                        platform: memory.platform,
-                        importance: memory.importance,
-                        associations: memory.associations,
-                        timestamp: memory.timestamp
-                    }
-                })
+                this.memgpt.storeMemory(memgptMemory)
             ]);
         } catch (error) {
             console.error('Error storing memory:', error);
         }
-
+    
         return memory;
+    }
+
+    private mapToMemGPTType(type: string): MemoryType {
+        const typeMap: Record<string, MemoryType> = {
+            'experience': 'chat_history',
+            'interaction': 'user_interaction',
+            'tweet': 'tweet_history',
+            // Add other mappings as needed
+        };
+        
+        return typeMap[type] || 'chat_history';
     }
 
     private generateAssociations(content: string): string[] {
@@ -163,13 +225,13 @@ export class MemorySystem {
     private async consolidateMemories(): Promise<void> {
         const now = new Date();
         const oneHour = 60 * 60 * 1000;
-
+    
         const memoriesForLTM = this.shortTermMemories
             .filter(memory => {
                 const age = now.getTime() - memory.timestamp.getTime();
                 return age > oneHour && memory.importance > 0.7;
             });
-
+    
         // Update status in both storages
         for (const memory of memoriesForLTM) {
             try {
@@ -180,10 +242,10 @@ export class MemorySystem {
                         .update({ archive_status: 'archived' })
                         .eq('id', memory.id),
                     
-                    // Update MemGPT
+                    // Update MemGPT - Add conversion to correct MemoryType
                     this.memgpt.storeMemory({
                         key: memory.id,
-                        memory_type: memory.type,
+                        memory_type: this.convertToMemGPTType(memory.type),
                         data: {
                             ...memory,
                             status: 'archived'
@@ -194,17 +256,18 @@ export class MemorySystem {
                 console.error('Error updating memory status:', error);
             }
         }
-
+    
         // Rest of your existing consolidation logic
         this.longTermMemories.push(...memoriesForLTM);
         this.shortTermMemories = this.shortTermMemories
             .filter(memory => !memoriesForLTM.includes(memory));
-
+    
         if (this.longTermMemories.length > this.LTM_LIMIT) {
             this.longTermMemories.sort((a, b) => b.importance - a.importance);
             this.longTermMemories = this.longTermMemories.slice(0, this.LTM_LIMIT);
         }
     }
+    
 
     private updatePatterns(content: string): void {
         const words = content.toLowerCase().split(/\s+/);

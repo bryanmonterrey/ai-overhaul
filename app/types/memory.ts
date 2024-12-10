@@ -5,10 +5,15 @@ export type MemoryType =
   | 'chat_history'
   | 'tweet_history'
   | 'trading_params'
+  | 'tweet'
+  | 'insight'
   | 'trading_history'
   | 'custom_prompts'
   | 'agent_state'
-  | 'user_interaction';
+  | 'user_interaction'
+  | 'experience'  
+  | 'interaction' 
+  | 'all';    
 
 export interface BaseMemory {
   key: string;

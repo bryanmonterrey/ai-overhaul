@@ -14,8 +14,22 @@ export type NarrativeMode =
   | 'creative' 
   | 'energetic' 
   | 'balanced';
-export type MemoryType = 'experience' | 'fact' | 'interaction' | 'insight';
+
 export type Platform = 'twitter' | 'chat' | 'telegram' | 'internal';
+
+export type MemoryType = 
+  | 'chat_history'
+  | 'tweet_history'
+  | 'trading_params'
+  | 'tweet'
+  | 'insight'
+  | 'trading_history'
+  | 'custom_prompts'
+  | 'agent_state'
+  | 'user_interaction'
+  | 'experience'  
+  | 'interaction' 
+  | 'all'; 
 
 export interface Memory {
   id: string;
