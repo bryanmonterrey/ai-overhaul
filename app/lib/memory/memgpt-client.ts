@@ -20,7 +20,7 @@ interface MemoryRequest {
   
     async storeMemory(request: MemoryRequest): Promise<MemoryResponse> {
       try {
-        const response = await fetch(`${this.baseUrl}/memory/store`, {
+        const response = await fetch(`${this.baseUrl}/store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -44,7 +44,7 @@ interface MemoryRequest {
   
     async getMemory(key: string): Promise<MemoryResponse> {
       try {
-        const response = await fetch(`${this.baseUrl}/memory/${key}`);
+        const response = await fetch(`${this.baseUrl}/${key}`);
   
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
