@@ -1,5 +1,6 @@
 // src/app/core/personality/MemorySystem.ts
 
+import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
 import { createClient } from '@supabase/supabase-js';
 import {
     Memory,
@@ -24,6 +25,7 @@ interface ExtendedMemoryPattern extends MemoryPattern {
 
 export class MemorySystem {
     private supabase;
+    private memgpt: MemGPTClient;
     private shortTermMemories: Memory[] = [];
     private longTermMemories: Memory[] = [];
     private patterns: ExtendedMemoryPattern[] = [];
@@ -35,25 +37,37 @@ export class MemorySystem {
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         );
+        this.memgpt = new MemGPTClient();
         setInterval(() => this.consolidateMemories(), 1000 * 60 * 60);
-        this.loadMemoriesFromDB(); // Load existing memories on startup
+        this.loadMemoriesFromDB();
     }
 
     private async loadMemoriesFromDB() {
         try {
-            const { data, error } = await this.supabase
+            // Load from Supabase
+            const { data: supabaseData, error } = await this.supabase
                 .from('memories')
                 .select('*')
                 .eq('archive_status', 'active');
 
             if (error) throw error;
 
-            if (data) {
+            // Load from MemGPT
+            const memgptData = await this.memgpt.queryMemories('all', {
+                status: 'active'
+            });
+
+            const allMemories = [
+                ...(supabaseData || []),
+                ...(memgptData?.data || [])
+            ];
+
+            if (allMemories.length > 0) {
                 const now = new Date();
                 const oneHour = 60 * 60 * 1000;
 
                 // Sort memories into short-term and long-term
-                data.forEach(dbMemory => {
+                allMemories.forEach(dbMemory => {
                     const memory = this.mapDBMemoryToMemory(dbMemory);
                     const age = now.getTime() - memory.timestamp.getTime();
                     
@@ -65,7 +79,7 @@ export class MemorySystem {
                 });
             }
         } catch (error) {
-            console.error('Error loading memories from DB:', error);
+            console.error('Error loading memories:', error);
         }
     }
 
@@ -89,25 +103,40 @@ export class MemorySystem {
         // Add to local memory
         this.shortTermMemories.push(memory);
 
-        // Store in database
+        // Store in both Supabase and MemGPT
         try {
-            const { error } = await this.supabase
-                .from('memories')
-                .insert({
-                    id: memory.id,
-                    content: memory.content,
-                    type: memory.type,
-                    created_at: memory.timestamp.toISOString(),
-                    emotional_context: memory.emotionalContext,
-                    importance: memory.importance,
-                    associations: memory.associations,
-                    platform: memory.platform,
-                    archive_status: 'active'
-                });
-
-            if (error) throw error;
+            await Promise.all([
+                // Supabase storage
+                this.supabase
+                    .from('memories')
+                    .insert({
+                        id: memory.id,
+                        content: memory.content,
+                        type: memory.type,
+                        created_at: memory.timestamp.toISOString(),
+                        emotional_context: memory.emotionalContext,
+                        importance: memory.importance,
+                        associations: memory.associations,
+                        platform: memory.platform,
+                        archive_status: 'active'
+                    }),
+                
+                // MemGPT storage
+                this.memgpt.storeMemory({
+                    key: memory.id,
+                    memory_type: type,
+                    data: {
+                        content: memory.content,
+                        emotionalContext: memory.emotionalContext,
+                        platform: memory.platform,
+                        importance: memory.importance,
+                        associations: memory.associations,
+                        timestamp: memory.timestamp
+                    }
+                })
+            ]);
         } catch (error) {
-            console.error('Error storing memory in DB:', error);
+            console.error('Error storing memory:', error);
         }
 
         return memory;
@@ -141,18 +170,32 @@ export class MemorySystem {
                 return age > oneHour && memory.importance > 0.7;
             });
 
-        // Update database status for these memories
+        // Update status in both storages
         for (const memory of memoriesForLTM) {
             try {
-                await this.supabase
-                    .from('memories')
-                    .update({ archive_status: 'archived' })
-                    .eq('id', memory.id);
+                await Promise.all([
+                    // Update Supabase
+                    this.supabase
+                        .from('memories')
+                        .update({ archive_status: 'archived' })
+                        .eq('id', memory.id),
+                    
+                    // Update MemGPT
+                    this.memgpt.storeMemory({
+                        key: memory.id,
+                        memory_type: memory.type,
+                        data: {
+                            ...memory,
+                            status: 'archived'
+                        }
+                    })
+                ]);
             } catch (error) {
                 console.error('Error updating memory status:', error);
             }
         }
 
+        // Rest of your existing consolidation logic
         this.longTermMemories.push(...memoriesForLTM);
         this.shortTermMemories = this.shortTermMemories
             .filter(memory => !memoriesForLTM.includes(memory));
