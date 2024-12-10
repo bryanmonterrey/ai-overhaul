@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Optional, Dict, Any, List
 import memgpt
 import uvicorn
+from memgpt.memory import MemoryStore
 from datetime import datetime
 
 class MemoryType(str, Enum):

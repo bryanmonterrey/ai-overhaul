@@ -14,9 +14,22 @@ import { useState } from 'react';
   
   export class MemGPTClient {
     private baseUrl: string;
+    private retryCount: number = 3;
   
-    constructor(baseUrl = '/api/memory') {
+    constructor(baseUrl = 'http://localhost:3001') {
       this.baseUrl = baseUrl;
+    }
+
+    private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
+        for (let i = 0; i < this.retryCount; i++) {
+            try {
+                return await operation();
+            } catch (error) {
+                if (i === this.retryCount - 1) throw error;
+                await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+            }
+        }
+        throw new Error('Operation failed after retries');
     }
   
     async storeMemory<T extends BaseMemory>(memory: T): Promise<MemoryResponse> {

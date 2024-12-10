@@ -11,7 +11,8 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.mjs",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "setup-admin": "node src/scripts/setup-admin.mjs"
+    "setup-admin": "node src/scripts/setup-admin.mjs",
+    "start-memgpt": "cd memgpt-service && python3 memgpt_service.py"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
