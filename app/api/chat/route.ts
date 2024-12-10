@@ -11,6 +11,7 @@ import { Platform } from '@/app/core/types';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
 import { MemorySystem } from '@/app/core/personality/MemorySystem';
+import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
 
 // Input validation schema
 const chatInputSchema = z.object({
@@ -65,16 +66,49 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const validatedInput = validateAIInput(chatInputSchema, body);
+    
 
     // Get platform from context or default to 'chat'
     const platform = (validatedInput.context?.environmentalFactors?.platform as Platform) || 'chat';
 
+    const memClient = new MemGPTClient();
+    const recentMemories = await memClient.queryMemories('chat_history', {
+      // You can customize this query based on your needs
+      limit: 5  // Get last 5 interactions
+    });
+
+
     // Use withRetry for the integration manager call
     const result = await withRetry(async () => {
-      return integrationManager.processInput(
+      // Pass memories as context to the integration manager
+      const response = await integrationManager.processInput(
         validatedInput.message,
-        platform
+        platform,
+        recentMemories?.data?.memories // Add this as context
       );
+     
+      await memClient.storeMemory({
+        key: `chat-${Date.now()}`,
+        memory_type: 'chat_history',
+        data: {
+          messages: [{
+            role: 'user',
+            content: validatedInput.message,
+            timestamp: new Date().toISOString()
+          }, {
+            role: 'assistant',
+            content: response.response,
+            timestamp: new Date().toISOString()
+          }]
+        },
+        metadata: {
+          platform,
+          personalityState: response.state,
+          emotionalState: response.emotion
+        }
+      });
+
+      return response;
     });
 
     // Ensure the response has all required fields

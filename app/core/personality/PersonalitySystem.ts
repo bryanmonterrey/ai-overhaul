@@ -14,13 +14,32 @@ import {
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
   
+  interface PersonalitySystemConfig {
+    baseTemperature: number;
+    creativityBias: number;
+    emotionalVolatility: number;
+    memoryRetention: number;
+    responsePatterns: Partial<ResponsePatterns>;
+  }
+
+  type ResponsePattern = string[];
+
+  interface ResponsePatterns {
+    neutral: ResponsePattern;
+    excited: ResponsePattern;
+    contemplative: ResponsePattern;
+    chaotic: ResponsePattern;
+    creative: ResponsePattern;
+    analytical: ResponsePattern;
+  }
+  
   export class PersonalitySystem {
     private state: PersonalityState;
     private config: PersonalityConfig;
     private traits: Map<string, number> = new Map();
     private trainingService: TwitterTrainingService;
 
-    constructor(config: PersonalityConfig) {
+    constructor(config: PersonalitySystemConfig) {
       this.config = config;
       this.state = this.initializeState();
       this.initializeTraits();
