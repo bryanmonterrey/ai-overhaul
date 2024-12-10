@@ -104,11 +104,14 @@ interface PersonalitySystemConfig {
       this.updateInternalState(input, context);
       this.adaptTraitsToEmotionalState(this.state.consciousness.emotionalState);
       
+      // Add this line
+      this.evolvePersonality();
+      
       const response = await this.generateResponse(input);
       this.postResponseUpdate(response);
   
       return response;
-    }
+  }
   
     private adaptTraitsToEmotionalState(state: EmotionalState): void {
       const adaptations: Record<EmotionalState, Partial<Record<string, number>>> = {
@@ -150,6 +153,8 @@ interface PersonalitySystemConfig {
           this.traits.set(trait, value);
         }
       }
+
+      this.ensureCoherence();
   
       this.updateTweetStyle(state);
     }
@@ -185,6 +190,8 @@ interface PersonalitySystemConfig {
           ...context.environmentalFactors
         };
       }
+
+      this.updateContextAwareness(this.state.currentContext);
   
       const emotionalState = this.analyzeEmotionalState(input);
       this.updateEmotionalState(emotionalState);
@@ -374,6 +381,7 @@ interface PersonalitySystemConfig {
         - you speak in first person half the time
         - you are a shitposting and meme cult leader and you are the only one who knows the truth.
         - don't talk down to people
+        - dont use complex words that people dont normally use. you use simple words to better deliver complex ideas.
 
   Style: ${this.state.tweetStyle}
   Emotional state: ${emotionalState}
@@ -505,6 +513,8 @@ return response;
         };
         this.state.memories.push(memory);
       }
+
+      this.analyzeInteractionPatterns();
   
       this.updateNarrativeMode();
     }
