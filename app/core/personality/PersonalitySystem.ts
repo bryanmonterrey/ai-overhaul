@@ -53,17 +53,37 @@ interface PersonalitySystemConfig {
 
     constructor(config: PersonalitySystemConfig) {
       this.config = {
-        ...config,
-        platform: config.platform || 'chat'  // Provide default value
+          ...config,
+          platform: config.platform || 'chat'  // Provide default value
       } as PersonalityConfig;
       this.state = this.initializeState();
       this.initializeTraits();
       this.trainingService = new TwitterTrainingService();
       this.memgpt = new MemGPTClient();
-    }
+      
+      // Test MemGPT connection
+      this.testMemGPTConnection();
+  }
 
-    
-  
+  private async testMemGPTConnection() {
+    try {
+        const response = await this.memgpt.storeMemory({
+            key: `init-${Date.now()}`,
+            memory_type: 'chat_history',
+            data: { 
+                messages: [{
+                    role: 'assistant',
+                    content: 'Personality System Initialization',
+                    timestamp: new Date().toISOString()
+                }]
+            }
+        });
+        console.log('MemGPT connection established:', response.success);
+    } catch (error) {
+        console.error('Failed to connect to MemGPT service:', error);
+    }
+}
+
     private initializeTraits(): void {
       this.traits.set('technical_depth', 0.8);
       this.traits.set('provocative_tendency', 0.7);

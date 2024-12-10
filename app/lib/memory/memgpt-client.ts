@@ -33,27 +33,31 @@ import { useState } from 'react';
     }
   
     async storeMemory<T extends BaseMemory>(memory: T): Promise<MemoryResponse> {
-      try {
-        const response = await fetch(`${this.baseUrl}/store`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(memory),
+        return this.withRetry(async () => {
+            const response = await fetch(`${this.baseUrl}/store`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(memory),
+            });
+    
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                throw new Error(
+                    errorData?.error || 
+                    `HTTP error! status: ${response.status}`
+                );
+            }
+    
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.error || 'Unknown error');
+            }
+    
+            return data;
         });
-  
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-  
-        return await response.json();
-      } catch (error) {
-        console.error('Error storing memory:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        };
-      }
     }
   
     async getMemory<T extends BaseMemory>(key: string, type: MemoryType): Promise<T | null> {

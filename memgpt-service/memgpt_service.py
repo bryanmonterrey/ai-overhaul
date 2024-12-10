@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Optional, Dict, Any, List
 import memgpt
-import uvicorn
 from memgpt.memory import MemoryStore
+import uvicorn
 from datetime import datetime
 
 class MemoryType(str, Enum):
@@ -29,7 +29,36 @@ class MemoryResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
+class MemGPTService:
+    def __init__(self):
+        self.store = MemoryStore()
+        self.memgpt = memgpt.MemGPT()
+
+    async def store_memory(self, memory: BaseMemory):
+        try:
+            # Store in MemGPT
+            await self.memgpt.store(
+                memory.key,
+                memory.data,
+                memory_type=memory.memory_type,
+                metadata=memory.metadata
+            )
+            return {"success": True, "data": memory.dict()}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
+        try:
+            memories = await self.memgpt.query(
+                memory_type=memory_type,
+                query=query
+            )
+            return {"success": True, "data": {"memories": memories}}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
 app = FastAPI()
+service = MemGPTService()
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,54 +68,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for development/testing
-memory_store = {}
-
 @app.post("/store")
 async def store_memory(memory: BaseMemory):
-    try:
-        # Store in memory_store with timestamp
-        memory_store[memory.key] = {
-            **memory.dict(),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        # Initialize MemGPT client and store memory
-        # This is where you'd implement MemGPT-specific storage
-        
-        return MemoryResponse(success=True, data=memory.dict())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    result = await service.store_memory(memory)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
 
 @app.get("/{key}")
 async def get_memory(key: str, type: MemoryType):
     try:
-        if key not in memory_store:
+        memory = await service.memgpt.get(key)
+        if not memory:
             return MemoryResponse(success=False, error="Memory not found")
-            
-        memory = memory_store[key]
-        if memory["memory_type"] != type:
-            return MemoryResponse(success=False, error="Memory type mismatch")
-            
         return MemoryResponse(success=True, data=memory)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/query")
 async def query_memories(type: MemoryType, query: Dict[str, Any]):
-    try:
-        # Filter memories by type and query parameters
-        matching_memories = [
-            memory for memory in memory_store.values()
-            if memory["memory_type"] == type and all(
-                query_val == memory.get(query_key)
-                for query_key, query_val in query.items()
-            )
-        ]
-        
-        return MemoryResponse(success=True, data={"memories": matching_memories})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    result = await service.query_memories(type, query)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=3001)
