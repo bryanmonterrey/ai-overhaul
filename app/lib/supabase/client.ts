@@ -1,16 +1,24 @@
 // app/lib/supabase/client.ts
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createRouteHandlerClient, createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase.types';
 
-let supabaseClient: ReturnType<typeof createRouteHandlerClient<Database>> | null = null;
-
 export function getSupabaseClient() {
-    if (!supabaseClient) {
-        const cookieStore = cookies();
-        supabaseClient = createRouteHandlerClient<Database>({ 
-            cookies: () => cookieStore
-        });
-    }
-    return supabaseClient;
+    const cookieStore = cookies();
+    return createRouteHandlerClient<Database>({ 
+        cookies: () => cookieStore
+    });
+}
+
+// Separate client for components with cookie options
+export function createClient() {
+    return createClientComponentClient<Database>({
+        cookieOptions: {
+            name: 'sb-auth-token',
+            domain: 'terminal.goatse.app',
+            path: '/',
+            secure: true,
+            sameSite: 'lax'
+        }
+    });
 }

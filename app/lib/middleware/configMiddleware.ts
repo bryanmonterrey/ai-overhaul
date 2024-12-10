@@ -5,6 +5,18 @@ import { configManager } from '../config/manager';
 export function withConfig(handler: Function) {
   return async function(req: NextRequest, ...args: any[]) {
     try {
+      const allowedDomains = ['terminal.goatse.app'];
+      const hostname = req.headers.get('host');
+      
+      if (process.env.NODE_ENV === 'production' && 
+          hostname && 
+          !allowedDomains.includes(hostname)) {
+        return NextResponse.json(
+          { error: 'Invalid domain' },
+          { status: 403 }
+        );
+      }
+      
       // In development, skip config validation
       if (process.env.NODE_ENV === 'development') {
         return handler(req, ...args);

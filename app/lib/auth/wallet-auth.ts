@@ -1,4 +1,5 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '../supabase/client';
 
 export class WalletAuthManager {
   private supabase;
@@ -6,7 +7,7 @@ export class WalletAuthManager {
   private maxRetries = 3;
 
   constructor() {
-    this.supabase = createClientComponentClient();
+    this.supabase = createClient();
   }
 
   async authenticateWallet(publicKey: string): Promise<{ success: boolean; error?: string }> {

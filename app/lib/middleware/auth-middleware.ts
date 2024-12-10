@@ -16,23 +16,10 @@ export async function withAuth(handler: Function) {
                     role: 'admin'
                 }
             };
-            const result = await handler(supabase, mockSession);
-            return result;
+            return handler(supabase, mockSession);
         }
 
         const sessionResponse = await supabase.auth.getSession();
-        
-        // Handle session errors silently in development
-        if (process.env.NODE_ENV === 'development') {
-          const mockSession = {
-              user: { 
-                  id: 'dev-user',
-                  role: 'admin'
-              }
-          };
-          const result = await handler(supabase, mockSession);
-          return result;
-      }
 
         if (!sessionResponse.data.session) {
             return NextResponse.json(
