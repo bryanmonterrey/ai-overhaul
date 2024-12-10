@@ -43,14 +43,15 @@ const personalitySystem = new PersonalitySystem({
   creativityBias: config.personality.creativityBias,
   emotionalVolatility: config.personality.emotionalVolatility,
   memoryRetention: config.personality.memoryRetention,
+  platform: 'chat' as Platform,
   responsePatterns: {
-    neutral: config.personality.responsePatterns?.neutral ?? [],
-    excited: config.personality.responsePatterns?.excited ?? [],
-    contemplative: config.personality.responsePatterns?.contemplative ?? [],
-    chaotic: config.personality.responsePatterns?.chaotic ?? [],
-    creative: config.personality.responsePatterns?.creative ?? [],
-    analytical: config.personality.responsePatterns?.analytical ?? []
-  }
+    neutral: [],
+    excited: [],
+    contemplative: [],
+    analytical: [],
+    chaotic: [],
+    creative: []
+  } as Record<EmotionalState, string[]>
 });
 const emotionalSystem = new EmotionalSystem();
 const memorySystem = new MemorySystem();

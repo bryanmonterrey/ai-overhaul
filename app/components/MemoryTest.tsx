@@ -5,15 +5,16 @@ import { useState } from 'react';
 import { useMemGPT } from '../lib/memory/memgpt-client';
 
 export default function MemoryTest() {
-  const { storeMemory, getMemory, loading, error } = useMemGPT();
+  const { storeChat, loading, error } = useMemGPT();
   const [result, setResult] = useState<any>(null);
 
   const handleStoreMemory = async () => {
     try {
-      const response = await storeMemory('user-context', {
-        preferences: { theme: 'dark' },
-        history: ['action1', 'action2']
-      });
+      const response = await storeChat([{
+        role: 'user',
+        content: 'Test message',
+        timestamp: new Date().toISOString()
+      }]);
       setResult(response);
     } catch (err) {
       console.error('Failed to store memory:', err);

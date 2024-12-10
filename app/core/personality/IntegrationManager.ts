@@ -55,6 +55,7 @@ export class IntegrationManager {
     this.personalitySystem = personalitySystem;
     this.emotionalSystem = emotionalSystem;
     this.memorySystem = memorySystem;
+    
     this.llmManager = llmManager;
     this.currentState = {
       personalityState: this.personalitySystem.getCurrentState(),
@@ -67,6 +68,7 @@ export class IntegrationManager {
       },
       platform: 'chat'
     };
+    this.state = this.currentState;
   }
 
   async processInput(
@@ -289,7 +291,7 @@ export class IntegrationManager {
   }
 
   private convertPersonalityState(state: PersonalityState): CorePersonalityState {
-    return {
+    const converted = {
       ...state,
       consciousness: {
         ...state.consciousness,
@@ -297,7 +299,7 @@ export class IntegrationManager {
           typeof mem === 'string' ? {
             id: crypto.randomUUID(),
             content: mem,
-            type: 'interaction' as MemoryType, // Explicitly type as MemoryType
+            type: 'interaction',
             timestamp: new Date(),
             emotionalContext: EmotionalState.Neutral,
             importance: 0.5,
@@ -306,6 +308,7 @@ export class IntegrationManager {
         )
       }
     };
+    return converted as unknown as CorePersonalityState;
   }
   
 
@@ -334,7 +337,7 @@ export class IntegrationManager {
       acc[key].push(memory);
       return acc;
     }, {} as Record<string, Memory[]>);
-
+  
     // Summarize each conversation
     const summaries = await Promise.all(
       Object.entries(conversations).map(async ([date, convoMemories]) => {
@@ -342,18 +345,22 @@ export class IntegrationManager {
           .flatMap(m => m.data.messages)
           .map(m => `${m.role}: ${m.content}`)
           .join('\n');
-
+  
+        // Convert the state before passing it to generateResponse
+        const currentState = this.personalitySystem.getCurrentState();
+        const convertedState = this.convertPersonalityState(currentState);
+  
         // Use your LLM manager to generate a summary
         const summary = await this.llmManager.generateResponse(
           `Summarize this conversation:\n${conversation}`,
-          this.personalitySystem.getCurrentState(),
+          convertedState,  // Use the converted state
           { timeOfDay: 'any', platformActivity: 0, socialContext: [], platform: 'internal' }
         );
-
+  
         return `[${date}] ${summary}`;
       })
     );
-
+  
     return summaries.join('\n\n');
   }
 
