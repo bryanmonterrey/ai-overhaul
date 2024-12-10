@@ -37,6 +37,12 @@ export interface TweetMemory extends BaseMemory {
   };
 }
 
+export interface MemoryResponse {
+    success: boolean;
+    data?: Record<string, any>;
+    error?: string;
+  }
+
 export interface TradingParamsMemory extends BaseMemory {
   memory_type: 'trading_params';
   data: {

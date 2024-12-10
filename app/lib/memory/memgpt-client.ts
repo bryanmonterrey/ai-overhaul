@@ -6,7 +6,8 @@ import {
     TweetMemory,
     TradingParamsMemory,
     CustomPromptMemory,
-    AgentStateMemory
+    AgentStateMemory,
+    MemoryResponse
   } from '@/app/types/memory';
 import { useCallback } from 'react';
 import { useState } from 'react';
