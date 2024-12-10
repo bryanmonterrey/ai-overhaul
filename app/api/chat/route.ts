@@ -12,6 +12,7 @@ import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
 import { MemorySystem } from '@/app/core/personality/MemorySystem';
 import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
+import { EmotionalState } from '@/app/core/personality/types';
 
 // Input validation schema
 const chatInputSchema = z.object({
@@ -68,35 +69,16 @@ export async function POST(request: Request) {
     const validatedInput = validateAIInput(chatInputSchema, body);
     const platform = (validatedInput.context?.environmentalFactors?.platform as Platform) || 'chat';
 
-    // Fetch relevant memories before processing
-    const memClient = new MemGPTClient();
-    const recentMemories = await memClient.queryMemories('chat_history', {
-      limit: 5
-    });
-
     // Use withRetry for the integration manager call
     const result = await withRetry(async () => {
-      // Instead of passing memories directly, update the memory system first
-      if (recentMemories?.data?.memories) {
-        recentMemories.data.memories.forEach(memory => {
-          memory.data.messages.forEach(msg => {
-            memorySystem.addMemory(
-              msg.content,
-              'interaction',
-              result?.emotion?.state || EmotionalState.Neutral,
-              platform
-            );
-          });
-        });
-      }
-
-      // Now process with updated memory system
+      // The memory handling is now done inside processInput
       const response = await integrationManager.processInput(
         validatedInput.message,
         platform
       );
 
-      // Store new memory
+      // Store new memory with enhanced metadata
+      const memClient = new MemGPTClient();
       await memClient.storeMemory({
         key: `chat-${Date.now()}`,
         memory_type: 'chat_history',
@@ -114,7 +96,25 @@ export async function POST(request: Request) {
         metadata: {
           platform,
           personalityState: response.state,
-          emotionalState: response.emotion
+          emotionalState: response.emotion,
+          conversationSummary: await integrationManager.summarizeMemories([{
+            data: {
+              messages: [{
+                role: 'user',
+                content: validatedInput.message,
+                timestamp: new Date().toISOString()
+              }, {
+                role: 'assistant',
+                content: response.response,
+                timestamp: new Date().toISOString()
+              }]
+            },
+            metadata: {
+              platform,
+              personalityState: response.state,
+              emotionalState: response.emotion
+            }
+          }])
         }
       });
 

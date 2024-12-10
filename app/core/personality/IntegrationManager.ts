@@ -6,7 +6,6 @@ import { MemorySystem } from './MemorySystem';
 import {
   PersonalityState,
   EmotionalResponse,
-  Memory,
   Platform,
   Context,
   EmotionalState
@@ -14,6 +13,8 @@ import {
 import { LLMManager } from '../llm/model_manager';
 import type { EnvironmentalFactors, MemoryType } from '../types/index';
 import type { PersonalityState as CorePersonalityState } from '../types/index';
+import { Memory, MemoryQueryResult, Message } from '@/app/types/memory';
+import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
 
 interface SystemState {
   personalityState: PersonalityState;
@@ -77,6 +78,8 @@ export class IntegrationManager {
     // Process emotional response
     const emotionalResponse = this.emotionalSystem.processStimulus(input);
 
+    const memoryContext = await this.retrieveAndSummarizeMemories(input);
+
     // Update context with environmental factors
     const updatedContext: Context = {
       platform,
@@ -87,7 +90,8 @@ export class IntegrationManager {
         socialContext: [],
         platform
       },
-      activeNarratives: []
+      activeNarratives: [],
+      memoryContext
     };
 
     // Add memory of input
@@ -228,5 +232,86 @@ export class IntegrationManager {
     };
     await this.personalitySystem.reset();
     this.emotionalSystem.reset();
+  }
+
+  private async retrieveAndSummarizeMemories(input: string): Promise<string> {
+    const memClient = new MemGPTClient();
+    
+    // Enhanced memory retrieval using multiple strategies
+    const [recentMemories, semanticMemories] = await Promise.all([
+      // Get recent memories
+      memClient.queryMemories('chat_history', { limit: 5 }) as Promise<MemoryQueryResult>,
+      
+      // Get semantically relevant memories
+      memClient.queryMemories('chat_history', {
+        semantic_query: input,
+        threshold: 0.7,
+        limit: 3
+      }) as Promise<MemoryQueryResult>
+    ]);
+
+    // Combine and deduplicate memories
+    const allMemories = new Map<string, Memory>();
+    
+    recentMemories?.data?.memories?.forEach(memory => {
+      const key = memory.data.messages.map(m => m.content).join('');
+      allMemories.set(key, memory);
+    });
+
+    semanticMemories?.data?.memories?.forEach(memory => {
+      const key = memory.data.messages.map(m => m.content).join('');
+      allMemories.set(key, memory);
+    });
+
+    // Convert memories to a format suitable for your memory system
+    Array.from(allMemories.values()).forEach(memory => {
+      memory.data.messages.forEach((msg: Message) => {
+        this.memorySystem.addMemory(
+          msg.content,
+          'interaction',
+          memory.metadata.emotionalState || EmotionalState.Neutral,
+          memory.metadata.platform || 'chat',
+          {
+            timestamp: new Date(msg.timestamp),
+            importance: this.calculateImportance(msg, input),
+            context: memory.metadata
+          }
+        );
+      });
+    });
+
+    // Summarize memories for context
+    return this.summarizeMemories(Array.from(allMemories.values()));
+  }
+
+  public async summarizeMemories(memories: Memory[]): Promise<string> {
+    // Group memories by conversation
+    const conversations = memories.reduce((acc, memory) => {
+      const key = memory.data.messages[0].timestamp.split('T')[0];
+      acc[key] = acc[key] || [];
+      acc[key].push(memory);
+      return acc;
+    }, {} as Record<string, Memory[]>);
+
+    // Summarize each conversation
+    const summaries = await Promise.all(
+      Object.entries(conversations).map(async ([date, convoMemories]) => {
+        const conversation = convoMemories
+          .flatMap(m => m.data.messages)
+          .map(m => `${m.role}: ${m.content}`)
+          .join('\n');
+
+        // Use your LLM manager to generate a summary
+        const summary = await this.llmManager.generateResponse(
+          `Summarize this conversation:\n${conversation}`,
+          this.personalitySystem.getCurrentState(),
+          { timeOfDay: 'any', platformActivity: 0, socialContext: [], platform: 'internal' }
+        );
+
+        return `[${date}] ${summary}`;
+      })
+    );
+
+    return summaries.join('\n\n');
   }
 }

@@ -1,4 +1,6 @@
 // app/types/memory.ts
+import { EmotionalState, Platform } from '@/app/core/types';
+
 export type MemoryType = 
   | 'chat_history'
   | 'tweet_history'
@@ -73,3 +75,26 @@ export interface AgentStateMemory extends BaseMemory {
     last_update: string;
   };
 }
+
+export interface Message {
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+  }
+  
+  export interface Memory {
+    data: {
+      messages: Message[];
+    };
+    metadata: {
+      platform: Platform;
+      personalityState: any; // Replace with your PersonalityState type
+      emotionalState: any; // Replace with your EmotionalState type
+    };
+  }
+  
+  export interface MemoryQueryResult {
+    data: {
+      memories: Memory[];
+    };
+  }
