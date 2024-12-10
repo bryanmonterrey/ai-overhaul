@@ -1,31 +1,31 @@
 // app/lib/memory/memgpt-client.ts
-interface MemoryRequest {
-    key: string;
-    data?: Record<string, any>;
-    context?: string;
-  }
-  
-  interface MemoryResponse {
-    success: boolean;
-    data?: Record<string, any>;
-    error?: string;
-  }
+import { 
+    BaseMemory, 
+    MemoryType,
+    ChatMemory,
+    TweetMemory,
+    TradingParamsMemory,
+    CustomPromptMemory,
+    AgentStateMemory
+  } from '@/app/types/memory';
+import { useCallback } from 'react';
+import { useState } from 'react';
   
   export class MemGPTClient {
     private baseUrl: string;
   
-    constructor(baseUrl = '/api/memory') {  // Change this to use the Next.js API
-        this.baseUrl = baseUrl;
-      }
+    constructor(baseUrl = '/api/memory') {
+      this.baseUrl = baseUrl;
+    }
   
-    async storeMemory(request: MemoryRequest): Promise<MemoryResponse> {
+    async storeMemory<T extends BaseMemory>(memory: T): Promise<MemoryResponse> {
       try {
         const response = await fetch(`${this.baseUrl}/store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(request),
+          body: JSON.stringify(memory),
         });
   
         if (!response.ok) {
@@ -42,9 +42,31 @@ interface MemoryRequest {
       }
     }
   
-    async getMemory(key: string): Promise<MemoryResponse> {
+    async getMemory<T extends BaseMemory>(key: string, type: MemoryType): Promise<T | null> {
       try {
-        const response = await fetch(`${this.baseUrl}/${key}`);
+        const response = await fetch(`${this.baseUrl}/${key}?type=${type}`);
+  
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+  
+        const data = await response.json();
+        return data.success ? data.data : null;
+      } catch (error) {
+        console.error('Error retrieving memory:', error);
+        return null;
+      }
+    }
+  
+    async queryMemories(type: MemoryType, query: Record<string, any>) {
+      try {
+        const response = await fetch(`${this.baseUrl}/query`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ type, query }),
+        });
   
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -52,32 +74,25 @@ interface MemoryRequest {
   
         return await response.json();
       } catch (error) {
-        console.error('Error retrieving memory:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        };
+        console.error('Error querying memories:', error);
+        return null;
       }
     }
   }
-  
-  // Memory manager hook for React components
-  import { useState, useCallback } from 'react';
   
   export function useMemGPT() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const client = new MemGPTClient();
   
-    const storeMemory = useCallback(async (key: string, data: any) => {
+    const storeChat = useCallback(async (messages: ChatMemory['data']['messages']) => {
       setLoading(true);
-      setError(null);
       try {
-        const response = await client.storeMemory({ key, data });
-        if (!response.success) {
-          throw new Error(response.error || 'Failed to store memory');
-        }
-        return response.data;
+        return await client.storeMemory<ChatMemory>({
+          key: `chat-${Date.now()}`,
+          memory_type: 'chat_history',
+          data: { messages }
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
         throw err;
@@ -86,15 +101,32 @@ interface MemoryRequest {
       }
     }, []);
   
-    const getMemory = useCallback(async (key: string) => {
+    const storeTweet = useCallback(async (tweet: TweetMemory['data']['generated_tweets'][0]) => {
       setLoading(true);
-      setError(null);
       try {
-        const response = await client.getMemory(key);
-        if (!response.success) {
-          throw new Error(response.error || 'Failed to retrieve memory');
-        }
-        return response.data;
+        return await client.storeMemory<TweetMemory>({
+          key: `tweet-${Date.now()}`,
+          memory_type: 'tweet_history',
+          data: {
+            generated_tweets: [tweet]
+          }
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+  
+    const storeTrading = useCallback(async (params: TradingParamsMemory['data']) => {
+      setLoading(true);
+      try {
+        return await client.storeMemory<TradingParamsMemory>({
+          key: `trading-${Date.now()}`,
+          memory_type: 'trading_params',
+          data: params
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
         throw err;
@@ -104,9 +136,11 @@ interface MemoryRequest {
     }, []);
   
     return {
-      storeMemory,
-      getMemory,
+      storeChat,
+      storeTweet,
+      storeTrading,
       loading,
       error,
+      client, // Expose the client for custom operations
     };
   }
