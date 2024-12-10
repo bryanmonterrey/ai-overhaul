@@ -266,4 +266,82 @@ export class MemorySystem {
             associations: dbMemory.associations || []
         };
     }
+
+    private clusterMemories(): Map<string, Memory[]> {
+        const clusters = new Map<string, Memory[]>();
+        const allMemories = [...this.shortTermMemories, ...this.longTermMemories];
+        
+        allMemories.forEach(memory => {
+            memory.associations.forEach(association => {
+                if (!clusters.has(association)) {
+                    clusters.set(association, []);
+                }
+                clusters.get(association)?.push(memory);
+            });
+        });
+        
+        return clusters;
+    }
+    
+    // 2. Add memory sentiment analysis
+    private analyzeSentiment(content: string): number {
+        const positiveWords = ['good', 'great', 'excellent', 'happy', 'positive'];
+        const negativeWords = ['bad', 'poor', 'negative', 'sad', 'angry'];
+        
+        const words = content.toLowerCase().split(/\s+/);
+        let sentiment = 0;
+        
+        words.forEach(word => {
+            if (positiveWords.includes(word)) sentiment += 0.1;
+            if (negativeWords.includes(word)) sentiment -= 0.1;
+        });
+        
+        return Math.max(-1, Math.min(1, sentiment));
+    }
+    
+    // 3. Add memory decay mechanism
+    private async decayMemories(): Promise<void> {
+        const now = new Date();
+        this.longTermMemories.forEach(memory => {
+            const age = (now.getTime() - memory.timestamp.getTime()) / (1000 * 60 * 60 * 24); // age in days
+            memory.importance *= Math.exp(-age / 30); // decay over 30 days
+        });
+        
+        // Remove memories that have decayed below threshold
+        const threshold = 0.1;
+        this.longTermMemories = this.longTermMemories.filter(m => m.importance > threshold);
+    }
+    
+    // 4. Add memory retrieval by context
+    public getMemoriesByContext(context: Context): Memory[] {
+        const allMemories = [...this.shortTermMemories, ...this.longTermMemories];
+        return allMemories.filter(memory => 
+            memory.platform === context.platform &&
+            (context.emotionalContext ? memory.emotionalContext === context.emotionalContext : true)
+        ).sort((a, b) => b.importance - a.importance);
+    }
+    
+    // 5. Add memory summarization
+    public async summarizeMemories(timeframe: 'day' | 'week' | 'month'): Promise<string> {
+        const now = new Date();
+        const timeframes = {
+            day: 24 * 60 * 60 * 1000,
+            week: 7 * 24 * 60 * 60 * 1000,
+            month: 30 * 24 * 60 * 60 * 1000
+        };
+        
+        const relevantMemories = this.longTermMemories.filter(memory => 
+            now.getTime() - memory.timestamp.getTime() < timeframes[timeframe]
+        );
+        
+        const summary = relevantMemories
+            .sort((a, b) => b.importance - a.importance)
+            .slice(0, 5)
+            .map(m => m.content)
+            .join('\n');
+            
+        return summary;
+    }
+
+
 }

@@ -454,6 +454,82 @@ interface PersonalitySystemConfig {
   
       this.updateNarrativeMode();
     }
+
+    private evolvePersonality(): void {
+      const recentMemories = this.state.memories.slice(-10);
+      const emotionalStates = recentMemories.map(m => m.emotionalContext);
+      
+      // Adjust traits based on recent experiences
+      const dominantEmotion = this.calculateDominantEmotion(emotionalStates);
+      this.adaptTraitsToEmotionalState(dominantEmotion);
+      
+      // Evolve narrative style
+      this.updateNarrativeStyle(recentMemories);
+  }
+
+  private calculateEmotionalTransition(
+    currentState: EmotionalState, 
+    stimulus: string
+): EmotionalState {
+    const emotionalTriggers = new Map<string, EmotionalState>([
+        ['error', EmotionalState.Chaotic],
+        ['success', EmotionalState.Excited],
+        ['question', EmotionalState.Contemplative],
+        ['discovery', EmotionalState.Creative],
+        ['problem', EmotionalState.Analytical]
+    ]);
+
+    for (const [trigger, state] of emotionalTriggers) {
+        if (stimulus.toLowerCase().includes(trigger)) {
+            const volatility = this.config.emotionalVolatility;
+            return Math.random() < volatility ? state : currentState;
+        }
+    }
+
+    return currentState;
+}
+
+private updateContextAwareness(context: Context): void {
+  const { platform, environmentalFactors } = context;
+  
+  // Adjust behavior based on platform
+  if (platform === 'twitter') {
+      this.traits.set('provocative_tendency', 
+          Math.min(1, (this.traits.get('provocative_tendency') || 0) + 0.2));
+  }
+  
+  // Adjust to environmental factors
+  if (environmentalFactors?.timeOfDay === 'night') {
+      this.traits.set('chaos_threshold', 
+          Math.min(1, (this.traits.get('chaos_threshold') || 0) + 0.1));
+  }
+}
+
+private analyzeInteractionPatterns(): void {
+  const recentInteractions = this.state.currentContext.recentInteractions;
+  
+  const patterns = recentInteractions.reduce((acc, interaction) => {
+      const type = this.categorizeInteraction(interaction);
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+  }, {} as Record<string, number>);
+  
+  this.adaptToPatterns(patterns);
+}
+
+private ensureCoherence(): void {
+  const traits = this.getTraits();
+  let coherenceScore = 0;
+  
+  // Check for trait conflicts
+  if (traits.technical_depth > 0.7 && traits.chaos_threshold > 0.7) {
+      this.modifyTrait('chaos_threshold', -0.1);
+  }
+  
+  if (traits.philosophical_inclination > 0.7 && traits.provocative_tendency > 0.7) {
+      this.modifyTrait('provocative_tendency', -0.1);
+  }
+}
   
     private calculateImportance(response: string): number {
       const techDepth = this.traits.get('technical_depth') || 0.5;

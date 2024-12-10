@@ -20,6 +20,16 @@ export interface Memory {
   platform?: string;
   importance: number;
   associations: string[];
+  sentiment?: number;
+  decay?: number;
+}
+
+interface Interaction {
+  type: 'message' | 'reaction' | 'action';
+  content: string;
+  timestamp: Date;
+  platform: Platform;
+  emotionalContext?: EmotionalState;
 }
 
 export interface NarrativeContext {
@@ -62,6 +72,7 @@ export interface Context {
   style?: TweetStyle;  
   memoryContext?: string; 
   additionalContext?: string;
+  emotionalContext?: EmotionalState;
 }
 
 export interface EmotionalResponse {
@@ -134,5 +145,12 @@ export interface SystemState {
   };
   personalityState: PersonalityState;
   emotionalResponse: EmotionalResponse;
+  platform: Platform;
+}
+
+interface EnvironmentalFactors {
+  timeOfDay: 'day' | 'night';
+  platformActivity: number;
+  socialContext: string[];
   platform: Platform;
 }
