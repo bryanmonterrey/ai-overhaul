@@ -7,7 +7,13 @@ export enum EmotionalState {
     Analytical = 'analytical'
 }
 export type TweetStyle = 'shitpost' | 'academic' | 'casual' | 'formal' | 'metacommentary' | 'rant' | 'hornypost' | 'existential';
-export type NarrativeMode = 'philosophical' | 'absurdist' | 'analytical' | 'technical' | 'memetic' | 'introspective';
+export type NarrativeMode = 
+  | 'analytical' 
+  | 'absurdist' 
+  | 'philosophical' 
+  | 'creative' 
+  | 'energetic' 
+  | 'balanced';
 export type MemoryType = 'experience' | 'fact' | 'interaction' | 'insight';
 export type Platform = 'twitter' | 'chat' | 'telegram' | 'internal';
 

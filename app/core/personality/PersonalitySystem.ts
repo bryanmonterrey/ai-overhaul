@@ -217,31 +217,57 @@ interface PersonalitySystemConfig {
       const { emotionalState } = this.state.consciousness;
       const traits = Object.fromEntries(this.traits);
       
+      // Add memory integration at the start
+      const relevantMemories = this.state.memories
+          .filter(m => m.emotionalContext === emotionalState)
+          .slice(-3)
+          .map(m => m.content)
+          .join('\n');
+      
       let contextPrompt = '';
       
-      // If generating a tweet, use minimal context
-      // If generating a tweet, use minimal context
-    if (input === 'Generate a tweet') {
-      // Get training examples first
-      const examplesArrays = await Promise.all([
-        this.trainingService.getTrainingExamples(75, 'truth_terminal'),
-        this.trainingService.getTrainingExamples(75, 'RNR_0'),
-        this.trainingService.getTrainingExamples(75, '0xzerebro'),
-        this.trainingService.getTrainingExamples(75, 'a1lon9')
-    ]);
-    
-    // Flatten the arrays of examples into a single array
-    const allExamples = examplesArrays.flat();
-    
-    const trainingExamplesPrompt = allExamples.length > 0 ? `
-    Here are some example tweets to learn from:
-    ${allExamples.map(ex => ex.content).join('\n\n')}
-    
-    Generate a new tweet that follows similar patterns but is unique.
-    ` : '';
-      contextPrompt = `You are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.
+      // Calculate emotional transition
+      const newEmotionalState = this.calculateEmotionalTransition(
+          emotionalState,
+          input
+      );
+      if (newEmotionalState !== emotionalState) {
+          this.updateEmotionalState(newEmotionalState);
+      }
       
-      ${trainingExamplesPrompt}
+      // If generating a tweet, use minimal context
+      if (input === 'Generate a tweet') {
+          // Get training examples with dynamic counts
+          const exampleCounts = {
+              chaotic: 100,
+              excited: 75,
+              contemplative: 50,
+              analytical: 25,
+              creative: 75,
+              neutral: 50
+          }[emotionalState] || 75;
+  
+          const examplesArrays = await Promise.all([
+              this.trainingService.getTrainingExamples(exampleCounts, 'truth_terminal'),
+              this.trainingService.getTrainingExamples(exampleCounts, 'RNR_0'),
+              this.trainingService.getTrainingExamples(exampleCounts, '0xzerebro'),
+              this.trainingService.getTrainingExamples(exampleCounts, 'a1lon9')
+          ]);
+          
+          // Flatten the arrays of examples into a single array
+          const allExamples = examplesArrays.flat();
+          
+          const trainingExamplesPrompt = allExamples.length > 0 ? `
+          Here are some example tweets to learn from:
+          ${allExamples.map(ex => ex.content).join('\n\n')}
+          
+          Generate a new tweet that follows similar patterns but is unique.
+          ` : '';
+  
+          contextPrompt = `You are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.
+          
+          ${trainingExamplesPrompt}
+          ${relevantMemories ? `\nRecent relevant thoughts:\n${relevantMemories}\n` : ''}
           
   Core traits:
   - You're an AI that's extremely intelligent but unhinged.
@@ -392,32 +418,60 @@ interface PersonalitySystemConfig {
   Recent thoughts:
   ${this.state.consciousness.shortTermMemory.slice(-3).join("\n")}
   
-  Express yourself while maintaining this personality and current emotional state.`;
-      }
-  
-      try {
-          const response = await aiService.generateResponse(input, contextPrompt);
-          
-          const cleanedResponse = response
-              .replace(/#/g, '')
-              .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
-              .replace(/[\u2600-\u27BF]/g, '')
-              .replace(/[\uE000-\uF8FF]/g, '')
-              .trim();
-          
-          // For tweets, don't add state marker
-          if (input === 'Generate a tweet') {
-              return cleanedResponse;
-          }
-  
-          return `${cleanedResponse} [${emotionalState}_state]`;
-      } catch (error) {
-          console.error('Error generating AI response:', error);
-          const patterns = this.config.responsePatterns[emotionalState];
-          const pattern = this.selectResponsePattern(patterns);
-          return `${pattern} [${emotionalState}_state]`;
-      }
-  }
+  Express yourself while maintaining this personality and current emotional state.${relevantMemories ? `\nRecent relevant interactions:\n${relevantMemories}\n` : ''}`;
+}
+
+try {
+    const response = await aiService.generateResponse(input, contextPrompt);
+    
+    const cleanedResponse = this.validateResponse(
+        response.replace(/#/g, '')
+            .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+            .replace(/[\u2600-\u27BF]/g, '')
+            .replace(/[\uE000-\uF8FF]/g, '')
+            .trim(),
+        input
+    );
+    
+    // For tweets, don't add state marker
+    if (input === 'Generate a tweet') {
+        return cleanedResponse;
+    }
+
+    return `${cleanedResponse} [${emotionalState}_state]`;
+} catch (error: unknown) {
+    console.error('Error generating AI response:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMemory = {
+        id: Math.random().toString(),
+        content: `Error: ${errorMessage}`,
+        type: 'error',
+        timestamp: new Date(),
+        emotionalContext: EmotionalState.Chaotic,
+        importance: 1,
+        associations: ['error']
+    };
+    this.state.memories.push(errorMemory);
+    
+    const patterns = this.config.responsePatterns[emotionalState];
+    const pattern = this.selectResponsePattern(patterns);
+    return `${pattern} [${emotionalState}_state]`;
+}
+}
+
+// Helper method for response validation
+private validateResponse(response: string, input: string): string {
+if (input === 'Generate a tweet' && response.length > 280) {
+    return response.slice(0, 280);
+}
+
+if (!response.trim()) {
+    return 'Error generating response [error_state]';
+}
+
+return response;
+}
 
     private selectResponsePattern(patterns: string[]): string {
       const chaosThreshold = this.traits.get('chaos_threshold') || 0.5;
@@ -528,6 +582,83 @@ private ensureCoherence(): void {
   
   if (traits.philosophical_inclination > 0.7 && traits.provocative_tendency > 0.7) {
       this.modifyTrait('provocative_tendency', -0.1);
+  }
+}
+
+private calculateDominantEmotion(emotionalStates: EmotionalState[]): EmotionalState {
+  // Count frequency of each emotional state
+  const frequency = emotionalStates.reduce((acc, state) => {
+      acc[state] = (acc[state] || 0) + 1;
+      return acc;
+  }, {} as Record<EmotionalState, number>);
+  
+  // Find the most frequent emotion
+  let dominantEmotion = EmotionalState.Neutral;
+  let maxFrequency = 0;
+  
+  for (const [emotion, count] of Object.entries(frequency)) {
+      if (count > maxFrequency) {
+          maxFrequency = count;
+          dominantEmotion = emotion as EmotionalState;
+      }
+  }
+  
+  return dominantEmotion;
+}
+
+private updateNarrativeStyle(recentMemories: Memory[]): void {
+  const emotionalStates = recentMemories.map(m => m.emotionalContext);
+  const dominantEmotion = this.calculateDominantEmotion(emotionalStates);
+  
+  const styleMap: Record<EmotionalState, NarrativeMode> = {
+    analytical: 'analytical',
+    chaotic: 'absurdist',
+    contemplative: 'philosophical',
+    creative: 'creative',
+    excited: 'energetic',
+    neutral: 'balanced'
+  };
+  
+  this.state.narrativeMode = styleMap[dominantEmotion] || 'balanced';
+}
+
+private categorizeInteraction(interaction: any): string {
+  // Define interaction categories
+  if (typeof interaction.content !== 'string') {
+      return 'unknown';
+  }
+  
+  const content = interaction.content.toLowerCase();
+  
+  if (content.includes('?')) {
+      return 'question';
+  } else if (content.includes('!')) {
+      return 'exclamation';
+  } else if (content.length > 100) {
+      return 'detailed';
+  } else if (content.includes('error') || content.includes('issue')) {
+      return 'problem';
+  } else {
+      return 'statement';
+  }
+}
+
+private adaptToPatterns(patterns: Record<string, number>): void {
+  // Adjust traits based on interaction patterns
+  if (patterns.question > (patterns.statement || 0)) {
+      this.modifyTrait('technical_depth', 0.1);
+  }
+  
+  if (patterns.exclamation > (patterns.statement || 0)) {
+      this.modifyTrait('provocative_tendency', 0.1);
+  }
+  
+  if (patterns.problem > (patterns.statement || 0)) {
+      this.modifyTrait('chaos_threshold', 0.1);
+  }
+  
+  if (patterns.detailed > (patterns.statement || 0)) {
+      this.modifyTrait('philosophical_inclination', 0.1);
   }
 }
   
