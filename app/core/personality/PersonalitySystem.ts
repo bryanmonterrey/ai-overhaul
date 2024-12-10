@@ -14,6 +14,13 @@ import {
   } from '@/app/core/personality/types';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
+import { 
+  ChatMemory, 
+  MemoryResponse,
+  Message,
+  Memory as MemGPTMemory 
+} from '@/app/types/memory';
   
 interface PersonalitySystemConfig {
   baseTemperature: number;
@@ -42,6 +49,7 @@ interface PersonalitySystemConfig {
     private config: PersonalityConfig;
     private traits: Map<string, number> = new Map();
     private trainingService: TwitterTrainingService;
+    private memgpt: MemGPTClient;
 
     constructor(config: PersonalitySystemConfig) {
       this.config = {
@@ -51,6 +59,7 @@ interface PersonalitySystemConfig {
       this.state = this.initializeState();
       this.initializeTraits();
       this.trainingService = new TwitterTrainingService();
+      this.memgpt = new MemGPTClient();
     }
 
     
@@ -223,13 +232,17 @@ interface PersonalitySystemConfig {
     public async generateResponse(input: string): Promise<string> {
       const { emotionalState } = this.state.consciousness;
       const traits = Object.fromEntries(this.traits);
+
+      const memgptMemories = await this.memgpt.queryMemories('chat_history', {
+        emotionalState,
+        limit: 3
+    });
       
       // Add memory integration at the start
-      const relevantMemories = this.state.memories
-          .filter(m => m.emotionalContext === emotionalState)
-          .slice(-3)
-          .map(m => m.content)
-          .join('\n');
+      const relevantMemories = memgptMemories?.data?.memories
+    ?.map((m: ChatMemory) => m.data.messages.map(msg => msg.content).join('\n'))
+    .join('\n') || '';
+  
       
       let contextPrompt = '';
       
@@ -499,37 +512,67 @@ return response;
         : patterns[Math.floor(Math.random() * patterns.length)];
     }
   
-    private postResponseUpdate(response: string): void {
+    private async postResponseUpdate(response: string): Promise<void> {
       if (this.isSignificantInteraction(response)) {
-        const memory: Memory = {
-          id: Math.random().toString(),
-          content: response,
-          type: 'interaction',
-          timestamp: new Date(),
-          emotionalContext: this.state.consciousness.emotionalState,
-          associations: [],
-          importance: this.calculateImportance(response),
-          platform: this.state.currentContext.platform
-        };
-        this.state.memories.push(memory);
+          const memory: Memory = {
+              id: Math.random().toString(),
+              content: response,
+              type: 'interaction',
+              timestamp: new Date(),
+              emotionalContext: this.state.consciousness.emotionalState,
+              associations: [],
+              importance: this.calculateImportance(response),
+              platform: this.state.currentContext.platform
+          };
+          
+          // Store in state
+          this.state.memories.push(memory);
+          
+          // Store in MemGPT
+          await this.memgpt.storeMemory({
+              key: memory.id,
+              memory_type: 'chat_history',
+              data: {
+                  messages: [{
+                      role: 'assistant',
+                      content: memory.content,
+                      timestamp: memory.timestamp.toISOString(),
+                      metadata: {
+                          emotionalState: {
+                              state: memory.emotionalContext,
+                              intensity: memory.importance
+                          }
+                      }
+                  }]
+              }
+          });
       }
-
-      this.analyzeInteractionPatterns();
   
-      this.updateNarrativeMode();
-    }
+      this.analyzeInteractionPatterns();
 
-    private evolvePersonality(): void {
-      const recentMemories = this.state.memories.slice(-10);
-      const emotionalStates = recentMemories.map(m => m.emotionalContext);
-      
-      // Adjust traits based on recent experiences
-      const dominantEmotion = this.calculateDominantEmotion(emotionalStates);
-      this.adaptTraitsToEmotionalState(dominantEmotion);
-      
-      // Evolve narrative style
-      this.updateNarrativeStyle(recentMemories);
+      this.updateNarrativeMode();
   }
+
+  private async evolvePersonality(): Promise<void> {
+    // Get recent memories from MemGPT
+    const recentMemories = await this.memgpt.queryMemories('chat_history', {
+        limit: 10,
+        orderBy: 'timestamp',
+        order: 'desc'
+    });
+
+    const memories = recentMemories?.data?.memories || [];
+    const emotionalStates = (memories as ChatMemory[]).map(m => 
+      m.metadata?.emotionalState?.state || EmotionalState.Neutral
+  );
+    
+
+    const dominantEmotion = this.calculateDominantEmotion(emotionalStates);
+
+    this.adaptTraitsToEmotionalState(dominantEmotion);
+    
+    this.updateNarrativeStyle(memories);
+}
 
   private calculateEmotionalTransition(
     currentState: EmotionalState, 
@@ -552,6 +595,8 @@ return response;
 
     return currentState;
 }
+
+
 
 private updateContextAwareness(context: Context): void {
   const { platform, environmentalFactors } = context;
@@ -581,11 +626,19 @@ private analyzeInteractionPatterns(): void {
   this.adaptToPatterns(patterns);
 }
 
-private ensureCoherence(): void {
+private async ensureCoherence(): Promise<void> {
+  // Get recent memories to check response patterns
+  const recentMemories = await this.memgpt.queryMemories('chat_history', {
+      limit: 5,
+      orderBy: 'timestamp',
+      order: 'desc'
+  });
+
+  const memories = recentMemories?.data?.memories || [];
   const traits = this.getTraits();
-  let coherenceScore = 0;
+
   
-  // Check for trait conflicts
+  // Existing coherence checks
   if (traits.technical_depth > 0.7 && traits.chaos_threshold > 0.7) {
       this.modifyTrait('chaos_threshold', -0.1);
   }
@@ -593,6 +646,27 @@ private ensureCoherence(): void {
   if (traits.philosophical_inclination > 0.7 && traits.provocative_tendency > 0.7) {
       this.modifyTrait('provocative_tendency', -0.1);
   }
+
+  // New memory-based coherence
+  const recentResponses = (memories as ChatMemory[]).map(m => 
+    m.data.messages[0]?.content || ''
+);
+  const consistency = this.checkResponseConsistency(recentResponses);
+  
+  if (consistency < 0.5) {
+      this.modifyTrait('chaos_threshold', -0.05);
+  }
+}
+
+private checkResponseConsistency(responses: string[]): number {
+  // Simple consistency check based on response length variance
+  if (responses.length < 2) return 1;
+  
+  const lengths = responses.map(r => r.length);
+  const average = lengths.reduce((a, b) => a + b) / lengths.length;
+  const variance = lengths.reduce((a, b) => a + Math.pow(b - average, 2), 0) / lengths.length;
+  
+  return Math.max(0, 1 - (variance / 10000)); // Normalize to 0-1
 }
 
 private calculateDominantEmotion(emotionalStates: EmotionalState[]): EmotionalState {
