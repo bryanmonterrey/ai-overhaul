@@ -14,7 +14,7 @@ import {
   } from '@/app/core/personality/types';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
-import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
+import { MemGPTClient } from '@/app/lib/memory/letta-client';
 import { 
   ChatMemory, 
   MemoryResponse,

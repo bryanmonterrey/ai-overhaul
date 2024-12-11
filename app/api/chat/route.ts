@@ -11,7 +11,7 @@ import { Platform } from '@/app/core/types';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
 import { MemorySystem } from '@/app/core/personality/MemorySystem';
-import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
+import { MemGPTClient } from '@/app/lib/memory/letta-client';
 import { EmotionalState } from '@/app/core/personality/types';
 
 // Input validation schema

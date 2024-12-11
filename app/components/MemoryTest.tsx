@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMemGPT } from '../lib/memory/memgpt-client';
+import { useMemGPT } from '../lib/memory/letta-client';
 
 export default function MemoryTest() {
   const { storeChat, loading, error } = useMemGPT();

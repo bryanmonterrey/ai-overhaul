@@ -1,6 +1,6 @@
 // src/app/core/personality/MemorySystem.ts
 
-import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
+import { MemGPTClient } from '@/app/lib/memory/letta-client';
 import { createClient } from '@supabase/supabase-js';
 import {
     Memory,

@@ -14,7 +14,7 @@ import { LLMManager } from '../llm/model_manager';
 import type { EnvironmentalFactors, MemoryType } from '../types/index';
 import type { PersonalityState as CorePersonalityState } from '../types/index';
 import { Memory, MemoryQueryResult, Message, StorageMemory } from '@/app/types/memory';
-import { MemGPTClient } from '@/app/lib/memory/memgpt-client';
+import { MemGPTClient } from '@/app/lib/memory/letta-client';
 import { convertCoreToStorageMemory } from '@/app/lib/memory/memory-converters';
 import { Memory as CoreMemory } from './types';
 

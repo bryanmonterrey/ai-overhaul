@@ -1,5 +1,5 @@
 // app/lib/memory/test-connection.ts
-import { MemGPTClient } from './memgpt-client';
+import { MemGPTClient } from './letta-client';
 
 export async function testMemGPTConnection() {
     const memgpt = new MemGPTClient();
