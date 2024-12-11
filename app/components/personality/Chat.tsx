@@ -1,5 +1,7 @@
 // src/app/components/personality/Chat.tsx
 
+'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { MemoryType, PersonalityState, Platform, Memory, EmotionalState } from '@/app/core/types';
 import { PersonalityState as SimulatorState } from '@/app/core/personality/types';

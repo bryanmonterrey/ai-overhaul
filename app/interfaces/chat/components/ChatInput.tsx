@@ -1,4 +1,5 @@
 // src/app/interfaces/chat/components/ChatInput.tsx
+'use client';
 
 import React, { useState } from 'react';
 import { Input } from '@/app/components/common/Input';
