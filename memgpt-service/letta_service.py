@@ -5,15 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Optional, Dict, Any, List
-from letta.config import LLMConfig, AgentConfig  # Keep these original imports
+from letta.config import LLMConfig  # Keep these original imports
 from letta.interface import CLIInterface
 from letta.agent import Agent  # Fix this import
 from memory_processor import MemoryProcessor  # Keep your original memory processor
 import uvicorn
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import asyncio
+
 
 load_dotenv()
 
@@ -72,30 +73,49 @@ class MemGPTService:
         # Initialize Supabase
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        # Initialize Letta with Claude/GPT-4 configuration
+        # Create LLM config first
         llm_config = LLMConfig(
             model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
             model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
-            context_window=100000 if ANTHROPIC_API_KEY else 8192,
-            api_key=ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY
+            context_window=100000 if ANTHROPIC_API_KEY else 8192
         )
         
-        # Initialize Letta agent
-        self.agent_config = AgentConfig(
-            name="memory_agent",
-            model=llm_config.model,  # Pass model directly
-            persona=DEFAULT_PERSONA,
-            human=DEFAULT_HUMAN,
-            context_window=llm_config.context_window
-        )
-        
+        # Create interface first
         self.interface = CLIInterface()
+        
+        # Create initial agent state and user
+        agent_state = {
+            "persona": DEFAULT_PERSONA,
+            "human": DEFAULT_HUMAN,
+            "messages": [],
+            "memory": {}
+        }
+        
+        user = {
+            "id": "default_user",
+            "name": "User",
+            "preferences": {}
+        }
+        
+        # Initialize Letta agent with required arguments
         self.agent = Agent(
-            agent_config=self.agent_config,
+            agent_state=agent_state,
+            user=user,
             interface=self.interface
         )
         
-        # Initialize memory processor for enhanced features
+        # Configure the agent's settings
+        self.agent.configure(
+            model=llm_config.model,
+            model_endpoint_type=llm_config.model_endpoint_type,
+            model_endpoint=f"https://api.{'anthropic' if ANTHROPIC_API_KEY else 'openai'}.com/v1",
+            context_window=llm_config.context_window,
+            embedding_endpoint_type="openai",
+            embedding_endpoint="https://api.openai.com/v1",
+            embedding_model="text-embedding-ada-002"
+        )
+        
+        # Initialize memory processor
         self.memory_processor = MemoryProcessor(self.agent)
 
     async def process_memory_content(self, content: str) -> Dict[str, Any]:

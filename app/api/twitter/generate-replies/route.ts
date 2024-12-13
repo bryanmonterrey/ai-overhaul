@@ -9,32 +9,40 @@ import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
 import { Platform } from '@/app/core/personality/types';
 
 export async function POST(request: Request) {
-  try {
-    const { tweet, style, count = 5 } = await request.json();
-    const lettaClient = new LettaClient();
-    const personalitySystem = new PersonalitySystem({
-        ...DEFAULT_PERSONALITY,
-        platform: 'twitter' as Platform
-    });
-
-    const trainingService = new TwitterTrainingService();
-
-
-    // Get all context data in parallel
-    const [memoryContext, patterns, analysis, trainingExamples] = await Promise.all([
-      lettaClient.chainMemories(tweet.id, {
-        depth: 3,
-        min_similarity: 0.6
-      }),
-      lettaClient.analyzeContent(tweet.content),
-      personalitySystem.analyzeContext(tweet.content),
-      Promise.all([
-        trainingService.getTrainingExamples(75, 'truth_terminal'),
-        trainingService.getTrainingExamples(75, 'RNR_0'),
-        trainingService.getTrainingExamples(75, '0xzerebro'),
-        trainingService.getTrainingExamples(75, 'a1lon9')
-      ])
-    ]);
+    try {
+        let { tweet, style, count = 5 } = await request.json();
+    
+        // Handle case when tweet is just text
+        if (typeof tweet === 'string') {
+          tweet = { 
+            id: Date.now().toString(),
+            content: tweet 
+          };
+        }
+    
+        const lettaClient = new LettaClient();
+        const personalitySystem = new PersonalitySystem({
+            ...DEFAULT_PERSONALITY,
+            platform: 'twitter' as Platform
+        });
+        const trainingService = new TwitterTrainingService();
+    
+        // Get all context data in parallel
+        const [memoryContext, patterns, analysis, trainingExamples] = await Promise.all([
+          lettaClient.chainMemories(tweet.id, {
+            depth: 3,
+            min_similarity: 0.6
+          }),
+          lettaClient.analyzeContent(tweet.content),
+          personalitySystem.analyzeContext(tweet.content),
+          Promise.all([
+            trainingService.getTrainingExamples(75, 'truth_terminal'),
+            trainingService.getTrainingExamples(75, 'RNR_0'),
+            trainingService.getTrainingExamples(75, '0xzerebro'),
+            trainingService.getTrainingExamples(75, 'a1lon9')
+          ])
+        ]);
+    
 
     // Process training examples
     const allExamples = trainingExamples.flat();
@@ -201,9 +209,12 @@ export async function POST(request: Request) {
           console.log(`Generation attempt ${attempts}/${maxRetries} for reply ${i + 1}`);
   
           const generatedReply = await aiService.generateResponse(
-            `Reply to tweet: ${tweet}`,
+            `Reply to tweet: ${tweet.content}`,
             contextPrompt
-          );
+          ).catch(error => {
+            console.error('AI generation error:', error);
+            return null;
+          });
   
           if (generatedReply) {
             // Your existing cleanup logic

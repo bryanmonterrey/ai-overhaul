@@ -12,6 +12,11 @@ interface GeneratedReply {
   style: TweetStyle;
 }
 
+interface Tweet {
+    id: string;
+    content: string;
+  }
+
 interface ReplyGeneratorProps {
   onReplySelect: (content: string) => Promise<void>;
   isLoading?: boolean;
@@ -34,18 +39,30 @@ export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGenera
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          tweet: originalTweet,
+          tweet: {
+            id: Date.now().toString(), // Generate a temporary ID if needed
+            content: originalTweet
+          },
           style: selectedStyle,
-          count: 3 // Generate 3 different replies
+          count: 3
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to generate replies');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate replies');
+      }
       
       const data = await response.json();
-      setGeneratedReplies(data.replies);
+      if (data.replies) {
+        setGeneratedReplies(data.replies);
+      } else {
+        throw new Error('No replies received');
+      }
     } catch (error) {
       console.error('Failed to generate replies:', error);
+      // Maybe add an error state to show to the user
+      setGeneratedReplies([]);
     } finally {
       setIsGenerating(false);
     }
