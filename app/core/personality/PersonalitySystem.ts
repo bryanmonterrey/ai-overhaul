@@ -23,6 +23,7 @@ import {
   Memory as MemGPTMemory 
 } from '@/app/types/memory';
 import { MemorySystem } from './MemorySystem';
+import { EmotionalSystem } from './EmotionalSystem';
   
 interface PersonalitySystemConfig {
   baseTemperature: number;
@@ -53,6 +54,7 @@ interface PersonalitySystemConfig {
     private trainingService: TwitterTrainingService;
     private memgpt: LettaClient;
     private memorySystem: MemorySystem;
+    private emotionalSystem: EmotionalSystem;
 
     constructor(config: PersonalitySystemConfig) {
       this.config = {
@@ -64,6 +66,7 @@ interface PersonalitySystemConfig {
       this.trainingService = new TwitterTrainingService();
       this.memgpt = new LettaClient();
       this.memorySystem = new MemorySystem(this.memgpt);
+      this.emotionalSystem = new EmotionalSystem();
       // Test MemGPT connection
       this.testMemGPTConnection();
   }
@@ -806,17 +809,19 @@ private adaptToPatterns(patterns: Record<string, number>): void {
 
     public async analyzeContext(content: string): Promise<EnhancedMemoryAnalysis> {
       try {
+          // Use emotional system for sentiment analysis
+          const sentiment = this.emotionalSystem.analyzeSentiment(content);
+          
           // Get memory chains and patterns in parallel
-          const [memoryChain, patterns, sentiment] = await Promise.all([
+          const [memoryChain, patterns] = await Promise.all([
               this.memgpt.queryMemories('chat_history', {
                   content,
                   limit: 3,
                   semantic_search: true
               }),
-              this.memgpt.analyzeContent(content),
-              this.analyzeSentiment(content)
+              this.memgpt.analyzeContent(content)
           ]);
-  
+
           // Get emotional context based on current state
           const emotional_context = this.state.consciousness.emotionalState;
           
@@ -827,11 +832,11 @@ private adaptToPatterns(patterns: Record<string, number>): void {
           const importance_score = this.calculateImportance(content);
           
           // Get associations from memory chain
-          const associations = memoryChain?.data?.memories?.map(m => m.content) || [];
+          const associations = memoryChain?.data?.memories?.map((m: any) => m.content) || [];
           
           // Generate a summary using the memory processor
           const summary = await this.memorySystem.getMemorySummary('recent');
-  
+
           return {
               sentiment,
               emotional_context,

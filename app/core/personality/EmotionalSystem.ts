@@ -101,6 +101,22 @@ import {
   
       return this.profile.baseState;
     }
+
+    public analyzeSentiment(content: string): number {
+      const positiveWords = ['good', 'great', 'excellent', 'happy', 'positive', 'amazing', 'incredible'];
+      const negativeWords = ['bad', 'poor', 'negative', 'sad', 'angry', 'chaos', 'wild'];
+      
+      const words = content.toLowerCase().split(/\s+/);
+      let sentiment = 0;
+      
+      words.forEach(word => {
+          if (positiveWords.includes(word)) sentiment += 0.1;
+          if (negativeWords.includes(word)) sentiment -= 0.1;
+      });
+      
+      // Normalize between -1 and 1
+      return Math.max(-1, Math.min(1, sentiment));
+  }
   
     private calculateIntensity(baseIntensity: number, state: EmotionalState): number {
       let intensity = baseIntensity;
