@@ -486,4 +486,40 @@ export class MemorySystem {
         return [];
     }
 
+    public async getMemoryChain(memoryKey: string, depth: number = 3): Promise<Memory[]> {
+        const response = await this.letta.chainMemories(memoryKey, {
+            depth,
+            min_similarity: 0.6
+        });
+        
+        if (response.success && response.data?.chain) {
+            return response.data.chain.map(this.mapDBMemoryToMemory);
+        }
+        return [];
+    }
+
+    public async getMemoryClusters(timeframe: string = 'week'): Promise<Map<string, Memory[]>> {
+        const response = await this.letta.clusterMemories({
+            time_period: timeframe,
+            min_cluster_size: 3,
+            similarity_threshold: 0.7
+        });
+        
+        if (response.success && response.data?.clusters) {
+            return new Map(
+                Object.entries(response.data.clusters)
+                    .map(([key, memories]) => [
+                        key, 
+                        memories.map(this.mapDBMemoryToMemory)
+                    ])
+            );
+        }
+        return new Map();
+    }
+
+    public async trackMemoryEvolution(concept: string): Promise<any> {
+        const response = await this.letta.trackEvolution(concept);
+        return response.success ? response.data.evolution : null;
+    }
+
 }

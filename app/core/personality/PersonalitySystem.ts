@@ -21,6 +21,7 @@ import {
   Message,
   Memory as MemGPTMemory 
 } from '@/app/types/memory';
+import { MemorySystem } from './MemorySystem';
   
 interface PersonalitySystemConfig {
   baseTemperature: number;
@@ -50,6 +51,7 @@ interface PersonalitySystemConfig {
     private traits: Map<string, number> = new Map();
     private trainingService: TwitterTrainingService;
     private memgpt: LettaClient;
+    private memorySystem: MemorySystem;
 
     constructor(config: PersonalitySystemConfig) {
       this.config = {
@@ -60,7 +62,7 @@ interface PersonalitySystemConfig {
       this.initializeTraits();
       this.trainingService = new TwitterTrainingService();
       this.memgpt = new LettaClient();
-      
+      this.memorySystem = new MemorySystem(this.memgpt);
       // Test MemGPT connection
       this.testMemGPTConnection();
   }
