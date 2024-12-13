@@ -1,10 +1,11 @@
 # memgpt-service/letta_service.py
 import os
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, ValidationError 
+from pydantic import BaseModel, Field, ValidationError, validator
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from letta.config import LLMConfig  # Keep these original imports
 from letta.interface import CLIInterface
 from letta.agent import Agent  # Fix this import
@@ -53,6 +54,12 @@ class QueryRequest(BaseModel):
     query: Union[str, Dict[str, Any]] = Field(..., description="Query content or parameters")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
 
+    @validator('query')
+    def validate_query(cls, v):
+        if isinstance(v, dict):
+            return json.dumps(v)
+        return v
+
 class BaseMemory(BaseModel):
     key: str
     memory_type: MemoryType
@@ -87,6 +94,8 @@ class AgentState:
         self.tools = []
         self.tool_rules = []
         self.llm_config = None
+
+
 
 class MemGPTService:
     def __init__(self):

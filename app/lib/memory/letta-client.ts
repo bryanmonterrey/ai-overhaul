@@ -61,9 +61,13 @@ export class LettaClient {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ type, query }),
+                body: JSON.stringify({ 
+                    type, 
+                    query: JSON.stringify(query), // Convert query object to string
+                    context: query.context
+                }),
             });
-
+    
             return this.handleResponse(response);
         });
     }
