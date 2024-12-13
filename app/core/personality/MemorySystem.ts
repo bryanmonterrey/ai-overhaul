@@ -37,12 +37,12 @@ export class MemorySystem {
     private readonly STM_LIMIT = 100;
     private readonly LTM_LIMIT = 1000;
 
-    constructor() {
+    constructor(lettaClient?: LettaClient) {
         this.supabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         );
-        this.letta = new LettaClient();
+        this.letta = lettaClient || new LettaClient();
         setInterval(() => this.consolidateMemories(), 1000 * 60 * 60);
         this.loadMemoriesFromDB();
     }

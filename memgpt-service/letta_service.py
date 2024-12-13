@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import asyncio
+from letta.memory import Memory
 
 
 load_dotenv()
@@ -68,55 +69,72 @@ class ContextConfig(BaseModel):
     max_tokens: int = 4000
     priority_keywords: List[str] = []
 
+class AgentState:
+    def __init__(self, persona, human, messages, memory):
+        self.persona = persona
+        self.human = human
+        self.messages = messages
+        self.message_ids = []
+        self.memory = memory
+        self.tools = []
+        self.tool_rules = []
+        self.llm_config = None
+
 class MemGPTService:
     def __init__(self):
-        # Initialize Supabase
-        self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        
-        # Create LLM config first
-        llm_config = LLMConfig(
-            model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
-            model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
-            context_window=100000 if ANTHROPIC_API_KEY else 8192
-        )
-        
-        # Create interface first
-        self.interface = CLIInterface()
-        
-        # Create initial agent state and user
-        agent_state = {
-            "persona": DEFAULT_PERSONA,
-            "human": DEFAULT_HUMAN,
-            "messages": [],
-            "memory": {}
-        }
-        
-        user = {
-            "id": "default_user",
-            "name": "User",
-            "preferences": {}
-        }
-        
-        # Initialize Letta agent with required arguments
-        self.agent = Agent(
-            agent_state=agent_state,
-            user=user,
-            interface=self.interface
-        )
-        
-        # Configure the agent's settings
-        self.agent.configure(
-            model=llm_config.model,
-            model_endpoint_type=llm_config.model_endpoint_type,
-            model_endpoint=f"https://api.{'anthropic' if ANTHROPIC_API_KEY else 'openai'}.com/v1",
-            context_window=llm_config.context_window,
-            embedding_endpoint_type="openai",
-            embedding_endpoint="https://api.openai.com/v1",
-            embedding_model="text-embedding-ada-002"
-        )
-        
-        # Initialize memory processor
-        self.memory_processor = MemoryProcessor(self.agent)
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            raise ValueError("Missing Supabase credentials in environment variables")
+        if not OPENAI_API_KEY and not ANTHROPIC_API_KEY:
+            raise ValueError("Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided")
+
+        try:
+            # Initialize Supabase
+            self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            
+            # Create LLM config with all necessary settings
+            llm_config = LLMConfig(
+                model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
+                model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
+                context_window=100000 if ANTHROPIC_API_KEY else 8192,
+                model_endpoint=f"https://api.{'anthropic' if ANTHROPIC_API_KEY else 'openai'}.com/v1",
+                embedding_endpoint_type="openai",
+                embedding_endpoint="https://api.openai.com/v1",
+                embedding_model="text-embedding-ada-002"
+            )
+            
+            # Create interface
+            self.interface = CLIInterface()
+            
+            # Create memory instance
+            memory = Memory(blocks=[])
+            
+            # Create agent state
+            agent_state = AgentState(
+                persona=DEFAULT_PERSONA,
+                human=DEFAULT_HUMAN,
+                messages=[],
+                memory=memory
+            )
+            agent_state.llm_config = llm_config
+            
+            user = {
+                "id": "default_user",
+                "name": "User",
+                "preferences": {}
+            }
+            
+            # Initialize Letta agent
+            self.agent = Agent(
+                agent_state=agent_state,
+                user=user,
+                interface=self.interface
+            )
+            
+            # Initialize memory processor
+            self.memory_processor = MemoryProcessor(self.agent)
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize MemGPTService: {str(e)}")
 
     async def process_memory_content(self, content: str) -> Dict[str, Any]:
         """Enhanced memory processing using Letta capabilities"""
@@ -415,4 +433,8 @@ async def get_memory_summary(timeframe: str = 'recent', limit: int = 5):
     return result
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=3001)
+    try:
+        print("Starting MemGPT Service...")
+        uvicorn.run(app, host="0.0.0.0", port=3001, log_level="info")
+    except Exception as e:
+        print(f"Failed to start service: {str(e)}")

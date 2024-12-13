@@ -8,14 +8,14 @@ import { Button } from '@/app/components/common/Button';
 import { TweetStyle } from '@/app/core/types';
 
 interface GeneratedReply {
-    content: string;
-    style: TweetStyle;
-    analysis?: {
-      sentiment?: number;
-      patterns?: string[];
-      emotional_context?: string;
-    };
-  }
+  content: string;
+  style: TweetStyle;
+  analysis?: {
+    sentiment?: number;
+    patterns?: string[];
+    emotional_context?: string;
+  };
+}
 
 interface ReplyGeneratorProps {
   onReplySelect: (content: string) => Promise<void>;
@@ -23,57 +23,63 @@ interface ReplyGeneratorProps {
 }
 
 export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGeneratorProps) {
-    const [originalTweet, setOriginalTweet] = useState('');
-    const [generatedReplies, setGeneratedReplies] = useState<GeneratedReply[]>([]);
-    const [selectedStyle, setSelectedStyle] = useState<TweetStyle>('metacommentary');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-  
-    const handleGenerate = async () => {
-      if (!originalTweet.trim() || isGenerating) return;
-      
-      setIsGenerating(true);
-      setError(null);
-  
-      try {
-        const response = await fetch('/api/twitter/generate-replies', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+  const [originalTweet, setOriginalTweet] = useState('');
+  const [generatedReplies, setGeneratedReplies] = useState<GeneratedReply[]>([]);
+  const [selectedStyle, setSelectedStyle] = useState<TweetStyle>('metacommentary');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = async () => {
+    if (!originalTweet.trim() || isGenerating) return;
+    
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/twitter/generate-replies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tweet: {
+            id: Date.now().toString(),
+            content: originalTweet
           },
-          body: JSON.stringify({
-            tweet: {
-              id: Date.now().toString(),
-              content: originalTweet
-            },
-            style: selectedStyle,
-            count: 3
-          }),
-        });
-  
-        const data = await response.json();
-  
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to generate replies');
-        }
-  
-        if (!data.replies || !Array.isArray(data.replies)) {
-          throw new Error('Invalid response format');
-        }
-  
-        setGeneratedReplies(data.replies);
-      } catch (error) {
-        console.error('Failed to generate replies:', error);
-        setError(error instanceof Error ? error.message : 'Failed to generate replies');
-        setGeneratedReplies([]);
-      } finally {
-        setIsGenerating(false);
+          style: selectedStyle,
+          count: 3
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate replies');
       }
-    };
+
+      const data = await response.json();
+
+      if (!data.replies || !Array.isArray(data.replies)) {
+        throw new Error('Invalid response format');
+      }
+
+      setGeneratedReplies(data.replies);
+    } catch (error) {
+      console.error('Failed to generate replies:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate replies');
+      setGeneratedReplies([]);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleReplySelect = async (reply: string) => {
-    if (!isLoading) {
+    if (isLoading) return;
+    
+    try {
       await onReplySelect(reply);
+    } catch (error) {
+      console.error('Error selecting reply:', error);
+      setError('Failed to select reply');
     }
   };
 
@@ -90,6 +96,12 @@ export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGenera
             placeholder="Paste tweet to reply to..."
           />
         </div>
+
+        {error && (
+          <div className="text-red-500 text-sm font-mono">
+            {error}
+          </div>
+        )}
 
         <div className="flex space-x-2">
           <select
