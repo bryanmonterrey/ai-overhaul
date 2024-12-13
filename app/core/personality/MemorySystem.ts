@@ -1,6 +1,6 @@
 // src/app/core/personality/MemorySystem.ts
 
-import { MemGPTClient } from '@/app/lib/memory/letta-client';
+import { LettaClient } from '@/app/lib/memory/letta-client';
 import { createClient } from '@supabase/supabase-js';
 import {
     Memory,
@@ -8,9 +8,12 @@ import {
     EmotionalState,
     Platform,
     MemoryPattern,
-    Context
+    Context,
+    EnhancedMemoryAnalysis
 } from '@/app/core/personality/types';
 import { ChatMemory, TweetMemory } from '@/app/types/memory';
+
+
 
 
 interface ExtendedMemoryPattern extends MemoryPattern {
@@ -27,7 +30,7 @@ interface ExtendedMemoryPattern extends MemoryPattern {
 
 export class MemorySystem {
     private supabase;
-    private memgpt: MemGPTClient;
+    private letta: LettaClient;
     private shortTermMemories: Memory[] = [];
     private longTermMemories: Memory[] = [];
     private patterns: ExtendedMemoryPattern[] = [];
@@ -39,9 +42,17 @@ export class MemorySystem {
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         );
-        this.memgpt = new MemGPTClient();
+        this.letta = new LettaClient();
         setInterval(() => this.consolidateMemories(), 1000 * 60 * 60);
         this.loadMemoriesFromDB();
+    }
+
+    public async getMemorySummary(timeframe: 'recent' | 'day' | 'week' = 'recent'): Promise<string> {
+        const response = await this.letta.getSummary(timeframe);
+        if (response.success) {
+            return response.data.summary;
+        }
+        return '';
     }
 
     private async loadMemoriesFromDB() {
@@ -56,9 +67,9 @@ export class MemorySystem {
     
             // Load from MemGPT - using Promise.all to fetch all memory types
             const memgptQueries = [
-                this.memgpt.queryMemories('chat_history' as MemoryType, { status: 'active' }),
-                this.memgpt.queryMemories('user_interaction' as MemoryType, { status: 'active' }),
-                this.memgpt.queryMemories('tweet_history' as MemoryType, { status: 'active' })
+                this.letta.queryMemories('chat_history' as MemoryType, { status: 'active' }),
+                this.letta.queryMemories('user_interaction' as MemoryType, { status: 'active' }),
+                this.letta.queryMemories('tweet_history' as MemoryType, { status: 'active' })
             ];
     
             const memgptResults = await Promise.all(memgptQueries);
@@ -156,40 +167,33 @@ export class MemorySystem {
             timestamp: new Date(),
             emotionalContext: emotionalContext || EmotionalState.Neutral,
             platform,
-            importance: this.calculateImportance(content),
-            associations: this.generateAssociations(content)
+            importance: 0.5,  // Will be updated by Letta's analysis
+            associations: []  // Will be updated by Letta's analysis
         };
-    
-        // Add to local memory
-        this.shortTermMemories.push(memory);
-    
-        // Map to appropriate MemGPT memory type
-        const memgptMemory = this.createMemGPTMemory(memory);
-    
+
         try {
-            await Promise.all([
-                // Supabase storage
-                this.supabase
-                    .from('memories')
-                    .insert({
-                        id: memory.id,
-                        content: memory.content,
-                        type: memory.type,
-                        created_at: memory.timestamp.toISOString(),
-                        emotional_context: memory.emotionalContext,
-                        importance: memory.importance,
-                        associations: memory.associations,
-                        platform: memory.platform,
-                        archive_status: 'active'
-                    }),
-                
-                // MemGPT storage
-                this.memgpt.storeMemory(memgptMemory)
-            ]);
+            const response = await this.letta.storeMemory({
+                key: memory.id,
+                memory_type: type,
+                data: { content },
+                metadata: {
+                    emotionalState: emotionalContext,
+                    platform,
+                }
+            });
+
+            if (response.success && response.data) {
+                // Update memory with enhanced analysis
+                memory.importance = response.data.metadata?.importance_score || memory.importance;
+                memory.associations = response.data.metadata?.associations || [];
+                memory.emotionalContext = response.data.metadata?.emotional_context || memory.emotionalContext;
+            }
+
+            this.shortTermMemories.push(memory);
         } catch (error) {
             console.error('Error storing memory:', error);
         }
-    
+
         return memory;
     }
 
@@ -243,7 +247,7 @@ export class MemorySystem {
                         .eq('id', memory.id),
                     
                     // Update MemGPT - Add conversion to correct MemoryType
-                    this.memgpt.storeMemory({
+                    this.letta.storeMemory({
                         key: memory.id,
                         memory_type: this.convertToMemGPTType(memory.type),
                         data: {
@@ -449,5 +453,37 @@ export class MemorySystem {
         return summary;
     }
 
+    public async semanticSearch(query: string, type?: MemoryType, limit: number = 5): Promise<Memory[]> {
+        try {
+            const response = await this.letta.queryMemories(type || 'chat_history', {
+                content: query,
+                semantic_search: true
+            });
+
+            if (response.success && response.data?.memories) {
+                return response.data.memories.map(this.mapDBMemoryToMemory.bind(this));
+            }
+        } catch (error) {
+            console.error('Error in semantic search:', error);
+        }
+        return [];
+    }
+
+    public async recognizePatterns(content: string): Promise<MemoryPattern[]> {
+        try {
+            const response = await this.letta.analyzeContent(content);
+            if (response.success && response.data?.patterns) {
+                return response.data.patterns.map(pattern => ({
+                    pattern,
+                    frequency: 1,
+                    lastOccurrence: new Date(),
+                    type: 'insight'
+                }));
+            }
+        } catch (error) {
+            console.error('Error recognizing patterns:', error);
+        }
+        return [];
+    }
 
 }

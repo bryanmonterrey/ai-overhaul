@@ -1,8 +1,8 @@
 // app/lib/memory/test-connection.ts
-import { MemGPTClient } from './letta-client';
+import { LettaClient } from './letta-client';
 
-export async function testMemGPTConnection() {
-    const memgpt = new MemGPTClient();
+export async function testLettaConnection() {
+    const memgpt = new LettaClient();
     try {
         const response = await memgpt.storeMemory({
             key: 'test',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { MemGPTClient } from './letta-client';
+import { LettaClient } from './letta-client';
 import { 
     ChatMemory, 
     TweetMemory, 
@@ -11,7 +11,7 @@ import {
 export function useMemGPT() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const client = new MemGPTClient();
+    const client = new LettaClient();
 
     const storeChat = useCallback(async (messages: ChatMemory['data']['messages']) => {
         setLoading(true);

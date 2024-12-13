@@ -5,7 +5,7 @@ import {
     MemoryResponse
 } from '@/app/types/memory';
 
-export class MemGPTClient {
+export class LettaClient {
     private baseUrl: string;
     private retryCount: number = 3;
 

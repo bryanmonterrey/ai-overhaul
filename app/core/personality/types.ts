@@ -174,3 +174,13 @@ interface EnvironmentalFactors {
   socialContext: string[];
   platform: Platform;
 }
+
+export interface EnhancedMemoryAnalysis {
+  sentiment: number;
+  emotional_context: EmotionalState;
+  key_concepts: string[];
+  patterns: string[];
+  importance_score: number;
+  associations: string[];
+  summary: string;
+}

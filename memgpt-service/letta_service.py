@@ -1,17 +1,19 @@
+# memgpt-service/letta_service.py
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Optional, Dict, Any, List
-import letta  # Changed from memgpt
 from letta.config import LLMConfig, AgentConfig
 from letta.interface import CLIInterface
 from letta.agent import Agent
+from letta.memory import MemoryProcessor
 import uvicorn
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import asyncio
 
 load_dotenv()
 
@@ -20,15 +22,14 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
-# Define default persona and human
 DEFAULT_PERSONA = {
-    "text": """You are MemGPT, an AI designed to store and recall memories.
-    Your purpose is to assist in managing and organizing memory data.
-    You communicate in a clear, precise manner and focus on memory-related tasks."""
+    "text": """You are a highly capable AI memory system focused on organizing and processing memories.
+    You excel at pattern recognition, emotional analysis, and contextual understanding.
+    Your goal is to help maintain and enhance the personality system's memory capabilities."""
 }
 
 DEFAULT_HUMAN = {
-    "text": """A human user interacting with the memory system."""
+    "text": """A user interacting with the memory and personality system."""
 }
 
 class MemoryType(str, Enum):
@@ -39,6 +40,8 @@ class MemoryType(str, Enum):
     custom_prompts = "custom_prompts"
     agent_state = "agent_state"
     user_interaction = "user_interaction"
+    memory_chain = "memory_chain"
+    memory_cluster = "memory_cluster"
 
 class BaseMemory(BaseModel):
     key: str
@@ -51,81 +54,278 @@ class MemoryResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
+class ChainConfig(BaseModel):
+    depth: int = 2
+    min_similarity: float = 0.5
+
+class ClusterConfig(BaseModel):
+    time_period: str = 'week'
+    min_cluster_size: int = 3
+    similarity_threshold: float = 0.7
+
+class ContextConfig(BaseModel):
+    max_tokens: int = 4000
+    priority_keywords: List[str] = []
+
 class MemGPTService:
     def __init__(self):
+        # Initialize Supabase
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
+        # Initialize Letta with Claude/GPT-4 configuration
+        self.llm_config = LLMConfig(
+            model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
+            model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
+            context_window=100000 if ANTHROPIC_API_KEY else 8192
+        )
+        
+        # Initialize Letta agent
+        self.agent_config = AgentConfig(
+            name="memory_agent",
+            model=self.llm_config.model,
+            persona=DEFAULT_PERSONA,
+            human=DEFAULT_HUMAN
+        )
+        
+        self.interface = CLIInterface()
+        self.agent = Agent(
+            agent_config=self.agent_config,
+            interface=self.interface
+        )
+        
+        # Initialize memory processor for enhanced features
+        self.memory_processor = MemoryProcessor(self.agent)
+
+    async def process_memory_content(self, content: str) -> Dict[str, Any]:
+        """Enhanced memory processing using Letta capabilities"""
+        try:
+            analysis = await self.memory_processor.analyze_content(content)
+            return {
+                'sentiment': analysis.get('sentiment', 0),
+                'emotional_context': analysis.get('emotional_context', 'neutral'),
+                'key_concepts': analysis.get('key_concepts', []),
+                'patterns': analysis.get('patterns', []),
+                'importance_score': analysis.get('importance', 0.5),
+                'associations': analysis.get('associations', []),
+                'summary': analysis.get('summary', '')
+            }
+        except Exception as e:
+            print(f"Error processing memory content: {str(e)}")
+            return {}
+
     async def store_memory(self, memory: BaseMemory):
         try:
+            content = str(memory.data.get('content', memory.data))
+            
+            # Enhanced processing with Letta
+            memory_analysis = await self.process_memory_content(content)
+            
             supabase_data = {
                 "id": memory.key,
-                "content": str(memory.data),
+                "content": content,
                 "type": memory.memory_type,
                 "created_at": datetime.utcnow().isoformat(),
-                "metadata": memory.metadata,
-                "archive_status": "active"
+                "metadata": {
+                    **memory.metadata,
+                    **memory_analysis
+                },
+                "archive_status": "active",
+                "emotional_context": memory_analysis.get('emotional_context', 'neutral'),
+                "importance": memory_analysis.get('importance_score', 0.5),
+                "associations": memory_analysis.get('associations', []),
+                "platform": memory.metadata.get('platform', 'default')
             }
-            
-            supabase_response = await self.supabase.table('memories').insert(supabase_data).execute()
-            return {"success": True, "data": supabase_data}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
 
-    async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
-        try:
-            # Query both Supabase and MemGPT
-            supabase_response = await self.supabase.table('memories')\
-                .select("*")\
-                .eq('type', memory_type)\
-                .eq('archive_status', 'active')\
-                .execute()
-            
-            memgpt_results = self.agent.archival_memory.search(
-                str(query),
-                limit=10
+            # Store in both systems
+            await asyncio.gather(
+                self.supabase.table('memories').insert(supabase_data).execute(),
+                self.agent.archival_memory.insert(
+                    memory.key,
+                    str({**supabase_data, 'analysis': memory_analysis})
+                )
             )
             
-            # Combine and filter results
-            all_results = []
+            return {"success": True, "data": supabase_data}
+        except Exception as e:
+            print(f"Error storing memory: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    # Memory Chaining feature
+    async def chain_memories(self, memory_key: str, config: ChainConfig):
+        try:
+            # Get initial memory
+            initial_memory = await self.get_memory(memory_key)
+            if not initial_memory["success"]:
+                return {"success": False, "error": "Initial memory not found"}
+
+            # Find related memories through semantic search
+            related_memories = await self.agent.archival_memory.search(
+                initial_memory["data"]["content"],
+                limit=config.depth * 5
+            )
+
+            # Build memory chain
+            memory_chain = [initial_memory["data"]]
+            current_memory = initial_memory["data"]
             
-            # Add Supabase results
-            if supabase_response.data:
-                all_results.extend(supabase_response.data)
+            for _ in range(config.depth):
+                next_memory = await self._find_most_related(current_memory, related_memories)
+                if next_memory and next_memory not in memory_chain:
+                    memory_chain.append(next_memory)
+                    current_memory = next_memory
+
+            return {"success": True, "data": {"chain": memory_chain}}
+        except Exception as e:
+            print(f"Error in memory chaining: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    # Memory Clustering feature
+    async def cluster_memories(self, config: ClusterConfig):
+        try:
+            memories = await self.get_memories_by_timeframe(config.time_period)
             
-            # Add MemGPT results
-            for result in memgpt_results:
-                try:
-                    memory_data = eval(result.content)
-                    if memory_data.get("type") == memory_type:
-                        all_results.append(memory_data)
-                except:
-                    continue
+            if not memories:
+                return {"success": True, "data": {"clusters": []}}
+
+            # Use memory processor for clustering
+            clusters = await self.memory_processor.cluster_memories(
+                memories,
+                min_size=config.min_cluster_size,
+                similarity_threshold=config.similarity_threshold
+            )
+
+            return {"success": True, "data": {"clusters": clusters}}
+        except Exception as e:
+            print(f"Error in memory clustering: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def track_memory_evolution(self, concept: str):
+        """Track how a concept evolved over different time periods"""
+        try:
+            time_periods = ['day', 'week', 'month']
+            evolution_data = {}
+            
+            for period in time_periods:
+                memories = await self.get_memories_by_timeframe(period)
+                if memories:
+                    analysis = await self.memory_processor.analyze_concept_evolution(
+                        concept,
+                        memories
+                    )
+                    evolution_data[period] = analysis
+
+            return {"success": True, "data": {"evolution": evolution_data}}
+        except Exception as e:
+            print(f"Error tracking memory evolution: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def _find_most_related(self, source_memory: Dict, potential_memories: List[Dict]) -> Optional[Dict]:
+        """Find the most semantically similar memory"""
+        try:
+            if not potential_memories:
+                return None
+
+            # Use memory processor for similarity analysis
+            most_similar = await self.memory_processor.find_most_similar(
+                source_memory,
+                potential_memories
+            )
+            
+            return most_similar
+        except Exception as e:
+            print(f"Error finding related memory: {str(e)}")
+            return None
+
+    async def get_memories_by_timeframe(self, timeframe: str) -> List[Dict]:
+        """Get memories within specified timeframe"""
+        try:
+            end_date = datetime.utcnow()
+            start_date = end_date - {
+                'day': timedelta(days=1),
+                'week': timedelta(weeks=1),
+                'month': timedelta(days=30)
+            }.get(timeframe, timedelta(days=1))
+
+            response = await self.supabase.table('memories')\
+                .select("*")\
+                .gte('created_at', start_date.isoformat())\
+                .lte('created_at', end_date.isoformat())\
+                .execute()
+
+            return response.data or []
+        except Exception as e:
+            print(f"Error getting memories by timeframe: {str(e)}")
+            return []
+
+    # Your existing methods...
+    async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
+        try:
+            # Enhanced semantic search using both systems
+            [supabase_results, semantic_results] = await asyncio.gather(
+                self.supabase.table('memories')
+                    .select("*")
+                    .eq('type', memory_type)
+                    .eq('archive_status', 'active')
+                    .execute(),
+                self.agent.archival_memory.semantic_search(
+                    query.get('content', ''),
+                    filter_type=memory_type,
+                    limit=10
+                )
+            )
+            
+            # Combine and rank results
+            all_results = await self.memory_processor.combine_and_rank_results(
+                supabase_results.data or [],
+                semantic_results,
+                query
+            )
             
             return {"success": True, "data": {"memories": all_results}}
         except Exception as e:
+            print(f"Error querying memories: {str(e)}")
             return {"success": False, "error": str(e)}
 
     async def get_memory(self, key: str):
         try:
-            # Try Supabase first
-            supabase_response = await self.supabase.table('memories')\
-                .select("*")\
-                .eq('id', key)\
-                .single()\
-                .execute()
+            [supabase_result, letta_result] = await asyncio.gather(
+                self.supabase.table('memories')
+                    .select("*")
+                    .eq('id', key)
+                    .single()
+                    .execute(),
+                self.agent.archival_memory.get(key)
+            )
             
-            if supabase_response.data:
-                return {"success": True, "data": supabase_response.data}
+            if supabase_result.data:
+                if letta_result:
+                    letta_data = eval(letta_result.content)
+                    enhanced_data = {
+                        **supabase_result.data,
+                        'enhanced_analysis': letta_data.get('analysis', {})
+                    }
+                    return {"success": True, "data": enhanced_data}
+                return {"success": True, "data": supabase_result.data}
             
-            # Try MemGPT if not found in Supabase
-            memory = self.agent.archival_memory.get(key)
-            if memory:
-                return {"success": True, "data": eval(memory.content)}
-                
             return {"success": False, "error": "Memory not found"}
         except Exception as e:
+            print(f"Error getting memory: {str(e)}")
             return {"success": False, "error": str(e)}
 
+    async def summarize_memories(self, timeframe: str = 'recent', limit: int = 5):
+        """Generate a summary of recent memories"""
+        try:
+            memories = await self.get_memories_by_timeframe(timeframe)
+            if not memories:
+                return {"success": True, "data": {"summary": "No memories found for the specified timeframe."}}
+                
+            summary = await self.memory_processor.generate_summary(memories[:limit])
+            return {"success": True, "data": {"summary": summary}}
+        except Exception as e:
+            print(f"Error summarizing memories: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+# FastAPI setup
 app = FastAPI()
 service = MemGPTService()
 
@@ -137,6 +337,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Existing endpoints
 @app.post("/store")
 async def store_memory(memory: BaseMemory):
     result = await service.store_memory(memory)
@@ -157,6 +358,35 @@ async def get_memory(key: str):
 @app.post("/query")
 async def query_memories(type: MemoryType, query: Dict[str, Any]):
     result = await service.query_memories(type, query)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+# New feature endpoints
+@app.post("/memories/chain/{memory_key}")
+async def chain_memories(memory_key: str, config: ChainConfig):
+    result = await service.chain_memories(memory_key, config)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+@app.post("/memories/cluster")
+async def cluster_memories(config: ClusterConfig):
+    result = await service.cluster_memories(config)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+@app.get("/memories/evolution/{concept}")
+async def track_memory_evolution(concept: str):
+    result = await service.track_memory_evolution(concept)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
+
+@app.get("/summary")
+async def get_memory_summary(timeframe: str = 'recent', limit: int = 5):
+    result = await service.summarize_memories(timeframe, limit)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result

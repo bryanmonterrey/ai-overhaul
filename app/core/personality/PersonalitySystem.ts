@@ -14,7 +14,7 @@ import {
   } from '@/app/core/personality/types';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
-import { MemGPTClient } from '@/app/lib/memory/letta-client';
+import { LettaClient } from '@/app/lib/memory/letta-client';
 import { 
   ChatMemory, 
   MemoryResponse,
@@ -49,7 +49,7 @@ interface PersonalitySystemConfig {
     private config: PersonalityConfig;
     private traits: Map<string, number> = new Map();
     private trainingService: TwitterTrainingService;
-    private memgpt: MemGPTClient;
+    private memgpt: LettaClient;
 
     constructor(config: PersonalitySystemConfig) {
       this.config = {
@@ -59,7 +59,7 @@ interface PersonalitySystemConfig {
       this.state = this.initializeState();
       this.initializeTraits();
       this.trainingService = new TwitterTrainingService();
-      this.memgpt = new MemGPTClient();
+      this.memgpt = new LettaClient();
       
       // Test MemGPT connection
       this.testMemGPTConnection();
