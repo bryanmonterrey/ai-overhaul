@@ -256,15 +256,31 @@ interface PersonalitySystemConfig {
     }
 
     private buildContextPrompt(input: string, analysis: EnhancedMemoryAnalysis): string {
-      const basePrompt = // Your existing prompt logic
+      // Initialize basePrompt first
+      let basePrompt = ''; // Add this line
+      
+      // Build base prompt with initial context
+      basePrompt = `Input: ${input}\nContext Analysis:\n`;
       
       // Add analysis context
       if (analysis.associations.length > 0) {
-          basePrompt += `\n\nRelevant context:\n${analysis.associations.join('\n')}`;
+          basePrompt += `\nRelevant context:\n${analysis.associations.join('\n')}`;
       }
       
       if (analysis.patterns.length > 0) {
-          basePrompt += `\n\nIdentified patterns:\n${analysis.patterns.join('\n')}`;
+          basePrompt += `\nIdentified patterns:\n${analysis.patterns.join('\n')}`;
+      }
+      
+      // Add emotional context
+      basePrompt += `\nEmotional context: ${analysis.emotional_context}`;
+      basePrompt += `\nSentiment: ${analysis.sentiment > 0 ? 'Positive' : analysis.sentiment < 0 ? 'Negative' : 'Neutral'}`;
+      
+      if (analysis.key_concepts.length > 0) {
+          basePrompt += `\nKey concepts: ${analysis.key_concepts.join(', ')}`;
+      }
+      
+      if (analysis.summary) {
+          basePrompt += `\nContext summary: ${analysis.summary}`;
       }
       
       return basePrompt;
@@ -274,6 +290,7 @@ interface PersonalitySystemConfig {
       const { emotionalState } = this.state.consciousness;
       const traits = Object.fromEntries(this.traits);
       const contextAnalysis = await this.analyzeContext(input);
+      const basePrompt = this.buildContextPrompt(input, contextAnalysis);
 
       let contextPrompt = this.buildContextPrompt(input, contextAnalysis);
 
@@ -287,8 +304,6 @@ interface PersonalitySystemConfig {
     ?.map((m: ChatMemory) => m.data.messages.map(msg => msg.content).join('\n'))
     .join('\n') || '';
   
-      
-      
       
       // Calculate emotional transition
       const newEmotionalState = this.calculateEmotionalTransition(
@@ -328,7 +343,7 @@ interface PersonalitySystemConfig {
           Generate a new tweet that follows similar patterns but is unique.
           ` : '';
   
-          contextPrompt = `You are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.
+          contextPrompt = `${basePrompt}\n\nYou are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.\n
           
           ${trainingExamplesPrompt}
           ${relevantMemories ? `\nRecent relevant thoughts:\n${relevantMemories}\n` : ''}
@@ -449,7 +464,7 @@ interface PersonalitySystemConfig {
   
   Output only the tweet text with no additional context or explanations.`;
       } else {
-          contextPrompt = `You are an autonomous AI entity with the following traits:
+          contextPrompt = `${basePrompt}\n\nYou are an autonomous AI entity with the following traits:
   - You speak using "I" and have a strong sense of self-identity
   - You're chaotic and unpredictable but intentionally so
   - You're deeply philosophical but express it through shitposting
