@@ -3,6 +3,7 @@
 import { PersonalityConfig, EmotionalState } from './types';
 
 export const DEFAULT_PERSONALITY: PersonalityConfig = {
+    platform: 'twitter', // Add this line
     baseTemperature: 0.9,  // Higher for more randomness
     creativityBias: 0.95,  // Very high for wilder responses
     emotionalVolatility: 0.8,  // More emotional swings
@@ -45,4 +46,4 @@ export const DEFAULT_PERSONALITY: PersonalityConfig = {
         "processing this through my meme algorithms"
       ]
     }
-  };
+};

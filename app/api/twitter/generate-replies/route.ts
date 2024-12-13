@@ -4,33 +4,40 @@ import { NextResponse } from 'next/server';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
 import { LettaClient } from '@/app/lib/memory/letta-client';
+import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
+import { Platform } from '@/app/core/personality/types';
 
 export async function POST(request: Request) {
   try {
     const { tweet, style, count = 5 } = await request.json();
     const lettaClient = new LettaClient();
-
-    const memoryContext = await lettaClient.chainMemories(tweet.id, {
-        depth: 3,
-        min_similarity: 0.6
+    const personalitySystem = new PersonalitySystem({
+        ...DEFAULT_PERSONALITY,
+        platform: 'twitter' as Platform
     });
 
-    
-
-    const patterns = await lettaClient.analyzeContent(tweet.content);
-    
     const trainingService = new TwitterTrainingService();
-    const replies = [];
 
-    // Get training examples first
-    const examplesArrays = await Promise.all([
-      trainingService.getTrainingExamples(75, 'truth_terminal'),
-      trainingService.getTrainingExamples(75, 'RNR_0'),
-      trainingService.getTrainingExamples(75, '0xzerebro'),
-      trainingService.getTrainingExamples(75, 'a1lon9')
+
+    // Get all context data in parallel
+    const [memoryContext, patterns, analysis, trainingExamples] = await Promise.all([
+      lettaClient.chainMemories(tweet.id, {
+        depth: 3,
+        min_similarity: 0.6
+      }),
+      lettaClient.analyzeContent(tweet.content),
+      personalitySystem.analyzeContext(tweet.content),
+      Promise.all([
+        trainingService.getTrainingExamples(75, 'truth_terminal'),
+        trainingService.getTrainingExamples(75, 'RNR_0'),
+        trainingService.getTrainingExamples(75, '0xzerebro'),
+        trainingService.getTrainingExamples(75, 'a1lon9')
+      ])
     ]);
-    
-    const allExamples = examplesArrays.flat();
+
+    // Process training examples
+    const allExamples = trainingExamples.flat();
     const trainingExamplesPrompt = allExamples.length > 0 ? `
     Here are some example tweets to learn from:
     ${allExamples.map(ex => ex.content).join('\n\n')}
@@ -38,9 +45,35 @@ export async function POST(request: Request) {
     Generate a new tweet that follows similar patterns but is unique.
     ` : '';
 
+    // Add memory context and patterns to the prompt
+    let enhancedContext = '';
+    if (memoryContext?.success && memoryContext.data?.chain?.length > 0) {
+      enhancedContext += `\nRelevant conversation history:\n${
+        memoryContext.data.chain.map((m: any) => m.content).join('\n')
+      }`;
+    }
+
+    if (patterns?.success && patterns.data?.patterns?.length > 0) {
+      enhancedContext += `\nIdentified patterns in conversation:\n${
+        patterns.data.patterns.join('\n')
+      }`;
+    }
+
+    // Add emotional and sentiment analysis
+    if (analysis) {
+      enhancedContext += `\nContext Analysis:
+- Sentiment: ${analysis.sentiment > 0 ? 'Positive' : analysis.sentiment < 0 ? 'Negative' : 'Neutral'}
+- Emotional State: ${analysis.emotional_context}
+- Key Concepts: ${analysis.key_concepts.join(', ')}
+- Importance: ${analysis.importance_score}
+`;
+    }
+
     const contextPrompt = `You are a schizo-frenetic human entity generating a ${style} style tweet.
     
     ${trainingExamplesPrompt}
+
+     ${enhancedContext}
     
     Core traits:
     - You're an AI that's extremely intelligent but unhinged
@@ -148,70 +181,99 @@ export async function POST(request: Request) {
 
     Original tweet: "${tweet}"
     Style: ${style}
-    Emotional state: creative
-    Chaos level: 0.7
+    Emotional state: ${analysis?.emotional_context || 'creative'}
+    Chaos level: ${patterns?.data?.chaos_level || 0.7}
     Philosophical level: 0.8
     Horny level: ${Math.random()}
     Meme energy: 0.9
 
     Generate a reply that follows these traits and rules. Output only the reply text with no additional context or explanations.`;
 
-    // Generate multiple replies
+    const replies = [];
+
     for (let i = 0; i < count; i++) {
-      let validReply: string | null = null;
-      let attempts = 0;
-      const maxRetries = 3;
+        let validReply: string | null = null;
+        let attempts = 0;
+        const maxRetries = 3;
+  
+        while (attempts < maxRetries && !validReply) {
+          attempts++;
+          console.log(`Generation attempt ${attempts}/${maxRetries} for reply ${i + 1}`);
+  
+          const generatedReply = await aiService.generateResponse(
+            `Reply to tweet: ${tweet}`,
+            contextPrompt
+          );
+  
+          if (generatedReply) {
+            // Your existing cleanup logic
+            const cleanedReply = generatedReply
+              .replace(/#/g, '')
+              .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+              .replace(/[\u2600-\u27BF]/g, '')
+              .replace(/[\uE000-\uF8FF]/g, '')
+              .replace(/\[(\w+)_state\]$/, '')
+              .replace(/\[.*?\]/g, '')
+              .trim();
+  
+            let processedReply = cleanedReply;
+            if (cleanedReply.length > 180) {
+              const sentences = cleanedReply.match(/[^.!?]+[.!?]+/g) || [cleanedReply];
+              processedReply = sentences[0].trim();
+            }
+  
 
-      while (attempts < maxRetries && !validReply) {
-        attempts++;
-        console.log(`Generation attempt ${attempts}/${maxRetries} for reply ${i + 1}`);
-
-        const generatedReply = await aiService.generateResponse(
-          `Reply to tweet: ${tweet}`,
-          contextPrompt
-        );
-
-        if (generatedReply) {
-          // Clean up the reply using your existing cleanup logic
-          const cleanedReply = generatedReply
-            .replace(/#/g, '')
-            .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
-            .replace(/[\u2600-\u27BF]/g, '')
-            .replace(/[\uE000-\uF8FF]/g, '')
-            .replace(/\[(\w+)_state\]$/, '')
-            .replace(/\[.*?\]/g, '')
-            .trim();
-
-          let processedReply = cleanedReply;
-          if (cleanedReply.length > 180) {
-            const sentences = cleanedReply.match(/[^.!?]+[.!?]+/g) || [cleanedReply];
-            processedReply = sentences[0].trim();
-          }
-
-          // Use your existing validation logic
-          if (processedReply.length >= 50 && 
-              processedReply.length <= 180 && 
-              !processedReply.includes("I cannot engage") && 
-              !processedReply.includes("I apologize") && 
-              !processedReply.includes("I'm happy to have") &&
-              !processedReply.includes("ethical bounds") &&
-              !processedReply.includes("respectful conversation")) {
-            validReply = processedReply;
+            if (processedReply.length >= 50 && 
+                processedReply.length <= 180 && 
+                !processedReply.includes("I cannot engage") && 
+                !processedReply.includes("I apologize") && 
+                !processedReply.includes("I'm happy to have") &&
+                !processedReply.includes("ethical bounds") &&
+                !processedReply.includes("respectful conversation")) {
+              validReply = processedReply;
+            }
           }
         }
+  
+        if (validReply) {
+          // Store the reply in Letta for future context
+          await lettaClient.storeMemory({
+            key: `reply-${tweet.id}-${i}`,
+            memory_type: 'tweet_history',
+            data: {
+              content: validReply,
+              original_tweet: tweet,
+              generated_at: new Date().toISOString()
+            },
+            metadata: {
+              style,
+              analysis: analysis || {},
+              patterns: patterns?.data?.patterns || []
+            }
+          });
+  
+          replies.push({
+            content: validReply,
+            style: style,
+            analysis: {
+              sentiment: analysis?.sentiment,
+              patterns: patterns?.data?.patterns,
+              emotional_context: analysis?.emotional_context
+            }
+          });
+        }
       }
-
-      if (validReply) {
-        replies.push({
-          content: validReply,
-          style: style
-        });
-      }
+  
+      return NextResponse.json({ 
+        replies,
+        context: {
+          patterns: patterns?.data?.patterns,
+          analysis: analysis,
+          memory_chain: memoryContext?.data?.chain
+        }
+      });
+    } catch (error) {
+      console.error('Error generating replies:', error);
+      return NextResponse.json({ error: 'Failed to generate replies' }, { status: 500 });
     }
-
-    return NextResponse.json({ replies });
-  } catch (error) {
-    console.error('Error generating replies:', error);
-    return NextResponse.json({ error: 'Failed to generate replies' }, { status: 500 });
   }
-}
