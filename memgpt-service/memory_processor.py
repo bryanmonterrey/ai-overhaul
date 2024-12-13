@@ -1,10 +1,12 @@
 # memgpt-service/memory_processor.py
-from typing import List, Dict, Any
+from typing import List, Dict, Any, TYPE_CHECKING
 import numpy as np
-from letta.agent import Agent
+
+if TYPE_CHECKING:
+    from agent import Agent
 
 class MemoryProcessor:
-    def __init__(self, agent: Agent):
+    def __init__(self, agent: 'Agent'):
         self.agent = agent
 
     async def analyze_content(self, content: str) -> Dict[str, Any]:

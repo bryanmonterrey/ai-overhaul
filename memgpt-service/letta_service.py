@@ -6,16 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, validator
 from enum import Enum
 from typing import Optional, Dict, Any, List, Union
-from letta.config import LLMConfig  # Keep these original imports
-from letta.interface import CLIInterface
-from letta.agent import Agent  # Fix this import
+from config import LLMConfig  # Keep these original imports
+from interface import CLIInterface
+from agent import Agent  # Fix this import
 from memory_processor import MemoryProcessor  # Keep your original memory processor
 import uvicorn
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import asyncio
-from letta.memory import Memory
+from memory import Memory
 
 
 load_dotenv()
