@@ -152,15 +152,23 @@ export class LettaClient {
 
     private async handleResponse(response: Response) {
         try {
-            const data = await response.json();
-            
             if (!response.ok) {
-                const errorMessage = data?.detail || data?.error || `HTTP error! status: ${response.status}`;
-                throw new Error(errorMessage);
+                const text = await response.text();
+                try {
+                    const errorData = JSON.parse(text);
+                    if (Array.isArray(errorData.detail)) {
+                        // Handle validation errors
+                        const errors = errorData.detail.map((e: any) => e.msg).join(', ');
+                        throw new Error(`Validation error: ${errors}`);
+                    }
+                    throw new Error(errorData?.detail || errorData?.error || `HTTP error! status: ${response.status}`);
+                } catch (jsonError) {
+                    throw new Error(text || `HTTP error! status: ${response.status}`);
+                }
             }
     
-            // The Letta service returns { success: true, data: {...} }
-            return data.success ? data.data : data; // Handle both formats
+            const data = await response.json();
+            return data.success ? data.data : data;
         } catch (error) {
             console.error('Error handling response:', {
                 error,

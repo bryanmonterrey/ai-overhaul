@@ -8,6 +8,7 @@ import { TweetStats } from './TweetStats';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { LettaClient } from '@/app/lib/memory/letta-client';
 
 
 interface QueuedTweet {
@@ -155,35 +156,30 @@ private async syncQueueWithDatabase(): Promise<void> {
             try {
                 const style = this.personality.getCurrentTweetStyle();
                 
-                // First get Letta analysis
-                const contextAnalysis = await lettaClient.analyzeContent('Generate a tweet');
-                
-                // Generate tweet with enhanced context
+                // Get content first
                 const content = await this.personality.processInput(
                     'Generate a tweet', 
-                    { 
-                        platform: 'twitter', 
-                        style,
-                        emotionalContext: contextAnalysis?.data?.emotional_context,
-                        memoryContext: contextAnalysis?.data?.summary,
-                        additionalContext: JSON.stringify(contextAnalysis?.data)
-                    }
+                    { platform: 'twitter', style }
                 );
 
                 if (content && typeof content === 'string' && content.length > 0) {
-                    // Store in Letta memory
-                    await lettaClient.storeMemory({
-                        key: `tweet-${Date.now()}-${i}`,
-                        memory_type: 'tweet_history',
-                        data: {
-                            content: this.cleanTweet(content),
-                            generated_at: new Date().toISOString()
-                        },
-                        metadata: {
-                            style,
-                            analysis: contextAnalysis?.data
-                        }
-                    });
+                    // Try to analyze with Letta, but don't block if it fails
+                    try {
+                        await lettaClient.storeMemory({
+                            key: `tweet-${Date.now()}-${i}`,
+                            memory_type: 'tweet_history',
+                            data: {
+                                content: this.cleanTweet(content),
+                                generated_at: new Date().toISOString()
+                            },
+                            metadata: {
+                                style
+                            }
+                        });
+                    } catch (lettaError) {
+                        console.error('Letta integration error:', lettaError);
+                        // Continue without Letta if it fails
+                    }
 
                     newTweets.push({
                         content: this.cleanTweet(content),
@@ -199,11 +195,7 @@ private async syncQueueWithDatabase(): Promise<void> {
         }
 
         if (newTweets.length > 0) {
-            try {
-                await this.addTweetsToQueue(newTweets);
-            } catch (error) {
-                console.error('Error adding tweets to queue:', error);
-            }
+            await this.addTweetsToQueue(newTweets);
         }
     } catch (error) {
         console.error('Error in generateTweetBatch:', error);

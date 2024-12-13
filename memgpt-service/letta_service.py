@@ -2,7 +2,7 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError 
 from enum import Enum
 from typing import Optional, Dict, Any, List
 from letta.config import LLMConfig  # Keep these original imports
@@ -50,7 +50,7 @@ class ContentRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     type: str = Field(..., description="Type of query (e.g. 'analysis')")
-    query: str = Field(..., description="Query content")
+    query: Union[str, Dict[str, Any]] = Field(..., description="Query content or parameters")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
 
 class BaseMemory(BaseModel):
@@ -273,6 +273,21 @@ class MemGPTService:
         except Exception as e:
             print(f"Error tracking memory evolution: {str(e)}")
             return {"success": False, "error": str(e)}
+        
+    async def analyze_content(self, content: str) -> Dict[str, Any]:
+        """Analyze content for patterns and context"""
+        try:
+            result = await self.memory_processor.analyze_content(content)
+            return {
+                "success": True,
+                "data": result
+            }
+        except Exception as e:
+            print(f"Error in analyze_content: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Content analysis failed: {str(e)}"
+            }
 
     async def _find_most_related(self, source_memory: Dict, potential_memories: List[Dict]) -> Optional[Dict]:
         """Find the most semantically similar memory"""
@@ -383,6 +398,7 @@ class MemGPTService:
 # FastAPI setup
 app = FastAPI()
 service = MemGPTService()
+app.state.memgpt_service = service 
 
 app.add_middleware(
     CORSMiddleware,
@@ -403,7 +419,7 @@ async def analyze_content(request: AnalyzeRequest):
             raise HTTPException(status_code=400, detail="Content is required")
 
         # Process the content
-        result = await app.state.memgpt_service.process_memory_content(
+        result = await service.process_memory_content(
             content=request.content,
             context=request.context
         )
@@ -415,6 +431,39 @@ async def analyze_content(request: AnalyzeRequest):
     except Exception as e:
         print(f"Error in analyze_content: {str(e)}")
         raise HTTPException(status_code=422, detail=str(e))
+
+@app.post("/query")
+async def query_content(request: QueryRequest):
+    try:
+        print(f"Received query request: {request}")  
+        
+        if not request.query:
+            raise HTTPException(status_code=400, detail="Query is required")
+
+        # Process based on query type
+        if request.type == 'analysis':
+            # Use process_memory_content instead of directly accessing service
+            result = await service.process_memory_content(
+                content=request.query,
+                context=request.context
+            )
+            
+            return {
+                "success": True,
+                "data": result
+            }
+        else:
+            # For other query types
+            return await service.query_memories(
+                memory_type=request.type,
+                query={"content": request.query, "context": request.context}
+            )
+            
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        print(f"Error processing query: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
     
 # Existing endpoints
 @app.post("/store", response_model=MemoryResponse)
@@ -434,30 +483,6 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
         )
     return result
 
-@app.post("/query")
-async def query_content(request: QueryRequest):
-    try:
-        print(f"Received query request: {request}")  # Debug logging
-        
-        if not request.query:
-            raise HTTPException(status_code=400, detail="Query is required")
-
-        # Process based on query type
-        if request.type == 'analysis':
-            result = await app.state.memgpt_service.process_memory_content(
-                content=request.query,
-                context=request.context
-            )
-        else:
-            raise HTTPException(status_code=400, detail=f"Unknown query type: {request.type}")
-
-        return {
-            "success": True,
-            "data": result
-        }
-    except Exception as e:
-        print(f"Error processing query: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # New feature endpoints
