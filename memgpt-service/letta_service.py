@@ -45,6 +45,13 @@ class MemoryType(str, Enum):
     memory_chain = "memory_chain"
     memory_cluster = "memory_cluster"
 
+class ContentRequest(BaseModel):
+    content: str
+
+class QueryRequest(BaseModel):
+    type: str
+    query: dict
+
 class BaseMemory(BaseModel):
     key: str
     memory_type: MemoryType
@@ -155,42 +162,40 @@ class MemGPTService:
 
     async def store_memory(self, memory: BaseMemory):
         try:
+            # Process content for analysis
             content = str(memory.data.get('content', memory.data))
+            memory_analysis = await self.process_memory_content(content)
             
-            # Enhanced processing with Letta
-            memory_analysis = await self.memory_processor.analyze_content(content)
-            
+            # Prepare data for Supabase
             supabase_data = {
-                "id": memory.key,
-                "content": content,
+                "key": memory.key,
                 "type": memory.memory_type,
-                "created_at": datetime.utcnow().isoformat(),
-                "metadata": {
-                    **memory.metadata,
-                    **memory_analysis
-                },
-                "archive_status": "active",
+                "content": content,
+                "metadata": memory.metadata or {},
                 "emotional_context": memory_analysis.get('emotional_context', 'neutral'),
                 "importance": memory_analysis.get('importance_score', 0.5),
                 "associations": memory_analysis.get('associations', []),
-                "platform": memory.metadata.get('platform', 'default')
+                "platform": memory.metadata.get('platform', 'default'),
+                "archive_status": "active"
             }
 
-            # Store in both systems
-            await asyncio.gather(
-                self.supabase.table('memories').insert(supabase_data).execute(),
-                self.agent.memory.store(
-                    key=memory.key,
-                    content=str({**supabase_data, 'analysis': memory_analysis}),
-                    metadata=memory.metadata
-                )
-            )
+            # Store in Supabase
+            response = await self.supabase.table('memories').insert(supabase_data).execute()
             
-            return {"success": True, "data": supabase_data}
+            if hasattr(response, 'error') and response.error:
+                raise Exception(response.error.message)
+            
+            return {
+                "success": True,
+                "data": response.data[0] if response.data else supabase_data
+            }
         except Exception as e:
             print(f"Error storing memory: {str(e)}")
-            return {"success": False, "error": str(e)}
-
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
     # Memory Chaining feature
     async def chain_memories(self, memory_key: str, config: ChainConfig):
         try:
@@ -372,22 +377,54 @@ service = MemGPTService()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "https://terminal.goatse.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.route("/analyze", methods=["POST"])
+@app.post("/analyze")
+async def analyze_content(request: ContentRequest):
+    """
+    Analyze content endpoint
+    """
+    try:
+        if not request.content:
+            raise HTTPException(status_code=400, detail="Content is required")
+
+        # Process the content through your service
+        analysis = await service.process_memory_content(request.content)
+        
+        if not analysis:
+            raise HTTPException(status_code=500, detail="Failed to process content")
+
+        return {
+            "success": True,
+            "data": {
+                "sentiment": analysis.get('sentiment', 0),
+                "emotional_context": analysis.get('emotional_context', 'neutral'),
+                "key_concepts": analysis.get('key_concepts', []),
+                "patterns": analysis.get('patterns', []),
+                "importance_score": analysis.get('importance', 0.5),
+                "associations": analysis.get('associations', []),
+                "summary": analysis.get('summary', '')
+            }
+        }
+    except Exception as e:
+        print(f"Error in analyze endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # Existing endpoints
-@app.post("/store")
+@app.post("/store", response_model=MemoryResponse)
 async def store_memory(memory: BaseMemory):
     result = await service.store_memory(memory)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
 
-@app.get("/{key}")
-async def get_memory(key: str):
+@app.get("/memories/{key}", response_model=MemoryResponse)
+async def get_memory(key: str, type: Optional[MemoryType] = None):
     result = await service.get_memory(key)
     if not result["success"]:
         raise HTTPException(
@@ -397,11 +434,23 @@ async def get_memory(key: str):
     return result
 
 @app.post("/query")
-async def query_memories(type: MemoryType, query: Dict[str, Any]):
-    result = await service.query_memories(type, query)
-    if not result["success"]:
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+async def query_memories(query_request: QueryRequest):
+    try:
+        if not query_request.type:
+            raise HTTPException(status_code=422, detail="Memory type is required")
+            
+        result = await service.query_memories(
+            memory_type=query_request.type,
+            query=query_request.query
+        )
+        
+        if result.get("success"):
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error", "Query failed"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # New feature endpoints
 @app.post("/memories/chain/{memory_key}")

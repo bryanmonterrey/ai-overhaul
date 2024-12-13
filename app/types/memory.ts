@@ -15,10 +15,11 @@ export type MemoryType =
   | 'interaction' 
   | 'all';    
 
-export interface BaseMemory {
-  key: string;
-  memory_type: MemoryType;
-  metadata?: Record<string, any>;
+  export interface BaseMemory {
+    key: string;
+    memory_type: MemoryType;
+    data: any;
+    metadata?: Record<string, any>;
 }
 
 export interface ChatMemory extends BaseMemory {
@@ -46,9 +47,10 @@ export interface TweetMemory extends BaseMemory {
 
 export interface MemoryResponse {
     success: boolean;
-    data?: Record<string, any>;
+    message?: string;
+    data?: any;
     error?: string;
-  }
+}
 
 export interface TradingParamsMemory extends BaseMemory {
   memory_type: 'trading_params';

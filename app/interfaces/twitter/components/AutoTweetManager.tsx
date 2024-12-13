@@ -77,22 +77,37 @@ export default function AutoTweetManager() {
   const generateTweetBatch = async () => {
     setIsLoading(true);
     setGenerationProgress(0);
+    setError(null);
+    
     try {
-      const response = await fetch('/api/twitter/queue/generate', { method: 'POST' });
-      const data = await response.json();
-      if (data.success && data.tweets) {
-        setQueuedTweets(data.tweets);
-        setGenerationProgress(totalTweets);
-      } else {
-        throw new Error('Failed to generate tweets');
-      }
+        const response = await fetch('/api/twitter/queue/generate', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to generate tweets');
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+            setQueuedTweets(data.tweets || []);
+            setGenerationProgress(totalTweets);
+        } else {
+            throw new Error(data.error || 'Failed to generate tweets');
+        }
     } catch (error) {
-      console.error('Error generating tweets:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate tweets');
+        console.error('Error generating tweets:', error);
+        setError(error instanceof Error ? error.message : 'Failed to generate tweets');
+        // Don't clear existing tweets on error
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  };
+};
 
   const updateTweetStatus = async (id: string, status: 'approved' | 'rejected') => {
     try {

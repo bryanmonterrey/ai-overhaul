@@ -147,24 +147,45 @@ private async syncQueueWithDatabase(): Promise<void> {
 
   // Auto-tweeter methods
   public async generateTweetBatch(count: number = 10): Promise<void> {
-    const newTweets: Omit<QueuedTweet, 'id'>[] = [];
-    
-    for (let i = 0; i < count; i++) {
-        const style = this.personality.getCurrentTweetStyle();
-        const content = await this.personality.processInput(
-            'Generate a tweet', 
-            { platform: 'twitter', style }
-        );
+    try {
+        const newTweets: Omit<QueuedTweet, 'id'>[] = [];
+        
+        for (let i = 0; i < count; i++) {
+            try {
+                const style = this.personality.getCurrentTweetStyle();
+                const content = await this.personality.processInput(
+                    'Generate a tweet', 
+                    { platform: 'twitter', style }
+                );
 
-        newTweets.push({
-            content: this.cleanTweet(content),
-            style,
-            status: 'pending',
-            generatedAt: new Date()
-        });
+                if (content && typeof content === 'string' && content.length > 0) {
+                    newTweets.push({
+                        content: this.cleanTweet(content),
+                        style,
+                        status: 'pending',
+                        generatedAt: new Date()
+                    });
+                }
+            } catch (error) {
+                console.error(`Error generating tweet ${i + 1}:`, error);
+                // Continue with the next tweet
+                continue;
+            }
+        }
+
+        // Only try to add tweets if we have any
+        if (newTweets.length > 0) {
+            try {
+                await this.addTweetsToQueue(newTweets);
+            } catch (error) {
+                console.error('Error adding tweets to queue:', error);
+                // Don't rethrow - allow the function to return what we have
+            }
+        }
+    } catch (error) {
+        console.error('Error in generateTweetBatch:', error);
+        throw error;
     }
-
-    await this.addTweetsToQueue(newTweets);
 }
 
   private cleanTweet(tweet: string): string {

@@ -1,3 +1,4 @@
+// app/lib/memory/letta-client.ts
 
 import { 
     BaseMemory, 
@@ -5,11 +6,21 @@ import {
     MemoryResponse
 } from '@/app/types/memory';
 
+interface ChainConfig {
+    depth?: number;
+    min_similarity?: number;
+}
+
+interface ClusterConfig {
+    algorithm?: string;
+    n_clusters?: number;
+}
+
 export class LettaClient {
     private baseUrl: string;
     private retryCount: number = 3;
 
-    constructor(baseUrl = 'http://localhost:3001') {
+    constructor(baseUrl = 'http://localhost:3001') {  // Changed to point to Python service
         this.baseUrl = baseUrl;
     }
 
@@ -18,6 +29,7 @@ export class LettaClient {
             try {
                 return await operation();
             } catch (error) {
+                console.error(`Attempt ${i + 1} failed:`, error);
                 if (i === this.retryCount - 1) throw error;
                 await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
             }
@@ -31,46 +43,26 @@ export class LettaClient {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
                 },
                 body: JSON.stringify(memory),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(
-                    errorData?.error || 
-                    `HTTP error! status: ${response.status}`
-                );
-            }
-
-            const data = await response.json();
-            if (!data.success) {
-                throw new Error(data.error || 'Unknown error');
-            }
-
-            return data;
+            return this.handleResponse(response);
         });
     }
 
     async getMemory<T extends BaseMemory>(key: string, type: MemoryType): Promise<T | null> {
-        try {
-            const response = await fetch(`${this.baseUrl}/${key}?type=${type}`);
+        return this.withRetry(async () => {
+            const response = await fetch(
+                `${this.baseUrl}/memories/${encodeURIComponent(key)}?type=${encodeURIComponent(type)}`
+            );
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data.success ? data.data : null;
-        } catch (error) {
-            console.error('Error retrieving memory:', error);
-            return null;
-        }
+            return this.handleResponse(response);
+        });
     }
 
     async queryMemories(type: MemoryType, query: Record<string, any>) {
-        try {
+        return this.withRetry(async () => {
             const response = await fetch(`${this.baseUrl}/query`, {
                 method: 'POST',
                 headers: {
@@ -79,16 +71,10 @@ export class LettaClient {
                 body: JSON.stringify({ type, query }),
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            console.error('Error querying memories:', error);
-            return null;
-        }
+            return this.handleResponse(response);
+        });
     }
+
 
     async chainMemories(memory_key: string, config: ChainConfig) {
         return this.withRetry(async () => {
@@ -103,7 +89,7 @@ export class LettaClient {
 
     async clusterMemories(config: ClusterConfig) {
         return this.withRetry(async () => {
-            const response = await fetch(`${this.baseUrl}/memories/cluster`, {
+            const response = await fetch(`${this.baseUrl}/cluster`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
@@ -115,7 +101,7 @@ export class LettaClient {
     async trackEvolution(concept: string) {
         return this.withRetry(async () => {
             const response = await fetch(
-                `${this.baseUrl}/memories/evolution/${encodeURIComponent(concept)}`
+                `${this.baseUrl}/evolution/${encodeURIComponent(concept)}`
             );
             return this.handleResponse(response);
         });
@@ -142,10 +128,16 @@ export class LettaClient {
     }
 
     private async handleResponse(response: Response) {
+        const data = await response.json().catch(() => null);
+        
         if (!response.ok) {
-            const errorData = await response.json().catch(() => null);
-            throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
+            throw new Error(data?.error || `HTTP error! status: ${response.status}`);
         }
-        return await response.json();
+
+        if (!data?.success) {
+            throw new Error(data?.error || 'Unknown error');
+        }
+
+        return data;
     }
 }
