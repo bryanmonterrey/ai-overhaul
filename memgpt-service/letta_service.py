@@ -72,8 +72,31 @@ class MemGPTService:
         # Initialize Supabase
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        # Initialize MemoryStore
-        self.memory_store = MemoryStore()
+        # Initialize Letta with Claude/GPT-4 configuration
+        llm_config = LLMConfig(
+            model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
+            model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
+            context_window=100000 if ANTHROPIC_API_KEY else 8192,
+            api_key=ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY
+        )
+        
+        # Initialize Letta agent
+        self.agent_config = AgentConfig(
+            name="memory_agent",
+            model=llm_config.model,  # Pass model directly
+            persona=DEFAULT_PERSONA,
+            human=DEFAULT_HUMAN,
+            context_window=llm_config.context_window
+        )
+        
+        self.interface = CLIInterface()
+        self.agent = Agent(
+            agent_config=self.agent_config,
+            interface=self.interface
+        )
+        
+        # Initialize memory processor for enhanced features
+        self.memory_processor = MemoryProcessor(self.agent)
 
     async def process_memory_content(self, content: str) -> Dict[str, Any]:
         """Enhanced memory processing using Letta capabilities"""
@@ -97,7 +120,7 @@ class MemGPTService:
             content = str(memory.data.get('content', memory.data))
             
             # Enhanced processing with Letta
-            memory_analysis = await self.process_memory_content(content)
+            memory_analysis = await self.memory_processor.analyze_content(content)
             
             supabase_data = {
                 "id": memory.key,
@@ -118,9 +141,10 @@ class MemGPTService:
             # Store in both systems
             await asyncio.gather(
                 self.supabase.table('memories').insert(supabase_data).execute(),
-                self.agent.archival_memory.insert(
-                    memory.key,
-                    str({**supabase_data, 'analysis': memory_analysis})
+                self.agent.memory.store(
+                    key=memory.key,
+                    content=str({**supabase_data, 'analysis': memory_analysis}),
+                    metadata=memory.metadata
                 )
             )
             
@@ -138,8 +162,8 @@ class MemGPTService:
                 return {"success": False, "error": "Initial memory not found"}
 
             # Find related memories through semantic search
-            related_memories = await self.agent.archival_memory.search(
-                initial_memory["data"]["content"],
+            related_memories = await self.agent.memory.search(
+                query=initial_memory["data"]["content"],
                 limit=config.depth * 5
             )
 
@@ -246,10 +270,10 @@ class MemGPTService:
                     .eq('type', memory_type)
                     .eq('archive_status', 'active')
                     .execute(),
-                self.agent.archival_memory.semantic_search(
-                    query.get('content', ''),
-                    filter_type=memory_type,
-                    limit=10
+                self.agent.memory.search(
+                    query=query.get('content', ''),
+                    limit=10,
+                    filter_fn=lambda x: x.get('type') == memory_type
                 )
             )
             
@@ -273,12 +297,12 @@ class MemGPTService:
                     .eq('id', key)
                     .single()
                     .execute(),
-                self.agent.archival_memory.get(key)
+                self.agent.memory.get(key)
             )
             
             if supabase_result.data:
                 if letta_result:
-                    letta_data = eval(letta_result.content)
+                    letta_data = eval(str(letta_result))
                     enhanced_data = {
                         **supabase_result.data,
                         'enhanced_analysis': letta_data.get('analysis', {})
