@@ -5,10 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Optional, Dict, Any, List
-from letta.config import LLMConfig, AgentConfig, LettaConfig # Add LettaConfig
+from letta.config import LLMConfig, AgentConfig  # Keep these original imports
 from letta.interface import CLIInterface
-from letta.agent import Agent
-from memory_processor import MemoryProcessor
+from letta.agent import Agent  # Fix this import
+from memory_processor import MemoryProcessor  # Keep your original memory processor
 import uvicorn
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -72,34 +72,8 @@ class MemGPTService:
         # Initialize Supabase
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        # Initialize Letta with Claude/GPT-4 configuration
-        llm_config = LLMConfig(
-            model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
-            model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
-            context_window=100000 if ANTHROPIC_API_KEY else 8192,
-            api_key=ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY,
-        )
-
-        letta_config = LettaConfig()
-        letta_config.llm_config = llm_config
-        
-        # Initialize Letta agent
-        self.agent_config = AgentConfig(
-            name="memory_agent",
-            config=letta_config,
-            persona=DEFAULT_PERSONA,
-            human=DEFAULT_HUMAN,
-            context_window=llm_config.context_window
-        )
-        
-        self.interface = CLIInterface()
-        self.agent = Agent(
-            agent_config=self.agent_config,
-            interface=self.interface
-        )
-        
-        # Initialize memory processor for enhanced features
-        self.memory_processor = MemoryProcessor(self.agent)
+        # Initialize MemoryStore
+        self.memory_store = MemoryStore()
 
     async def process_memory_content(self, content: str) -> Dict[str, Any]:
         """Enhanced memory processing using Letta capabilities"""
