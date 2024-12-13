@@ -42,6 +42,15 @@ export interface Memory {
   associations: string[];
   sentiment?: number;
   decay?: number;
+  clusters?: string[];
+    chainLinks?: string[];
+    evolutionData?: {
+        previousStates: Array<{
+            timestamp: Date;
+            content: string;
+            emotionalContext: EmotionalState;
+        }>;
+    };
 }
 
 interface Interaction {
@@ -183,4 +192,51 @@ export interface EnhancedMemoryAnalysis {
   importance_score: number;
   associations: string[];
   summary: string;
+}
+
+// types.ts
+
+export interface ChainConfig {
+  depth: number;
+  min_similarity: number;
+}
+
+export interface ClusterConfig {
+  time_period: 'day' | 'week' | 'month';
+  min_cluster_size: number;
+  similarity_threshold: number;
+}
+
+export interface MemoryChainResponse {
+  success: boolean;
+  data?: {
+      chain: Memory[];
+  };
+  error?: string;
+}
+
+export interface MemoryClusterResponse {
+  success: boolean;
+  data?: {
+      clusters: {
+          centroid: string;
+          memories: Memory[];
+      }[];
+  };
+  error?: string;
+}
+
+export interface MemoryEvolutionResponse {
+  success: boolean;
+  data?: {
+      evolution: {
+          [timeframe: string]: {
+              sentiment: number;
+              frequency: number;
+              context_changes: string[];
+              related_concepts: string[];
+          };
+      };
+  };
+  error?: string;
 }

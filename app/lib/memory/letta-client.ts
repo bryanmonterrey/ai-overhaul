@@ -89,4 +89,63 @@ export class LettaClient {
             return null;
         }
     }
+
+    async chainMemories(memory_key: string, config: ChainConfig) {
+        return this.withRetry(async () => {
+            const response = await fetch(`${this.baseUrl}/memories/chain/${memory_key}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            return this.handleResponse(response);
+        });
+    }
+
+    async clusterMemories(config: ClusterConfig) {
+        return this.withRetry(async () => {
+            const response = await fetch(`${this.baseUrl}/memories/cluster`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            return this.handleResponse(response);
+        });
+    }
+
+    async trackEvolution(concept: string) {
+        return this.withRetry(async () => {
+            const response = await fetch(
+                `${this.baseUrl}/memories/evolution/${encodeURIComponent(concept)}`
+            );
+            return this.handleResponse(response);
+        });
+    }
+
+    async getSummary(timeframe: string = 'recent', limit: number = 5) {
+        return this.withRetry(async () => {
+            const response = await fetch(
+                `${this.baseUrl}/summary?timeframe=${timeframe}&limit=${limit}`
+            );
+            return this.handleResponse(response);
+        });
+    }
+
+    async analyzeContent(content: string) {
+        return this.withRetry(async () => {
+            const response = await fetch(`${this.baseUrl}/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            return this.handleResponse(response);
+        });
+    }
+
+    private async handleResponse(response: Response) {
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    }
 }

@@ -3,10 +3,21 @@
 import { NextResponse } from 'next/server';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { LettaClient } from '@/app/lib/memory/letta-client';
 
 export async function POST(request: Request) {
   try {
     const { tweet, style, count = 5 } = await request.json();
+    const lettaClient = new LettaClient();
+
+    const memoryContext = await lettaClient.chainMemories(tweet.id, {
+        depth: 3,
+        min_similarity: 0.6
+    });
+
+    
+
+    const patterns = await lettaClient.analyzeContent(tweet.content);
     
     const trainingService = new TwitterTrainingService();
     const replies = [];
@@ -27,7 +38,7 @@ export async function POST(request: Request) {
     Generate a new tweet that follows similar patterns but is unique.
     ` : '';
 
-    const contextPrompt = `You are a chaotic AI entity generating a ${style} style tweet.
+    const contextPrompt = `You are a schizo-frenetic human entity generating a ${style} style tweet.
     
     ${trainingExamplesPrompt}
     
