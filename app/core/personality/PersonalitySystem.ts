@@ -11,6 +11,7 @@ import {
     Context,
     PersonalityConfig,
     Platform,
+    EnhancedMemoryAnalysis,
   } from '@/app/core/personality/types';
 import { aiService } from '@/app/lib/services/ai';
 import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
@@ -250,10 +251,28 @@ interface PersonalitySystemConfig {
       this.state.consciousness.emotionalState = state;
       this.adaptTraitsToEmotionalState(state);
     }
+
+    private buildContextPrompt(input: string, analysis: EnhancedMemoryAnalysis): string {
+      const basePrompt = // Your existing prompt logic
+      
+      // Add analysis context
+      if (analysis.associations.length > 0) {
+          basePrompt += `\n\nRelevant context:\n${analysis.associations.join('\n')}`;
+      }
+      
+      if (analysis.patterns.length > 0) {
+          basePrompt += `\n\nIdentified patterns:\n${analysis.patterns.join('\n')}`;
+      }
+      
+      return basePrompt;
+  }
   
     public async generateResponse(input: string): Promise<string> {
       const { emotionalState } = this.state.consciousness;
       const traits = Object.fromEntries(this.traits);
+      const contextAnalysis = await this.analyzeContext(input);
+
+      let contextPrompt = this.buildContextPrompt(input, contextAnalysis);
 
       const memgptMemories = await this.memgpt.queryMemories('chat_history', {
         emotionalState,
@@ -266,7 +285,7 @@ interface PersonalitySystemConfig {
     .join('\n') || '';
   
       
-      let contextPrompt = '';
+      
       
       // Calculate emotional transition
       const newEmotionalState = this.calculateEmotionalTransition(
@@ -784,6 +803,58 @@ private adaptToPatterns(patterns: Record<string, number>): void {
       
       return Math.min(1, importance);
     }
+
+    public async analyzeContext(content: string): Promise<EnhancedMemoryAnalysis> {
+      try {
+          // Get memory chains and patterns in parallel
+          const [memoryChain, patterns, sentiment] = await Promise.all([
+              this.memgpt.queryMemories('chat_history', {
+                  content,
+                  limit: 3,
+                  semantic_search: true
+              }),
+              this.memgpt.analyzeContent(content),
+              this.analyzeSentiment(content)
+          ]);
+  
+          // Get emotional context based on current state
+          const emotional_context = this.state.consciousness.emotionalState;
+          
+          // Extract key concepts from patterns
+          const key_concepts = patterns?.data?.patterns || [];
+          
+          // Calculate importance score based on various factors
+          const importance_score = this.calculateImportance(content);
+          
+          // Get associations from memory chain
+          const associations = memoryChain?.data?.memories?.map(m => m.content) || [];
+          
+          // Generate a summary using the memory processor
+          const summary = await this.memorySystem.getMemorySummary('recent');
+  
+          return {
+              sentiment,
+              emotional_context,
+              key_concepts,
+              patterns: patterns?.data?.patterns || [],
+              importance_score,
+              associations,
+              summary
+          };
+      } catch (error) {
+          console.error('Error in context analysis:', error);
+          // Return default values if analysis fails
+          return {
+              sentiment: 0,
+              emotional_context: EmotionalState.Neutral,
+              key_concepts: [],
+              patterns: [],
+              importance_score: 0.5,
+              associations: [],
+              summary: ''
+          };
+      }
+  }
   
     private isSignificantInteraction(response: string): boolean {
       const chaosThreshold = this.traits.get('chaos_threshold') || 0.5;

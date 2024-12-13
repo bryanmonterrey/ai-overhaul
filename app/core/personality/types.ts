@@ -240,3 +240,26 @@ export interface MemoryEvolutionResponse {
   };
   error?: string;
 }
+
+export interface MemoryAnalysis {
+  sentiment: number;
+  emotional_context: EmotionalState;
+  key_concepts: string[];
+  patterns: string[];
+  importance_score: number;
+  associations: string[];
+  summary: string;
+}
+
+export interface MemoryChain {
+  start_memory: Memory;
+  chain: Memory[];
+  associations: string[];
+}
+
+export interface MemoryCluster {
+  center: Memory;
+  memories: Memory[];
+  theme: string;
+  coherence_score: number;
+}
