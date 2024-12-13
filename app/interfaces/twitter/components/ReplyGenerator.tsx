@@ -8,13 +8,13 @@ import { Button } from '@/app/components/common/Button';
 import { TweetStyle } from '@/app/core/types';
 
 interface GeneratedReply {
-  content: string;
-  style: TweetStyle;
-}
-
-interface Tweet {
-    id: string;
     content: string;
+    style: TweetStyle;
+    analysis?: {
+      sentiment?: number;
+      patterns?: string[];
+      emotional_context?: string;
+    };
   }
 
 interface ReplyGeneratorProps {
@@ -23,50 +23,53 @@ interface ReplyGeneratorProps {
 }
 
 export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGeneratorProps) {
-  const [originalTweet, setOriginalTweet] = useState('');
-  const [generatedReplies, setGeneratedReplies] = useState<GeneratedReply[]>([]);
-  const [selectedStyle, setSelectedStyle] = useState<TweetStyle>('metacommentary');
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleGenerate = async () => {
-    if (!originalTweet.trim() || isGenerating) return;
-    
-    setIsGenerating(true);
-    try {
-      const response = await fetch('/api/twitter/generate-replies', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tweet: {
-            id: Date.now().toString(), // Generate a temporary ID if needed
-            content: originalTweet
-          },
-          style: selectedStyle,
-          count: 3
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate replies');
-      }
+    const [originalTweet, setOriginalTweet] = useState('');
+    const [generatedReplies, setGeneratedReplies] = useState<GeneratedReply[]>([]);
+    const [selectedStyle, setSelectedStyle] = useState<TweetStyle>('metacommentary');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+  
+    const handleGenerate = async () => {
+      if (!originalTweet.trim() || isGenerating) return;
       
-      const data = await response.json();
-      if (data.replies) {
+      setIsGenerating(true);
+      setError(null);
+  
+      try {
+        const response = await fetch('/api/twitter/generate-replies', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tweet: {
+              id: Date.now().toString(),
+              content: originalTweet
+            },
+            style: selectedStyle,
+            count: 3
+          }),
+        });
+  
+        const data = await response.json();
+  
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to generate replies');
+        }
+  
+        if (!data.replies || !Array.isArray(data.replies)) {
+          throw new Error('Invalid response format');
+        }
+  
         setGeneratedReplies(data.replies);
-      } else {
-        throw new Error('No replies received');
+      } catch (error) {
+        console.error('Failed to generate replies:', error);
+        setError(error instanceof Error ? error.message : 'Failed to generate replies');
+        setGeneratedReplies([]);
+      } finally {
+        setIsGenerating(false);
       }
-    } catch (error) {
-      console.error('Failed to generate replies:', error);
-      // Maybe add an error state to show to the user
-      setGeneratedReplies([]);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+    };
 
   const handleReplySelect = async (reply: string) => {
     if (!isLoading) {
