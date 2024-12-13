@@ -5,10 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Optional, Dict, Any, List
-from letta.config import LLMConfig, AgentConfig
+from letta.config import LLMConfig, AgentConfig, LettaConfig # Add LettaConfig
 from letta.interface import CLIInterface
 from letta.agent import Agent
-from letta.memory import MemoryProcessor
+from memory_processor import MemoryProcessor
 import uvicorn
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -73,18 +73,23 @@ class MemGPTService:
         self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
         # Initialize Letta with Claude/GPT-4 configuration
-        self.llm_config = LLMConfig(
+        llm_config = LLMConfig(
             model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
             model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
-            context_window=100000 if ANTHROPIC_API_KEY else 8192
+            context_window=100000 if ANTHROPIC_API_KEY else 8192,
+            api_key=ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY,
         )
+
+        letta_config = LettaConfig()
+        letta_config.llm_config = llm_config
         
         # Initialize Letta agent
         self.agent_config = AgentConfig(
             name="memory_agent",
-            model=self.llm_config.model,
+            config=letta_config,
             persona=DEFAULT_PERSONA,
-            human=DEFAULT_HUMAN
+            human=DEFAULT_HUMAN,
+            context_window=llm_config.context_window
         )
         
         self.interface = CLIInterface()
