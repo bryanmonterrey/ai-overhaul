@@ -149,16 +149,42 @@ private async syncQueueWithDatabase(): Promise<void> {
   public async generateTweetBatch(count: number = 10): Promise<void> {
     try {
         const newTweets: Omit<QueuedTweet, 'id'>[] = [];
+        const lettaClient = new LettaClient();
         
         for (let i = 0; i < count; i++) {
             try {
                 const style = this.personality.getCurrentTweetStyle();
+                
+                // First get Letta analysis
+                const contextAnalysis = await lettaClient.analyzeContent('Generate a tweet');
+                
+                // Generate tweet with enhanced context
                 const content = await this.personality.processInput(
                     'Generate a tweet', 
-                    { platform: 'twitter', style }
+                    { 
+                        platform: 'twitter', 
+                        style,
+                        emotionalContext: contextAnalysis?.data?.emotional_context,
+                        memoryContext: contextAnalysis?.data?.summary,
+                        additionalContext: JSON.stringify(contextAnalysis?.data)
+                    }
                 );
 
                 if (content && typeof content === 'string' && content.length > 0) {
+                    // Store in Letta memory
+                    await lettaClient.storeMemory({
+                        key: `tweet-${Date.now()}-${i}`,
+                        memory_type: 'tweet_history',
+                        data: {
+                            content: this.cleanTweet(content),
+                            generated_at: new Date().toISOString()
+                        },
+                        metadata: {
+                            style,
+                            analysis: contextAnalysis?.data
+                        }
+                    });
+
                     newTweets.push({
                         content: this.cleanTweet(content),
                         style,
@@ -168,18 +194,15 @@ private async syncQueueWithDatabase(): Promise<void> {
                 }
             } catch (error) {
                 console.error(`Error generating tweet ${i + 1}:`, error);
-                // Continue with the next tweet
                 continue;
             }
         }
 
-        // Only try to add tweets if we have any
         if (newTweets.length > 0) {
             try {
                 await this.addTweetsToQueue(newTweets);
             } catch (error) {
                 console.error('Error adding tweets to queue:', error);
-                // Don't rethrow - allow the function to return what we have
             }
         }
     } catch (error) {

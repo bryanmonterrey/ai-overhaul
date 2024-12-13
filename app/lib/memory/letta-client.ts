@@ -16,25 +16,18 @@ interface ClusterConfig {
     n_clusters?: number;
 }
 
+interface LettaResponse<T> {
+    success: boolean;
+    data?: T;
+    error?: string;
+}
+
 export class LettaClient {
     private baseUrl: string;
     private retryCount: number = 3;
 
     constructor(baseUrl = 'http://localhost:3001') {  // Changed to point to Python service
         this.baseUrl = baseUrl;
-    }
-
-    private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
-        for (let i = 0; i < this.retryCount; i++) {
-            try {
-                return await operation();
-            } catch (error) {
-                console.error(`Attempt ${i + 1} failed:`, error);
-                if (i === this.retryCount - 1) throw error;
-                await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-            }
-        }
-        throw new Error('Operation failed after retries');
     }
 
     async storeMemory<T extends BaseMemory>(memory: T): Promise<MemoryResponse> {
@@ -116,25 +109,21 @@ export class LettaClient {
         });
     }
 
-    async analyzeContent(content: string, context?: Record<string, any>) {
+    async analyzeContent(content: string, context?: Record<string, any>): Promise<LettaResponse<any>> {
         return this.withRetry(async () => {
             if (!content) {
                 throw new Error('Content is required');
             }
-
+    
+            // Using /query endpoint instead of /analyze - this needs to change
             const payload = {
-                type: 'analysis',
-                query: content,
-                context: context || null
+                content,  // Changed from type/query structure
+                context: context || {}
             };
-
-            console.log('Analyzing content:', {
-                url: `${this.baseUrl}/query`,
-                payload
-            });
-
+    
             try {
-                const response = await fetch(`${this.baseUrl}/query`, {
+                // Should use /analyze endpoint instead of /query
+                const response = await fetch(`${this.baseUrl}/analyze`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -142,25 +131,22 @@ export class LettaClient {
                     },
                     body: JSON.stringify(payload)
                 });
-
+    
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('Query failed:', {
+                    console.error('Analysis failed:', {
                         status: response.status,
                         statusText: response.statusText,
                         error: errorText,
                         payload
                     });
                 }
-
+    
                 return this.handleResponse(response);
             } catch (error) {
                 console.error('Network error:', error);
-                throw new Error(`Network error: ${error.message}`);
+                throw new Error(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
-        }, {
-            retries: 3,
-            backoff: true
         });
     }
 
@@ -172,15 +158,37 @@ export class LettaClient {
                 const errorMessage = data?.detail || data?.error || `HTTP error! status: ${response.status}`;
                 throw new Error(errorMessage);
             }
-
-            if (!data?.success) {
-                throw new Error(data?.error || 'Unknown error occurred');
-            }
-
-            return data.data;
+    
+            // The Letta service returns { success: true, data: {...} }
+            return data.success ? data.data : data; // Handle both formats
         } catch (error) {
-            console.error('Error parsing response:', error);
+            console.error('Error handling response:', {
+                error,
+                responseStatus: response.status,
+                responseUrl: response.url
+            });
             throw error;
         }
+    }
+
+    private async withRetry<T>(
+        operation: () => Promise<T>, 
+        options = { retries: 3, backoff: true }
+    ): Promise<T> {
+        for (let i = 0; i < options.retries; i++) {
+            try {
+                return await operation();
+            } catch (error) {
+                console.error(`Attempt ${i + 1} failed:`, error);
+                if (i === options.retries - 1) throw error;
+                
+                const delay = options.backoff 
+                    ? Math.min(1000 * Math.pow(2, i), 10000) // Exponential backoff up to 10s
+                    : 1000; // Fixed 1s delay
+                    
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        throw new Error('Operation failed after retries');
     }
 }
