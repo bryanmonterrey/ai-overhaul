@@ -116,28 +116,71 @@ export class LettaClient {
         });
     }
 
-    async analyzeContent(content: string) {
+    async analyzeContent(content: string, context?: Record<string, any>) {
         return this.withRetry(async () => {
-            const response = await fetch(`${this.baseUrl}/analyze`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content })
+            if (!content) {
+                throw new Error('Content is required');
+            }
+
+            const payload = {
+                type: 'analysis',
+                query: content,
+                context: context || null
+            };
+
+            console.log('Analyzing content:', {
+                url: `${this.baseUrl}/query`,
+                payload
             });
-            return this.handleResponse(response);
+
+            try {
+                const response = await fetch(`${this.baseUrl}/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Query failed:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: errorText,
+                        payload
+                    });
+                }
+
+                return this.handleResponse(response);
+            } catch (error) {
+                console.error('Network error:', error);
+                throw new Error(`Network error: ${error.message}`);
+            }
+        }, {
+            retries: 3,
+            backoff: true
         });
     }
 
     private async handleResponse(response: Response) {
-        const data = await response.json().catch(() => null);
-        
-        if (!response.ok) {
-            throw new Error(data?.error || `HTTP error! status: ${response.status}`);
-        }
+        try {
+            const data = await response.json();
+            
+            if (!response.ok) {
+                const errorMessage = data?.detail || data?.error || `HTTP error! status: ${response.status}`;
+                throw new Error(errorMessage);
+            }
 
-        if (!data?.success) {
-            throw new Error(data?.error || 'Unknown error');
-        }
+            if (!data?.success) {
+                throw new Error(data?.error || 'Unknown error occurred');
+            }
 
-        return data;
+            return data.data;
+        } catch (error) {
+            console.error('Error parsing response:', error);
+            throw error;
+        }
     }
 }

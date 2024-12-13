@@ -49,8 +49,9 @@ class ContentRequest(BaseModel):
     content: str
 
 class QueryRequest(BaseModel):
-    type: str
-    query: dict
+    type: str = Field(..., description="Type of query (e.g. 'analysis')")
+    query: str = Field(..., description="Query content")
+    context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
 
 class BaseMemory(BaseModel):
     key: str
@@ -143,22 +144,30 @@ class MemGPTService:
         except Exception as e:
             raise RuntimeError(f"Failed to initialize MemGPTService: {str(e)}")
 
-    async def process_memory_content(self, content: str) -> Dict[str, Any]:
-        """Enhanced memory processing using Letta capabilities"""
+    async def process_memory_content(self, content: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Process and analyze content with optional context"""
         try:
-            analysis = await self.memory_processor.analyze_content(content)
+            if not content or not isinstance(content, str):
+                raise ValueError("Invalid content provided")
+
+            # Use the agent to analyze the content
+            analysis = await self.agent.analyze_content(content, context)
+            
+            if not analysis:
+                raise ValueError("Analysis failed to produce results")
+
             return {
                 'sentiment': analysis.get('sentiment', 0),
                 'emotional_context': analysis.get('emotional_context', 'neutral'),
                 'key_concepts': analysis.get('key_concepts', []),
                 'patterns': analysis.get('patterns', []),
-                'importance_score': analysis.get('importance', 0.5),
+                'importance': analysis.get('importance', 0.5),
                 'associations': analysis.get('associations', []),
                 'summary': analysis.get('summary', '')
             }
         except Exception as e:
-            print(f"Error processing memory content: {str(e)}")
-            return {}
+            print(f"Error processing content: {str(e)}")
+            raise ValueError(f"Content analysis failed: {str(e)}")
 
     async def store_memory(self, memory: BaseMemory):
         try:
@@ -383,37 +392,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.route("/analyze", methods=["POST"])
+class AnalyzeRequest(BaseModel):
+    content: str = Field(..., description="Content to analyze")
+    context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
+
 @app.post("/analyze")
-async def analyze_content(request: ContentRequest):
-    """
-    Analyze content endpoint
-    """
+async def analyze_content(request: AnalyzeRequest):
     try:
         if not request.content:
             raise HTTPException(status_code=400, detail="Content is required")
 
-        # Process the content through your service
-        analysis = await service.process_memory_content(request.content)
-        
-        if not analysis:
-            raise HTTPException(status_code=500, detail="Failed to process content")
+        # Process the content
+        result = await app.state.memgpt_service.process_memory_content(
+            content=request.content,
+            context=request.context
+        )
 
         return {
             "success": True,
-            "data": {
-                "sentiment": analysis.get('sentiment', 0),
-                "emotional_context": analysis.get('emotional_context', 'neutral'),
-                "key_concepts": analysis.get('key_concepts', []),
-                "patterns": analysis.get('patterns', []),
-                "importance_score": analysis.get('importance', 0.5),
-                "associations": analysis.get('associations', []),
-                "summary": analysis.get('summary', '')
-            }
+            "data": result
         }
     except Exception as e:
-        print(f"Error in analyze endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error in analyze_content: {str(e)}")
+        raise HTTPException(status_code=422, detail=str(e))
     
 # Existing endpoints
 @app.post("/store", response_model=MemoryResponse)
@@ -434,21 +435,28 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
     return result
 
 @app.post("/query")
-async def query_memories(query_request: QueryRequest):
+async def query_content(request: QueryRequest):
     try:
-        if not query_request.type:
-            raise HTTPException(status_code=422, detail="Memory type is required")
-            
-        result = await service.query_memories(
-            memory_type=query_request.type,
-            query=query_request.query
-        )
+        print(f"Received query request: {request}")  # Debug logging
         
-        if result.get("success"):
-            return result
+        if not request.query:
+            raise HTTPException(status_code=400, detail="Query is required")
+
+        # Process based on query type
+        if request.type == 'analysis':
+            result = await app.state.memgpt_service.process_memory_content(
+                content=request.query,
+                context=request.context
+            )
         else:
-            raise HTTPException(status_code=500, detail=result.get("error", "Query failed"))
+            raise HTTPException(status_code=400, detail=f"Unknown query type: {request.type}")
+
+        return {
+            "success": True,
+            "data": result
+        }
     except Exception as e:
+        print(f"Error processing query: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
