@@ -16,6 +16,9 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import asyncio
 from memory import Memory
+import memory_processor
+import uuid
+
 
 
 load_dotenv()
@@ -183,9 +186,10 @@ class MemGPTService:
             # Process content for analysis
             content = str(memory.data.get('content', memory.data))
             memory_analysis = await self.process_memory_content(content)
-            
+                
             # Prepare data for Supabase
             supabase_data = {
+                "id": str(uuid.uuid4()),
                 "key": memory.key,
                 "type": memory.memory_type,
                 "content": content,
@@ -197,22 +201,23 @@ class MemGPTService:
                 "archive_status": "active"
             }
 
-            # Store in Supabase
+            # Store in Supabase and handle response
             response = await self.supabase.table('memories').insert(supabase_data).execute()
-            
+            response_data = response.data if response else None
+                
             if hasattr(response, 'error') and response.error:
                 raise Exception(response.error.message)
-            
+                
             return {
                 "success": True,
-                "data": response.data[0] if response.data else supabase_data
+                "data": response_data[0] if response_data else supabase_data
             }
         except Exception as e:
             print(f"Error storing memory: {str(e)}")
             return {
                 "success": False,
                 "error": str(e)
-            }
+            } 
     
     # Memory Chaining feature
     async def chain_memories(self, memory_key: str, config: ChainConfig):
@@ -339,23 +344,26 @@ class MemGPTService:
     # Your existing methods...
     async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
         try:
-            # Enhanced semantic search using both systems
-            [supabase_results, semantic_results] = await asyncio.gather(
-                self.supabase.table('memories')
-                    .select("*")
-                    .eq('type', memory_type)
-                    .eq('archive_status', 'active')
-                    .execute(),
-                self.agent.memory.search(
-                    query=query.get('content', ''),
-                    limit=10,
-                    filter_fn=lambda x: x.get('type') == memory_type
-                )
+            # Get the Supabase results
+            supabase_response = await self.supabase.table('memories')\
+                .select("*")\
+                .eq('type', memory_type)\
+                .eq('archive_status', 'active')\
+                .execute()
+            
+            # Convert APIResponse to dict
+            supabase_results = supabase_response.data if supabase_response else []
+
+            # Get semantic results
+            semantic_results = await self.agent.memory.search(
+                query=query.get('content', ''),
+                limit=10,
+                filter_fn=lambda x: x.get('type') == memory_type
             )
             
             # Combine and rank results
             all_results = await self.memory_processor.combine_and_rank_results(
-                supabase_results.data or [],
+                supabase_results,
                 semantic_results,
                 query
             )
