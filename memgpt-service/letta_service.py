@@ -186,7 +186,7 @@ class MemGPTService:
             # Process content for analysis
             content = str(memory.data.get('content', memory.data))
             memory_analysis = await self.process_memory_content(content)
-                
+                    
             # Prepare data for Supabase
             supabase_data = {
                 "id": str(uuid.uuid4()),
@@ -202,13 +202,12 @@ class MemGPTService:
             }
 
             try:
-                # Get the raw Supabase response
-                supabase_response = await self.supabase.table('memories').insert(supabase_data).execute()
+                # Modified Supabase insert
+                data = await self.supabase.table('memories').insert(supabase_data).execute()
                 
-                # Safely extract data
-                if hasattr(supabase_response, 'data'):
-                    raw_data = supabase_response.data
-                    inserted_data = raw_data[0] if isinstance(raw_data, list) and len(raw_data) > 0 else raw_data
+                # Properly handle Supabase response
+                if hasattr(data, 'data'):
+                    inserted_data = data.data[0] if isinstance(data.data, list) and len(data.data) > 0 else data.data
                 else:
                     inserted_data = supabase_data
 
@@ -227,27 +226,31 @@ class MemGPTService:
                 "success": False,
                 "error": str(e)
             }
-
+    
     # Memory Chaining feature
     async def chain_memories(self, memory_key: str, config: ChainConfig):
         try:
             # Get initial memory
-            initial_memory = await self.get_memory(memory_key)
-            if not initial_memory["success"]:
+            initial_memory_response = await self.get_memory(memory_key)
+            if not initial_memory_response["success"]:
                 return {"success": False, "error": "Initial memory not found"}
 
+            # Modified memory search
             related_memories_response = await self.agent.memory.search(
-            query=initial_memory["data"]["content"],
-            limit=config.depth * 5
-        )
-        
-        # Convert APIResponse to list if needed
-            related_memories = related_memories_response.data if hasattr(related_memories_response, 'data') else related_memories_response
-
+                query=initial_memory_response["data"]["content"],
+                limit=config.depth * 5
+            )
+            
+            # Properly handle search response
+            related_memories = []
+            if hasattr(related_memories_response, 'data'):
+                related_memories = related_memories_response.data
+            elif isinstance(related_memories_response, list):
+                related_memories = related_memories_response
 
             # Build memory chain
-            memory_chain = [initial_memory["data"]]
-            current_memory = initial_memory["data"]
+            memory_chain = [initial_memory_response["data"]]
+            current_memory = initial_memory_response["data"]
             
             for _ in range(config.depth):
                 next_memory = await self._find_most_related(current_memory, related_memories)
@@ -335,43 +338,57 @@ class MemGPTService:
     async def get_memories_by_timeframe(self, timeframe: str) -> List[Dict]:
         """Get memories within specified timeframe"""
         try:
-            end_date = datetime.utcnow()
+            # Use UTC.now() instead of deprecated utcnow()
+            end_date = datetime.now(timezone.utc)
             start_date = end_date - {
                 'day': timedelta(days=1),
                 'week': timedelta(weeks=1),
                 'month': timedelta(days=30)
             }.get(timeframe, timedelta(days=1))
 
+            # Modified Supabase query
             response = await self.supabase.table('memories')\
                 .select("*")\
                 .gte('created_at', start_date.isoformat())\
                 .lte('created_at', end_date.isoformat())\
                 .execute()
 
-            return response.data or []
+            # Properly handle response
+            if hasattr(response, 'data'):
+                return response.data or []
+            return []
         except Exception as e:
             print(f"Error getting memories by timeframe: {str(e)}")
             return []
 
+
     # Your existing methods...
     async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
         try:
-            # Get Supabase results
-            supabase_response = await self.supabase.table('memories')\
+            # Modified Supabase query
+            response = await self.supabase.table('memories')\
                 .select("*")\
                 .eq('type', memory_type)\
                 .eq('archive_status', 'active')\
                 .execute()
-                
-            # Safely extract data
-            db_results = supabase_response.data if hasattr(supabase_response, 'data') else []
+                    
+            # Properly handle Supabase response
+            db_results = []
+            if hasattr(response, 'data'):
+                db_results = response.data
 
-            # Get semantic results (if needed)
-            semantic_results = await self.agent.memory.search(
-                query=query.get('content', ''),
-                limit=10,
-                filter_fn=lambda x: x.get('type') == memory_type
-            ) if query.get('content') else []
+            # Modified semantic search
+            semantic_results = []
+            if query.get('content'):
+                search_response = await self.agent.memory.search(
+                    query=query.get('content', ''),
+                    limit=10,
+                    filter_fn=lambda x: x.get('type') == memory_type
+                )
+                if hasattr(search_response, 'data'):
+                    semantic_results = search_response.data
+                elif isinstance(search_response, list):
+                    semantic_results = search_response
 
             # Combine and rank results
             all_results = await self.memory_processor.combine_and_rank_results(
@@ -393,7 +410,7 @@ class MemGPTService:
                 "success": False,
                 "error": str(e)
             }
-
+    
     async def get_memory(self, key: str):
         try:
             supabase_response = await self.supabase.table('memories')\
