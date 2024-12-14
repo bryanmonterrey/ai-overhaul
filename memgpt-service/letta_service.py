@@ -188,9 +188,10 @@ class MemGPTService:
             memory_analysis = await self.process_memory_content(content)
                     
             # Prepare data for Supabase
+            memory_id = str(uuid.uuid4())
             supabase_data = {
-                "id": str(uuid.uuid4()),
-                "key": memory.key,
+                "id": memory_id,  # Use as both id and key
+                "key": memory_id,  # Store the same UUID as key
                 "type": memory.memory_type,
                 "content": content,
                 "metadata": memory.metadata or {},
@@ -416,13 +417,23 @@ class MemGPTService:
         
     async def get_memory(self, key: str):
         try:
+            # Check both id and key fields in case either is used
             supabase_response = self.supabase.table('memories')\
                 .select("*")\
-                .eq('id', key)\
+                .or_(f'id.eq.{key},key.eq.{key}')\
                 .single()\
                 .execute()
 
             supabase_data = supabase_response.data if hasattr(supabase_response, 'data') else None
+
+            if not supabase_data:
+                # Try querying by key if id fails
+                supabase_response = self.supabase.table('memories')\
+                    .select("*")\
+                    .eq('key', key)\
+                    .single()\
+                    .execute()
+                supabase_data = supabase_response.data if hasattr(supabase_response, 'data') else None
 
             if supabase_data:
                 try:

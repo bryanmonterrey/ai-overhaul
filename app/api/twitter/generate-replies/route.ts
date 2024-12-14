@@ -28,16 +28,27 @@ export async function POST(request: Request) {
         });
         const trainingService = new TwitterTrainingService();
 
+        // First store the initial tweet as a memory
         try {
+            await lettaClient.storeMemory({
+                key: tweet.id,
+                memory_type: 'tweet_history',
+                data: {
+                    content: tweet.content,
+                    timestamp: new Date().toISOString(),
+                    type: 'original_tweet'
+                },
+                metadata: {
+                    tweet_id: tweet.id,
+                    is_original: true
+                }
+            });
+
+            // Add a small delay to ensure database consistency
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             // Get all context data in parallel with proper error handling
-            const [memoryContext, patterns, analysis, trainingExamplesArrays] = await Promise.allSettled([
-                lettaClient.chainMemories(tweet.id, {
-                    depth: 3,
-                    min_similarity: 0.6
-                }).catch(error => {
-                    console.error('Memory chain error:', error);
-                    return { success: false, data: { chain: [] } };
-                }),
+            const [patterns, analysis, trainingExamplesArrays] = await Promise.allSettled([
                 lettaClient.analyzeContent(tweet.content).catch(error => {
                     console.error('Content analysis error:', error);
                     return { success: false, data: { patterns: [] } };
@@ -57,8 +68,17 @@ export async function POST(request: Request) {
                 })
             ]);
 
+            // Try to chain memories, but don't fail if it doesn't work
+            const memoryChainResult = await lettaClient.chainMemories(tweet.id, {
+                depth: 3,
+                min_similarity: 0.6
+            }).catch(error => {
+                console.error('Memory chain error:', error);
+                return { success: true, data: { chain: [] } };
+            });
+
             // Process results safely
-            const memoryChain = memoryContext.status === 'fulfilled' ? memoryContext.value?.data?.chain || [] : [];
+            const memoryChain = memoryChainResult?.data?.chain || [];
             const contentPatterns = patterns.status === 'fulfilled' ? patterns.value?.data?.patterns || [] : [];
             const contextAnalysis = analysis.status === 'fulfilled' ? analysis.value : null;
             const allExamples = trainingExamplesArrays.status === 'fulfilled' ? 
@@ -192,6 +212,7 @@ ${enhancedContext}
 Generate a reply that follows these traits and rules. Output only the reply text with no additional context or explanations.`;
 
             const replies = [];
+            const replyPromises = [];
 
             for (let i = 0; i < count; i++) {
                 let validReply: string | null = null;
@@ -220,6 +241,39 @@ Generate a reply that follows these traits and rules. Output only the reply text
               
                             if (cleanedReply.length >= 50 && cleanedReply.length <= 180) {
                                 validReply = cleanedReply;
+
+                                // Store memory asynchronously
+                                const memoryPromise = lettaClient.storeMemory({
+                                    key: uuidv4(),
+                                    memory_type: 'tweet_history',
+                                    data: {
+                                        content: validReply,
+                                        original_tweet: tweet,
+                                        generated_at: new Date().toISOString(),
+                                        type: 'generated_reply'
+                                    },
+                                    metadata: {
+                                        style,
+                                        analysis: contextAnalysis || {},
+                                        patterns: contentPatterns,
+                                        reply_to: tweet.id
+                                    }
+                                }).catch(error => {
+                                    console.error('Memory storage error:', error);
+                                    return null;
+                                });
+
+                                replyPromises.push(memoryPromise);
+
+                                replies.push({
+                                    content: validReply,
+                                    style: style,
+                                    analysis: {
+                                        sentiment: contextAnalysis?.sentiment,
+                                        patterns: contentPatterns,
+                                        emotional_context: contextAnalysis?.emotional_context
+                                    }
+                                });
                             }
                         }
                     } catch (error) {
@@ -227,52 +281,10 @@ Generate a reply that follows these traits and rules. Output only the reply text
                         continue;
                     }
                 }
-          
-                if (validReply) {
-                    try {
-                        // Store the reply in Letta
-                        await lettaClient.storeMemory({
-                            key: `reply-${tweet.id}-${i}`,
-                            memory_type: 'tweet_history',
-                            data: {
-                                content: validReply,
-                                original_tweet: tweet,
-                                generated_at: new Date().toISOString()
-                            },
-                            metadata: {
-                                style,
-                                analysis: contextAnalysis || {},
-                                patterns: contentPatterns
-                            }
-                        }).catch(error => {
-                            console.error('Memory storage error:', error);
-                            // Continue even if storage fails
-                        });
-
-                        replies.push({
-                            content: validReply,
-                            style: style,
-                            analysis: {
-                                sentiment: contextAnalysis?.sentiment,
-                                patterns: contentPatterns,
-                                emotional_context: contextAnalysis?.emotional_context
-                            }
-                        });
-                    } catch (error) {
-                        console.error('Error storing reply:', error);
-                        // Still add the reply even if storage fails
-                        replies.push({
-                            content: validReply,
-                            style: style,
-                            analysis: {
-                                sentiment: contextAnalysis?.sentiment,
-                                patterns: contentPatterns,
-                                emotional_context: contextAnalysis?.emotional_context
-                            }
-                        });
-                    }
-                }
             }
+
+            // Wait for all memory stores to complete
+            await Promise.allSettled(replyPromises);
           
             return NextResponse.json({ 
                 replies,
@@ -285,7 +297,6 @@ Generate a reply that follows these traits and rules. Output only the reply text
 
         } catch (error) {
             console.error('Error in context processing:', error);
-            // Fall back to basic reply generation
             return NextResponse.json({ 
                 replies: [],
                 error: 'Failed to process context, but you can try again' 

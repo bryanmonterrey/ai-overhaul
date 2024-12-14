@@ -75,12 +75,54 @@ export class LettaClient {
 
     async chainMemories(memory_key: string, config: ChainConfig) {
         return this.withRetry(async () => {
-            const response = await fetch(`${this.baseUrl}/memories/chain/${memory_key}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-            });
-            return this.handleResponse(response);
+            try {
+                const response = await fetch(`${this.baseUrl}/memories/chain/${memory_key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.warn(`Chain memories failed for key ${memory_key}:`, errorText);
+                    // Instead of throwing, return empty chain
+                    return { 
+                        success: true, 
+                        data: { 
+                            chain: [],
+                            error: errorText
+                        } 
+                    };
+                }
+                
+                const data = await response.json();
+                
+                // Check if we got a valid response
+                if (!data || !data.data) {
+                    console.warn(`Invalid response format for key ${memory_key}`);
+                    return { 
+                        success: true, 
+                        data: { 
+                            chain: [] 
+                        } 
+                    };
+                }
+    
+                return this.handleResponse(response);
+            } catch (error) {
+                console.error('Chain memories error:', error);
+                // Return empty chain instead of throwing
+                return { 
+                    success: true, 
+                    data: { 
+                        chain: [],
+                        error: error instanceof Error ? error.message : 'Unknown error'
+                    } 
+                };
+            }
+        }, {
+            retries: this.retryCount,
+            backoff: true
         });
     }
 
