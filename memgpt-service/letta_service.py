@@ -228,38 +228,87 @@ class MemGPTService:
                 "error": str(e)
             }
         
-    # Memory Chaining feature
     async def chain_memories(self, memory_key: str, config: ChainConfig):
+        """Chain memories with support for tweet-based relationships."""
         try:
-            # Get initial memory
+            # Validate and sanitize config
+            depth = min(max(1, config.depth), 5)
+            min_similarity = min(max(0.1, config.min_similarity), 1.0)
+
+            # Get initial memory with expanded search
             initial_memory = await self.get_memory(memory_key)
             if not initial_memory["success"]:
                 return {"success": False, "error": "Initial memory not found"}
 
-            # Fix search handling
-            search_response = await self.agent.memory.search(
-                query=initial_memory["data"]["content"],
-                limit=config.depth * 5
-            )
-            
-            # Properly handle search response
-            related_memories = []
-            if hasattr(search_response, 'data'):
-                related_memories = search_response.data
-            elif isinstance(search_response, list):
-                related_memories = search_response
+            # Extract content safely
+            memory_data = initial_memory["data"]
+            content = memory_data.get("content", "")
+            if isinstance(content, dict) and 'messages' in content:
+                content = content['messages'][0].get('content', "") if content['messages'] else ""
 
-            # Build memory chain
-            memory_chain = [initial_memory["data"]]
-            current_memory = initial_memory["data"]
-            
-            for _ in range(config.depth):
-                next_memory = await self._find_most_related(current_memory, related_memories)
-                if next_memory and next_memory not in memory_chain:
-                    memory_chain.append(next_memory)
-                    current_memory = next_memory
+            # Start building the chain
+            memory_chain = [memory_data]
+            seen_ids = {memory_data['id']}
 
-            return {"success": True, "data": {"chain": memory_chain}}
+            # Get related memories
+            try:
+                # First, check for direct replies using metadata
+                reply_query = self.supabase.table('memories')\
+                    .select("*")\
+                    .eq('type', memory_data['type'])\
+                    .eq('archive_status', 'active')\
+                    .execute()
+
+                replies = [m for m in reply_query.data 
+                          if m.get('metadata', {}).get('reply_to') == memory_key 
+                          and m['id'] not in seen_ids]
+
+                # Add replies to chain
+                for reply in replies[:depth-1]:
+                    if reply['id'] not in seen_ids:
+                        memory_chain.append(reply)
+                        seen_ids.add(reply['id'])
+
+                # If we still need more memories, use semantic search
+                if len(memory_chain) < depth:
+                    search_results = await self.agent.memory.search(
+                        query=content,
+                        limit=(depth - len(memory_chain)) * 2
+                    )
+                    
+                    # Process search results
+                    if search_results:
+                        related_memories = (
+                            search_results.data if hasattr(search_results, 'data')
+                            else search_results if isinstance(search_results, list)
+                            else []
+                        )
+
+                        for memory in related_memories:
+                            if memory.get('id') and memory['id'] not in seen_ids:
+                                memory_chain.append(memory)
+                                seen_ids.add(memory['id'])
+                                if len(memory_chain) >= depth:
+                                    break
+
+                return {
+                    "success": True,
+                    "data": {
+                        "chain": memory_chain,
+                        "total": len(memory_chain)
+                    }
+                }
+
+            except Exception as search_error:
+                print(f"Error in memory search: {str(search_error)}")
+                return {
+                    "success": True,
+                    "data": {
+                        "chain": memory_chain,
+                        "error": "Failed to find additional related memories"
+                    }
+                }
+
         except Exception as e:
             print(f"Error in memory chaining: {str(e)}")
             return {"success": False, "error": str(e)}
@@ -320,18 +369,74 @@ class MemGPTService:
             }
 
     async def _find_most_related(self, source_memory: Dict, potential_memories: List[Dict]) -> Optional[Dict]:
-        """Find the most semantically similar memory"""
+        """Find the most semantically similar memory from a list of potential matches."""
         try:
             if not potential_memories:
                 return None
 
+            if not source_memory:
+                print("Warning: Source memory is empty")
+                return None
+
+            # Extract content safely from source memory
+            try:
+                source_content = source_memory.get("content", "")
+                if isinstance(source_content, dict):
+                    source_content = (
+                        source_content.get("messages", [])[0].get("content", "")
+                        if "messages" in source_content
+                        else str(source_content)
+                    )
+                elif not isinstance(source_content, str):
+                    source_content = str(source_content)
+            except (AttributeError, IndexError) as e:
+                print(f"Error extracting content from source memory: {e}")
+                source_content = str(source_memory)
+
+            # Filter out invalid memories and prepare for comparison
+            valid_memories = []
+            for memory in potential_memories:
+                try:
+                    if not memory:
+                        continue
+                    
+                    target_content = memory.get("content", "")
+                    if isinstance(target_content, dict):
+                        target_content = (
+                            target_content.get("messages", [])[0].get("content", "")
+                            if "messages" in target_content
+                            else str(target_content)
+                        )
+                    elif not isinstance(target_content, str):
+                        target_content = str(target_content)
+                    
+                    if target_content:  # Only include memories with content
+                        memory['_processed_content'] = target_content
+                        valid_memories.append(memory)
+                    
+                except (AttributeError, IndexError) as e:
+                    print(f"Error processing potential memory: {e}")
+                    continue
+
+            if not valid_memories:
+                return None
+
             # Use memory processor for similarity analysis
             most_similar = await self.memory_processor.find_most_similar(
-                source_memory,
-                potential_memories
+                {"content": source_content},
+                [{"content": m['_processed_content']} for m in valid_memories]
             )
             
-            return most_similar
+            if most_similar:
+                # Find and return the original memory that matches the most similar processed content
+                for memory in valid_memories:
+                    if memory['_processed_content'] == most_similar.get('content'):
+                        # Clean up temporary processing field
+                        memory.pop('_processed_content', None)
+                        return memory
+                    
+            return None
+        
         except Exception as e:
             print(f"Error finding related memory: {str(e)}")
             return None
@@ -415,50 +520,68 @@ class MemGPTService:
                 "error": str(e)
             }
         
-    async def get_memory(self, key: str):
+    async def get_memory(self, key: str, type: Optional[MemoryType] = None):
+        """Get a memory by key, with support for metadata-based lookups."""
         try:
-            # Try to get memory by ID first
-            supabase_response = self.supabase.table('memories')\
-                .select("*")\
-                .eq('id', key)\
-                .execute()  # Remove .single()
+            query = self.supabase.table('memories').select("*")
+            
+            if type:
+                query = query.eq('type', type)
 
+            # First try direct ID match
+            supabase_response = query.eq('id', key).execute()
             data_list = supabase_response.data if hasattr(supabase_response, 'data') else []
             supabase_data = data_list[0] if data_list else None
 
             if not supabase_data:
-                # Try by key if ID fails
-                supabase_response = self.supabase.table('memories')\
-                    .select("*")\
-                    .eq('key', key)\
-                    .execute()  # Remove .single()
+                # Try metadata tweet_id match for tweet_history type
+                metadata_query = query.eq('type', 'tweet_history')
+                metadata_response = metadata_query.execute()
+                metadata_list = metadata_response.data if hasattr(metadata_response, 'data') else []
                 
-                data_list = supabase_response.data if hasattr(supabase_response, 'data') else []
-                supabase_data = data_list[0] if data_list else None
+                # Look for the key in metadata.tweet_id
+                supabase_data = next(
+                    (item for item in metadata_list 
+                     if item.get('metadata', {}).get('tweet_id') == key),
+                    None
+                )
+
+            if not supabase_data:
+                # Try to find in reply_to metadata
+                reply_query = query.execute()
+                reply_list = reply_query.data if hasattr(reply_query, 'data') else []
+                supabase_data = next(
+                    (item for item in reply_list 
+                     if item.get('metadata', {}).get('reply_to') == key),
+                    None
+                )
 
             if supabase_data:
+                # Parse content if it's stored as a JSON string
                 try:
-                    letta_result = await self.agent.memory.get(key)
-                    if letta_result:
+                    if isinstance(supabase_data.get('content'), str):
                         try:
-                            if isinstance(letta_result, str):
-                                letta_data = json.loads(letta_result)
-                            else:
-                                letta_data = letta_result
-                            enhanced_data = {
-                                **supabase_data,
-                                'enhanced_analysis': letta_data.get('analysis', {})
-                            }
-                            return {"success": True, "data": enhanced_data}
+                            if supabase_data['content'].startswith('{'):
+                                parsed_content = json.loads(supabase_data['content'])
+                                supabase_data['content'] = parsed_content
                         except json.JSONDecodeError:
-                            print(f"Error parsing Letta data: {letta_result}")
-                            return {"success": True, "data": supabase_data}
+                            pass
+                
                     return {"success": True, "data": supabase_data}
+                
                 except Exception as e:
-                    print(f"Error getting Letta data: {str(e)}")
+                    print(f"Error processing memory data: {str(e)}")
                     return {"success": True, "data": supabase_data}
+                
+            return {
+                "success": False, 
+                "error": "Memory not found",
+                "debug_info": {
+                    "key": key,
+                    "type": type
+                }
+            }
             
-            return {"success": False, "error": "Memory not found"}
         except Exception as e:
             print(f"Error getting memory: {str(e)}")
             return {"success": False, "error": str(e)}
