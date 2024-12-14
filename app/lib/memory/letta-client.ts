@@ -62,10 +62,10 @@ export class LettaClient {
     }
 
     async getMemory<T extends BaseMemory>(key: string, type: MemoryType): Promise<T | null> {
+        console.log('Getting memory with key:', key);
         return this.withRetry(async () => {
-            // Changed back to /memories/{key} to match FastAPI endpoint
             const response = await fetch(
-                `${this.baseUrl}/memories/chain/${encodeURIComponent(key)}`
+                `${this.baseUrl}/memories/${encodeURIComponent(key)}?type=${encodeURIComponent(type)}`
             );
     
             if (!response.ok) {
@@ -75,7 +75,7 @@ export class LettaClient {
             }
     
             const data = await response.json();
-            console.log('Get memory response:', data);  // Add logging
+            console.log('Get memory response:', data);
             return data.success ? data.data : null;
         });
     }
