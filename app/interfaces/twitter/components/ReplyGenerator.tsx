@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Card } from '@/app/components/common/Card';
 import { Button } from '@/app/components/common/Button';
 import { TweetStyle } from '@/app/core/types';
+import { v4 as uuidv4 } from 'uuid'; 
 
 interface GeneratedReply {
   content: string;
@@ -43,7 +44,7 @@ export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGenera
         },
         body: JSON.stringify({
           tweet: {
-            id: Date.now().toString(),
+            id: uuidv4(),
             content: originalTweet
           },
           style: selectedStyle,

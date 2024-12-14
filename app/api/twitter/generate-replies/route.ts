@@ -7,6 +7,7 @@ import { LettaClient } from '@/app/lib/memory/letta-client';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
 import { Platform } from '@/app/core/personality/types';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
     try {
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
         // Handle case when tweet is just text
         if (typeof tweet === 'string') {
           tweet = { 
-            id: Date.now().toString(),
+            id: uuidv4(),
             content: tweet 
           };
         }
