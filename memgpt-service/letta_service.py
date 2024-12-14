@@ -202,12 +202,12 @@ class MemGPTService:
             }
 
             try:
-                # Modified Supabase insert
-                data = await self.supabase.table('memories').insert(supabase_data).execute()
+                # Modified Supabase insert without await
+                result = self.supabase.table('memories').insert(supabase_data).execute()
                 
-                # Properly handle Supabase response
-                if hasattr(data, 'data'):
-                    inserted_data = data.data[0] if isinstance(data.data, list) and len(data.data) > 0 else data.data
+                # Handle the response data
+                if hasattr(result, 'data'):
+                    inserted_data = result.data[0] if isinstance(result.data, list) and result.data else result.data
                 else:
                     inserted_data = supabase_data
 
@@ -226,7 +226,7 @@ class MemGPTService:
                 "success": False,
                 "error": str(e)
             }
-    
+        
     # Memory Chaining feature
     async def chain_memories(self, memory_key: str, config: ChainConfig):
         try:
@@ -361,34 +361,37 @@ class MemGPTService:
             print(f"Error getting memories by timeframe: {str(e)}")
             return []
 
-
-    # Your existing methods...
     async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
         try:
-            # Modified Supabase query
-            response = await self.supabase.table('memories')\
+            # Modified Supabase query without await
+            query_result = self.supabase.table('memories')\
                 .select("*")\
                 .eq('type', memory_type)\
                 .eq('archive_status', 'active')\
                 .execute()
-                    
-            # Properly handle Supabase response
+            
+            # Handle the response data
             db_results = []
-            if hasattr(response, 'data'):
-                db_results = response.data
+            if hasattr(query_result, 'data'):
+                db_results = query_result.data
 
             # Modified semantic search
             semantic_results = []
             if query.get('content'):
-                search_response = await self.agent.memory.search(
-                    query=query.get('content', ''),
-                    limit=10,
-                    filter_fn=lambda x: x.get('type') == memory_type
-                )
-                if hasattr(search_response, 'data'):
-                    semantic_results = search_response.data
-                elif isinstance(search_response, list):
-                    semantic_results = search_response
+                try:
+                    search_result = self.agent.memory.search(
+                        query=query.get('content', ''),
+                        limit=10,
+                        filter_fn=lambda x: x.get('type') == memory_type
+                    )
+                    
+                    if isinstance(search_result, list):
+                        semantic_results = search_result
+                    elif hasattr(search_result, 'data'):
+                        semantic_results = search_result.data
+                except Exception as search_error:
+                    print(f"Search error: {str(search_error)}")
+                    semantic_results = []
 
             # Combine and rank results
             all_results = await self.memory_processor.combine_and_rank_results(
@@ -410,7 +413,7 @@ class MemGPTService:
                 "success": False,
                 "error": str(e)
             }
-    
+        
     async def get_memory(self, key: str):
         try:
             supabase_response = await self.supabase.table('memories')\
