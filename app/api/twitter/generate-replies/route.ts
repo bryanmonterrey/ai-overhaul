@@ -30,7 +30,8 @@ export async function POST(request: Request) {
 
         // First store the initial tweet as a memory
         try {
-            await lettaClient.storeMemory({
+            console.log('Storing initial memory:', tweet.id);
+            const storeResult = await lettaClient.storeMemory({
                 key: tweet.id,
                 memory_type: 'tweet_history',
                 data: {
@@ -43,16 +44,20 @@ export async function POST(request: Request) {
                     is_original: true
                 }
             });
-
+        
+            if (!storeResult.success) {
+                throw new Error('Failed to store initial memory');
+            }
+        
             // Add a small delay to ensure database consistency
             await new Promise(resolve => setTimeout(resolve, 500));
-
+        
             console.log('Verifying stored memory...');
             const verifyMemory = await lettaClient.getMemory(tweet.id, 'tweet_history');
             console.log('Verify result:', verifyMemory);
-
-    if (!verifyMemory) {
-        console.log('Memory not yet available, waiting additional time...');
+        
+            if (!verifyMemory) {
+                console.log('Memory not yet available, waiting additional time...');
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
 

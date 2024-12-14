@@ -2,19 +2,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useMemGPT } from '../lib/memory/letta-client';
+import { LettaClient } from '../lib/memory/letta-client';
 
 export default function MemoryTest() {
-  const { storeChat, loading, error } = useMemGPT();
+  const lettaClient = new LettaClient();
   const [result, setResult] = useState<any>(null);
 
   const handleStoreMemory = async () => {
     try {
-      const response = await storeChat([{
-        role: 'user',
-        content: 'Test message',
-        timestamp: new Date().toISOString()
-      }]);
+      const response = await lettaClient.getMemory('test_key', 'tweet_history');
       setResult(response);
     } catch (err) {
       console.error('Failed to store memory:', err);
@@ -27,7 +23,7 @@ export default function MemoryTest() {
       <button 
         onClick={handleStoreMemory}
         className="bg-blue-500 text-white px-4 py-2 rounded"
-        disabled={loading}
+        disabled={loading}      
       >
         {loading ? 'Storing...' : 'Store Memory'}
       </button>

@@ -46,10 +46,16 @@ export class LettaClient {
 
     async getMemory<T extends BaseMemory>(key: string, type: MemoryType): Promise<T | null> {
         return this.withRetry(async () => {
+            // Changed from /memories/{key} to /memory/{key}
             const response = await fetch(
-                `${this.baseUrl}/memories/${encodeURIComponent(key)}?type=${encodeURIComponent(type)}`
+                `${this.baseUrl}/memory/${encodeURIComponent(key)}`  // Removed type parameter as it's not needed
             );
-
+    
+            if (!response.ok) {
+                console.warn(`Get memory failed for key ${key}:`, await response.text());
+                return null;
+            }
+    
             return this.handleResponse(response);
         });
     }
