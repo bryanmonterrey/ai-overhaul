@@ -153,6 +153,10 @@ class MemoryProcessor:
     ) -> Dict:
         """Find most similar memory"""
         try:
+            # Convert APIResponse to dict if needed
+            if hasattr(candidates, 'data'):
+                candidates = candidates.data
+                
             source_content = source.get('content', '').lower()
             source_words = set(source_content.split())
             
