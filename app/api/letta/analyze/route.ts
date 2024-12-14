@@ -1,17 +1,16 @@
 // app/api/letta/analyze/route.ts
-
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
     try {
-        const { content } = await request.json();
+        const { content, context } = await request.json();
 
         if (!content) {
             return NextResponse.json({ error: 'Content is required' }, { status: 400 });
         }
 
-        // Perform content analysis
-        const analysis = {
+        // Local analysis
+        const localAnalysis = {
             sentiment: calculateSentiment(content),
             patterns: detectPatterns(content),
             chaos_level: calculateChaosLevel(content),
@@ -20,10 +19,34 @@ export async function POST(request: Request) {
             importance_score: calculateImportance(content)
         };
 
+        // Get Letta service analysis
+        const lettaResponse = await fetch('http://localhost:3001/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, context })
+        });
+
+        if (!lettaResponse.ok) {
+            // Fall back to local analysis if Letta service fails
+            return NextResponse.json({
+                success: true,
+                data: localAnalysis,
+                source: 'local'
+            });
+        }
+
+        const lettaData = await lettaResponse.json();
+
+        // Combine both analyses
         return NextResponse.json({
             success: true,
-            data: analysis
+            data: {
+                ...localAnalysis,
+                ...lettaData.data,
+                source: 'combined'
+            }
         });
+
     } catch (error) {
         console.error('Content analysis error:', error);
         return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
