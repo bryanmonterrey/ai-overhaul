@@ -202,18 +202,21 @@ class MemGPTService:
             }
 
             try:
-                # Insert data and handle the response properly
-                response = await self.supabase.table('memories').insert(supabase_data).execute()
+                # Get the raw Supabase response
+                supabase_response = await self.supabase.table('memories').insert(supabase_data).execute()
                 
-                # Convert Supabase APIResponse to dict
-                response_data = response.data if hasattr(response, 'data') else None
-                first_record = response_data[0] if response_data and len(response_data) > 0 else None
-                    
+                # Safely extract data
+                if hasattr(supabase_response, 'data'):
+                    raw_data = supabase_response.data
+                    inserted_data = raw_data[0] if isinstance(raw_data, list) and len(raw_data) > 0 else raw_data
+                else:
+                    inserted_data = supabase_data
+
                 return {
                     "success": True,
-                    "data": first_record or supabase_data  # fallback to original data if no response
+                    "data": inserted_data
                 }
-                
+
             except Exception as e:
                 print(f"Supabase insert error: {str(e)}")
                 raise
@@ -353,34 +356,43 @@ class MemGPTService:
     # Your existing methods...
     async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
         try:
-            # Get the Supabase results
+            # Get Supabase results
             supabase_response = await self.supabase.table('memories')\
                 .select("*")\
                 .eq('type', memory_type)\
                 .eq('archive_status', 'active')\
                 .execute()
-            
-            # Convert APIResponse to dict
-            supabase_results = supabase_response.data if supabase_response else []
+                
+            # Safely extract data
+            db_results = supabase_response.data if hasattr(supabase_response, 'data') else []
 
-            # Get semantic results
+            # Get semantic results (if needed)
             semantic_results = await self.agent.memory.search(
                 query=query.get('content', ''),
                 limit=10,
                 filter_fn=lambda x: x.get('type') == memory_type
-            )
-            
+            ) if query.get('content') else []
+
             # Combine and rank results
             all_results = await self.memory_processor.combine_and_rank_results(
-                supabase_results,
+                db_results,
                 semantic_results,
                 query
             )
-            
-            return {"success": True, "data": {"memories": all_results}}
+
+            return {
+                "success": True, 
+                "data": {
+                    "memories": all_results
+                }
+            }
+
         except Exception as e:
             print(f"Error querying memories: {str(e)}")
-            return {"success": False, "error": str(e)}
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
     async def get_memory(self, key: str):
         try:

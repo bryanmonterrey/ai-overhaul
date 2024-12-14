@@ -5,6 +5,13 @@ import { NextResponse } from 'next/server'
 import { MemoryType } from '@/app/types/memory'
 
 export async function POST(request: Request) {
+
+  if (!request.headers.get('Content-Type')?.includes('application/json')) {
+    return NextResponse.json({ 
+      error: 'Content-Type must be application/json' 
+    }, { status: 400 });
+  }
+  
   try {
     const { key, memory_type, data, metadata } = await request.json()
     const supabase = createRouteHandlerClient({ cookies })
@@ -35,6 +42,10 @@ export async function POST(request: Request) {
     }
 
     const lettaData = await lettaResponse.json()
+
+    if (!lettaData.success) {
+      throw new Error(lettaData.error || 'Failed to store in Letta service')
+    }
 
     // Store reference in Supabase
     const { data: memoryData, error } = await supabase

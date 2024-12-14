@@ -1,18 +1,26 @@
 // app/api/letta/memories/chain/[key]/route.ts
 
 import { NextResponse } from 'next/server';
+import { validate as validateUUID } from 'uuid';
 
 export async function POST(
     request: Request,
     { params }: { params: { key: string } }
 ) {
+
+    if (!request.headers.get('Content-Type')?.includes('application/json')) {
+        return NextResponse.json({ 
+          error: 'Content-Type must be application/json' 
+        }, { status: 400 });
+      }
+      
     try {
         const config = await request.json();
         const { key } = params;
 
-        if (!key) {
+        if (!validateUUID(key)) {
             return NextResponse.json({ 
-                error: 'Memory key is required' 
+                error: 'Invalid memory key format' 
             }, { status: 400 });
         }
 

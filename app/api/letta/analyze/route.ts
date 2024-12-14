@@ -1,13 +1,29 @@
 // app/api/letta/analyze/route.ts
 import { NextResponse } from 'next/server';
 
+interface AnalyzeRequest {
+    content: string;
+    context?: Record<string, any>;
+  }
+  
+
 export async function POST(request: Request) {
+
+    if (!request.headers.get('Content-Type')?.includes('application/json')) {
+        return NextResponse.json({ 
+          error: 'Content-Type must be application/json' 
+        }, { status: 400 });
+      }
+      
     try {
         const { content, context } = await request.json();
 
-        if (!content) {
-            return NextResponse.json({ error: 'Content is required' }, { status: 400 });
+        if (typeof content !== 'string') {
+            return NextResponse.json({ 
+              error: 'Content must be a string' 
+            }, { status: 400 });
         }
+
 
         // Local analysis
         const localAnalysis = {

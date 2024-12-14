@@ -2,6 +2,13 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
+
+    if (!request.headers.get('Content-Type')?.includes('application/json')) {
+        return NextResponse.json({ 
+          error: 'Content-Type must be application/json' 
+        }, { status: 400 });
+      }
+      
     try {
         const { key, memory_type, data, metadata } = await request.json();
 
