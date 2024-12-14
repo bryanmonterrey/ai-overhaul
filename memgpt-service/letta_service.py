@@ -182,19 +182,26 @@ class MemGPTService:
             raise ValueError(f"Content analysis failed: {str(e)}")
 
     async def store_memory(self, memory: BaseMemory):
+        """Store memory with enhanced logging."""
         try:
-            # Process content for analysis
+            print(f"Storing memory with key: {memory.key}")
+            print(f"Memory type: {memory.memory_type}")
+            print(f"Memory metadata: {json.dumps(memory.metadata, indent=2)}")
+            
             content = str(memory.data.get('content', memory.data))
             memory_analysis = await self.process_memory_content(content)
-                    
+            
             # Prepare data for Supabase
             memory_id = str(uuid.uuid4())
             supabase_data = {
-                "id": memory_id,  # Use as both id and key
-                "key": memory_id,  # Store the same UUID as key
+                "id": memory_id,
+                "key": memory_id,
                 "type": memory.memory_type,
                 "content": content,
-                "metadata": memory.metadata or {},
+                "metadata": {
+                    **memory.metadata,
+                    "original_key": memory.key  # Store original key in metadata
+                },
                 "emotional_context": memory_analysis.get('emotional_context', 'neutral'),
                 "importance": memory_analysis.get('importance_score', 0.5),
                 "associations": memory_analysis.get('associations', []),
@@ -202,24 +209,20 @@ class MemGPTService:
                 "archive_status": "active"
             }
 
-            try:
-                # Modified Supabase insert without await
-                result = self.supabase.table('memories').insert(supabase_data).execute()
-                
-                # Handle the response data
-                if hasattr(result, 'data'):
-                    inserted_data = result.data[0] if isinstance(result.data, list) and result.data else result.data
-                else:
-                    inserted_data = supabase_data
+            print(f"Prepared Supabase data: {json.dumps(supabase_data, indent=2)}")
+            
+            result = self.supabase.table('memories').insert(supabase_data).execute()
+            print(f"Supabase insert result: {json.dumps(result.data if hasattr(result, 'data') else {}, indent=2)}")
+            
+            if hasattr(result, 'data'):
+                inserted_data = result.data[0] if isinstance(result.data, list) and result.data else result.data
+            else:
+                inserted_data = supabase_data
 
-                return {
-                    "success": True,
-                    "data": inserted_data
-                }
-
-            except Exception as e:
-                print(f"Supabase insert error: {str(e)}")
-                raise
+            return {
+                "success": True,
+                "data": inserted_data
+            }
 
         except Exception as e:
             print(f"Error storing memory: {str(e)}")
@@ -468,6 +471,7 @@ class MemGPTService:
             return []
 
     async def query_memories(self, memory_type: MemoryType, query: Dict[str, Any]):
+        """Query memories with proper metadata handling and async search."""
         try:
             # Modified Supabase query without await
             query_result = self.supabase.table('memories')\
@@ -481,11 +485,11 @@ class MemGPTService:
             if hasattr(query_result, 'data'):
                 db_results = query_result.data
 
-            # Modified semantic search
+            # Modified semantic search with proper await
             semantic_results = []
             if query.get('content'):
                 try:
-                    search_result = self.agent.memory.search(
+                    search_result = await self.agent.memory.search(
                         query=query.get('content', ''),
                         limit=10,
                         filter_fn=lambda x: x.get('type') == memory_type
@@ -521,57 +525,45 @@ class MemGPTService:
             }
         
     async def get_memory(self, key: str, type: Optional[MemoryType] = None):
-        """Get a memory by key, with support for metadata-based lookups."""
+        """Get memory with proper metadata querying."""
         try:
-            query = self.supabase.table('memories').select("*")
+            # Build base query
+            base_query = self.supabase.table('memories')
             
-            if type:
-                query = query.eq('type', type)
+            # Try direct ID match first
+            response = base_query.select("*").eq('id', key).execute()
+            data_list = response.data if hasattr(response, 'data') else []
+            memory_data = data_list[0] if data_list else None
 
-            # First try direct ID match
-            supabase_response = query.eq('id', key).execute()
-            data_list = supabase_response.data if hasattr(supabase_response, 'data') else []
-            supabase_data = data_list[0] if data_list else None
-
-            if not supabase_data:
-                # Try metadata tweet_id match for tweet_history type
-                metadata_query = query.eq('type', 'tweet_history')
-                metadata_response = metadata_query.execute()
-                metadata_list = metadata_response.data if hasattr(metadata_response, 'data') else []
+            if not memory_data:
+                # Try to find by metadata.tweet_id using raw SQL for proper JSONB querying
+                metadata_query = base_query.select("*")\
+                    .eq('type', 'tweet_history')\
+                    .filter('metadata->tweet_id', 'eq.', key)\
+                    .execute()
                 
-                # Look for the key in metadata.tweet_id
-                supabase_data = next(
-                    (item for item in metadata_list 
-                     if item.get('metadata', {}).get('tweet_id') == key),
-                    None
-                )
+                data_list = metadata_query.data if hasattr(metadata_query, 'data') else []
+                memory_data = data_list[0] if data_list else None
 
-            if not supabase_data:
-                # Try to find in reply_to metadata
-                reply_query = query.execute()
-                reply_list = reply_query.data if hasattr(reply_query, 'data') else []
-                supabase_data = next(
-                    (item for item in reply_list 
-                     if item.get('metadata', {}).get('reply_to') == key),
-                    None
-                )
+            if not memory_data:
+                # Try to find by metadata.reply_to
+                reply_query = base_query.select("*")\
+                    .filter('metadata->reply_to', 'eq.', key)\
+                    .execute()
+                
+                data_list = reply_query.data if hasattr(reply_query, 'data') else []
+                memory_data = data_list[0] if data_list else None
 
-            if supabase_data:
-                # Parse content if it's stored as a JSON string
+            if memory_data:
+                # Process content if it's a JSON string
                 try:
-                    if isinstance(supabase_data.get('content'), str):
-                        try:
-                            if supabase_data['content'].startswith('{'):
-                                parsed_content = json.loads(supabase_data['content'])
-                                supabase_data['content'] = parsed_content
-                        except json.JSONDecodeError:
-                            pass
+                    if isinstance(memory_data.get('content'), str):
+                        if memory_data['content'].startswith('{'):
+                            memory_data['content'] = json.loads(memory_data['content'])
+                except json.JSONDecodeError:
+                    pass  # Keep original content if parse fails
                 
-                    return {"success": True, "data": supabase_data}
-                
-                except Exception as e:
-                    print(f"Error processing memory data: {str(e)}")
-                    return {"success": True, "data": supabase_data}
+                return {"success": True, "data": memory_data}
                 
             return {
                 "success": False, 
@@ -581,11 +573,11 @@ class MemGPTService:
                     "type": type
                 }
             }
-            
+
         except Exception as e:
             print(f"Error getting memory: {str(e)}")
             return {"success": False, "error": str(e)}
-
+    
     async def summarize_memories(self, timeframe: str = 'recent', limit: int = 5):
         """Generate a summary of recent memories"""
         try:
@@ -688,23 +680,50 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
 # New feature endpoints
 @app.post("/memories/chain/{memory_key}")
 async def chain_memories(memory_key: str, config: ChainConfig):
+    """Chain memories endpoint with better error handling."""
     try:
         # Validate UUID format
         try:
             uuid_obj = uuid.UUID(memory_key)
             key = str(uuid_obj)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid UUID format")
+            if not memory_key:
+                raise HTTPException(status_code=400, detail="Memory key is required")
+            key = memory_key  # Allow non-UUID keys for metadata lookup
             
-        result = await service.chain_memories(key, config)
+        result = await service.get_memory(key)
         if not result["success"]:
-            raise HTTPException(status_code=500, detail=result["error"])
-        return result
-    except HTTPException:
-        raise
+            return {
+                "success": True,
+                "data": {
+                    "chain": [],
+                    "error": "Initial memory not found"
+                }
+            }
+            
+        # If we found the memory, proceed with chaining
+        chain_result = await service.chain_memories(key, config)
+        if not chain_result["success"]:
+            return {
+                "success": True,
+                "data": {
+                    "chain": [result["data"]],  # Return at least the initial memory
+                    "error": chain_result["error"]
+                }
+            }
+            
+        return chain_result
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        print(f"Chain memories error: {str(e)}")
+        return {
+            "success": True,
+            "data": {
+                "chain": [],
+                "error": str(e)
+            }
+        }
+    
 @app.post("/memories/cluster")
 async def cluster_memories(config: ClusterConfig):
     result = await service.cluster_memories(config)
