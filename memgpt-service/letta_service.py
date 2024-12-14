@@ -525,7 +525,7 @@ class MemGPTService:
             }
         
     async def get_memory(self, key: str, type: Optional[MemoryType] = None):
-        """Get memory with proper metadata querying."""
+        """Get memory with properly formatted JSONB querying."""
         try:
             # Build base query
             base_query = self.supabase.table('memories')
@@ -536,19 +536,19 @@ class MemGPTService:
             memory_data = data_list[0] if data_list else None
 
             if not memory_data:
-                # Try to find by metadata.tweet_id using raw SQL for proper JSONB querying
+                # Try to find by tweet_id in metadata using containment operator
                 metadata_query = base_query.select("*")\
                     .eq('type', 'tweet_history')\
-                    .filter('metadata->tweet_id', 'eq.', key)\
+                    .contains('metadata', {'tweet_id': key})\
                     .execute()
                 
                 data_list = metadata_query.data if hasattr(metadata_query, 'data') else []
                 memory_data = data_list[0] if data_list else None
 
             if not memory_data:
-                # Try to find by metadata.reply_to
+                # Try to find by reply_to in metadata using containment
                 reply_query = base_query.select("*")\
-                    .filter('metadata->reply_to', 'eq.', key)\
+                    .contains('metadata', {'reply_to': key})\
                     .execute()
                 
                 data_list = reply_query.data if hasattr(reply_query, 'data') else []
@@ -570,7 +570,12 @@ class MemGPTService:
                 "error": "Memory not found",
                 "debug_info": {
                     "key": key,
-                    "type": type
+                    "type": type,
+                    "search_attempts": [
+                        "direct_id",
+                        "metadata_tweet_id",
+                        "metadata_reply_to"
+                    ]
                 }
             }
 
