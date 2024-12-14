@@ -231,26 +231,26 @@ class MemGPTService:
     async def chain_memories(self, memory_key: str, config: ChainConfig):
         try:
             # Get initial memory
-            initial_memory_response = await self.get_memory(memory_key)
-            if not initial_memory_response["success"]:
+            initial_memory = await self.get_memory(memory_key)
+            if not initial_memory["success"]:
                 return {"success": False, "error": "Initial memory not found"}
 
-            # Modified memory search
-            related_memories_response = await self.agent.memory.search(
-                query=initial_memory_response["data"]["content"],
+            # Fix search handling
+            search_response = await self.agent.memory.search(
+                query=initial_memory["data"]["content"],
                 limit=config.depth * 5
             )
             
             # Properly handle search response
             related_memories = []
-            if hasattr(related_memories_response, 'data'):
-                related_memories = related_memories_response.data
-            elif isinstance(related_memories_response, list):
-                related_memories = related_memories_response
+            if hasattr(search_response, 'data'):
+                related_memories = search_response.data
+            elif isinstance(search_response, list):
+                related_memories = search_response
 
             # Build memory chain
-            memory_chain = [initial_memory_response["data"]]
-            current_memory = initial_memory_response["data"]
+            memory_chain = [initial_memory["data"]]
+            current_memory = initial_memory["data"]
             
             for _ in range(config.depth):
                 next_memory = await self._find_most_related(current_memory, related_memories)
@@ -346,8 +346,8 @@ class MemGPTService:
                 'month': timedelta(days=30)
             }.get(timeframe, timedelta(days=1))
 
-            # Modified Supabase query
-            response = await self.supabase.table('memories')\
+            # Remove await, add execute() directly
+            response = self.supabase.table('memories')\
                 .select("*")\
                 .gte('created_at', start_date.isoformat())\
                 .lte('created_at', end_date.isoformat())\
@@ -416,24 +416,35 @@ class MemGPTService:
         
     async def get_memory(self, key: str):
         try:
-            supabase_response = await self.supabase.table('memories')\
+            supabase_response = self.supabase.table('memories')\
                 .select("*")\
                 .eq('id', key)\
                 .single()\
                 .execute()
 
-            supabase_data = supabase_response.data if supabase_response else None
+            supabase_data = supabase_response.data if hasattr(supabase_response, 'data') else None
 
             if supabase_data:
-                letta_result = await self.agent.memory.get(key)
-                if letta_result:
-                    letta_data = eval(str(letta_result))
-                    enhanced_data = {
-                        **supabase_data,
-                        'enhanced_analysis': letta_data.get('analysis', {})
-                    }
-                    return {"success": True, "data": enhanced_data}
-                return {"success": True, "data": supabase_data}
+                try:
+                    letta_result = await self.agent.memory.get(key)
+                    if letta_result:
+                        try:
+                            if isinstance(letta_result, str):
+                                letta_data = json.loads(letta_result)
+                            else:
+                                letta_data = letta_result
+                            enhanced_data = {
+                                **supabase_data,
+                                'enhanced_analysis': letta_data.get('analysis', {})
+                            }
+                            return {"success": True, "data": enhanced_data}
+                        except json.JSONDecodeError:
+                            print(f"Error parsing Letta data: {letta_result}")
+                            return {"success": True, "data": supabase_data}
+                    return {"success": True, "data": supabase_data}
+                except Exception as e:
+                    print(f"Error getting Letta data: {str(e)}")
+                    return {"success": True, "data": supabase_data}
             
             return {"success": False, "error": "Memory not found"}
         except Exception as e:
@@ -498,24 +509,20 @@ async def query_content(request: QueryRequest):
         if not request.query:
             raise HTTPException(status_code=400, detail="Query is required")
 
-        # Process based on query type
+
         if request.type == 'analysis':
-            # Use process_memory_content instead of directly accessing service
             result = await service.process_memory_content(
                 content=request.query,
                 context=request.context
             )
-            
-            return {
-                "success": True,
-                "data": result
-            }
+            return {"success": True, "data": result}
         else:
-            # For other query types
-            return await service.query_memories(
+            # Properly await the memory query
+            result = await service.query_memories(
                 memory_type=request.type,
                 query={"content": request.query, "context": request.context}
             )
+            return result
             
     except ValidationError as e:
         raise HTTPException(status_code=422, detail=str(e))
