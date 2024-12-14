@@ -201,19 +201,23 @@ class MemGPTService:
                 "archive_status": "active"
             }
 
-            # Store in Supabase
             try:
+                # Insert data and handle the response properly
                 response = await self.supabase.table('memories').insert(supabase_data).execute()
-                response_data = response.data[0] if response and hasattr(response, 'data') else None
                 
+                # Convert Supabase APIResponse to dict
+                response_data = response.data if hasattr(response, 'data') else None
+                first_record = response_data[0] if response_data and len(response_data) > 0 else None
+                    
                 return {
                     "success": True,
-                    "data": response_data or supabase_data
+                    "data": first_record or supabase_data  # fallback to original data if no response
                 }
+                
             except Exception as e:
                 print(f"Supabase insert error: {str(e)}")
                 raise
-                
+
         except Exception as e:
             print(f"Error storing memory: {str(e)}")
             return {
