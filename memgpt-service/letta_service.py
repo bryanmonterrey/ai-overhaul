@@ -201,24 +201,26 @@ class MemGPTService:
                 "archive_status": "active"
             }
 
-            # Store in Supabase and handle response
-            response = await self.supabase.table('memories').insert(supabase_data).execute()
-            response_data = response.data if response else None
+            # Store in Supabase
+            try:
+                response = await self.supabase.table('memories').insert(supabase_data).execute()
+                response_data = response.data[0] if response and hasattr(response, 'data') else None
                 
-            if hasattr(response, 'error') and response.error:
-                raise Exception(response.error.message)
+                return {
+                    "success": True,
+                    "data": response_data or supabase_data
+                }
+            except Exception as e:
+                print(f"Supabase insert error: {str(e)}")
+                raise
                 
-            return {
-                "success": True,
-                "data": response_data[0] if response_data else supabase_data
-            }
         except Exception as e:
             print(f"Error storing memory: {str(e)}")
             return {
                 "success": False,
                 "error": str(e)
-            } 
-    
+            }
+
     # Memory Chaining feature
     async def chain_memories(self, memory_key: str, config: ChainConfig):
         try:
@@ -227,11 +229,14 @@ class MemGPTService:
             if not initial_memory["success"]:
                 return {"success": False, "error": "Initial memory not found"}
 
-            # Find related memories through semantic search
-            related_memories = await self.agent.memory.search(
-                query=initial_memory["data"]["content"],
-                limit=config.depth * 5
-            )
+            related_memories_response = await self.agent.memory.search(
+            query=initial_memory["data"]["content"],
+            limit=config.depth * 5
+        )
+        
+        # Convert APIResponse to list if needed
+            related_memories = related_memories_response.data if hasattr(related_memories_response, 'data') else related_memories_response
+
 
             # Build memory chain
             memory_chain = [initial_memory["data"]]
@@ -375,24 +380,24 @@ class MemGPTService:
 
     async def get_memory(self, key: str):
         try:
-            [supabase_result, letta_result] = await asyncio.gather(
-                self.supabase.table('memories')
-                    .select("*")
-                    .eq('id', key)
-                    .single()
-                    .execute(),
-                self.agent.memory.get(key)
-            )
-            
-            if supabase_result.data:
+            supabase_response = await self.supabase.table('memories')\
+                .select("*")\
+                .eq('id', key)\
+                .single()\
+                .execute()
+
+            supabase_data = supabase_response.data if supabase_response else None
+
+            if supabase_data:
+                letta_result = await self.agent.memory.get(key)
                 if letta_result:
                     letta_data = eval(str(letta_result))
                     enhanced_data = {
-                        **supabase_result.data,
+                        **supabase_data,
                         'enhanced_analysis': letta_data.get('analysis', {})
                     }
                     return {"success": True, "data": enhanced_data}
-                return {"success": True, "data": supabase_result.data}
+                return {"success": True, "data": supabase_data}
             
             return {"success": False, "error": "Memory not found"}
         except Exception as e:
@@ -505,10 +510,22 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
 # New feature endpoints
 @app.post("/memories/chain/{memory_key}")
 async def chain_memories(memory_key: str, config: ChainConfig):
-    result = await service.chain_memories(memory_key, config)
-    if not result["success"]:
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    try:
+        # Validate UUID format
+        try:
+            uuid_obj = uuid.UUID(memory_key)
+            key = str(uuid_obj)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid UUID format")
+            
+        result = await service.chain_memories(key, config)
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/memories/cluster")
 async def cluster_memories(config: ClusterConfig):
