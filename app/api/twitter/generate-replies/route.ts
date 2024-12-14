@@ -45,7 +45,16 @@ export async function POST(request: Request) {
             });
 
             // Add a small delay to ensure database consistency
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            console.log('Verifying stored memory...');
+            const verifyMemory = await lettaClient.getMemory(tweet.id, 'tweet_history');
+            console.log('Verify result:', verifyMemory);
+
+    if (!verifyMemory) {
+        console.log('Memory not yet available, waiting additional time...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
 
             // Get all context data in parallel with proper error handling
             const [patterns, analysis, trainingExamplesArrays] = await Promise.allSettled([
