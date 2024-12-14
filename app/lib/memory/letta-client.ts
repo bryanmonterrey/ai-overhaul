@@ -32,6 +32,7 @@ export class LettaClient {
 
     async storeMemory<T extends BaseMemory>(memory: T): Promise<MemoryResponse> {
         return this.withRetry(async () => {
+            console.log('Storing memory:', memory);
             const response = await fetch(`${this.baseUrl}/store`, {
                 method: 'POST',
                 headers: {
@@ -39,8 +40,24 @@ export class LettaClient {
                 },
                 body: JSON.stringify(memory),
             });
-
-            return this.handleResponse(response);
+    
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Store memory failed:', text);
+                return {
+                    success: false,
+                    error: text
+                };
+            }
+    
+            const data = await response.json();
+            console.log('Store response:', data);
+    
+            // Return a properly formatted MemoryResponse
+            return {
+                success: true,
+                data: data.data || data
+            };
         });
     }
 

@@ -44,9 +44,11 @@ export async function POST(request: Request) {
                     is_original: true
                 }
             });
-        
-            if (!storeResult.success) {
-                throw new Error('Failed to store initial memory');
+            
+            console.log('Store result:', storeResult);
+            
+            if (!storeResult || storeResult.error) {
+                throw new Error(storeResult?.error || 'Failed to store initial memory');
             }
         
             // Add a small delay to ensure database consistency
