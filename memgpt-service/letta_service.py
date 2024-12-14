@@ -417,23 +417,24 @@ class MemGPTService:
         
     async def get_memory(self, key: str):
         try:
-            # Check both id and key fields in case either is used
+            # Try to get memory by ID first
             supabase_response = self.supabase.table('memories')\
                 .select("*")\
-                .or_(f'id.eq.{key},key.eq.{key}')\
-                .single()\
-                .execute()
+                .eq('id', key)\
+                .execute()  # Remove .single()
 
-            supabase_data = supabase_response.data if hasattr(supabase_response, 'data') else None
+            data_list = supabase_response.data if hasattr(supabase_response, 'data') else []
+            supabase_data = data_list[0] if data_list else None
 
             if not supabase_data:
-                # Try querying by key if id fails
+                # Try by key if ID fails
                 supabase_response = self.supabase.table('memories')\
                     .select("*")\
                     .eq('key', key)\
-                    .single()\
-                    .execute()
-                supabase_data = supabase_response.data if hasattr(supabase_response, 'data') else None
+                    .execute()  # Remove .single()
+                
+                data_list = supabase_response.data if hasattr(supabase_response, 'data') else []
+                supabase_data = data_list[0] if data_list else None
 
             if supabase_data:
                 try:
