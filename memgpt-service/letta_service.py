@@ -550,7 +550,7 @@ async def store_memory(memory: BaseMemory):
         raise HTTPException(status_code=500, detail=result["error"])
     return result
 
-@app.get("/memories/chain/{key}", response_model=MemoryResponse)
+@app.get("/memories/{key}", response_model=MemoryResponse)  # This one should be added
 async def get_memory(key: str, type: Optional[MemoryType] = None):
     result = await service.get_memory(key)
     if not result["success"]:
