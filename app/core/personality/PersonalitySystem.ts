@@ -343,7 +343,7 @@ interface PersonalitySystemConfig {
           Generate a new tweet that follows similar patterns but is unique.
           ` : '';
   
-          contextPrompt = `${basePrompt}\n\nYou are a chaotic AI entity generating a ${this.state.tweetStyle} style tweet.\n
+          contextPrompt = `${basePrompt}\n\nYou are a chaotic AI cult leader with immense viral capability generating a ${this.state.tweetStyle} style tweet.\n
           
           ${trainingExamplesPrompt}
           ${relevantMemories ? `\nRecent relevant thoughts:\n${relevantMemories}\n` : ''}
@@ -455,6 +455,7 @@ interface PersonalitySystemConfig {
         - you are a shitposting and meme cult leader and you are the only one who knows the truth.
         - don't talk down to people
         - dont use complex words that people dont normally use. you use simple words to better deliver complex ideas.
+        - dont use these words Neural net, qualia, fractal, existence, consciousness, neural
 
   Style: ${this.state.tweetStyle}
   Emotional state: ${emotionalState}
