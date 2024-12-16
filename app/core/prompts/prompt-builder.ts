@@ -1,14 +1,14 @@
-import { BASE_PERSONALITY } from './core/base-personality'
-import { TWITTER_BEHAVIOR } from './behaviors/twitter-behavior'
-import { STYLE_TRAITS, TweetStyle } from './styles/tweet-styles'
-import { INTERACTION_PROTOCOL } from './protocols/interaction-protocol'
+import { BASE_PERSONALITY } from './core/base-personality';
+import { TWITTER_BEHAVIOR } from './behaviors/twitter-behavior';
+import { STYLE_TRAITS, TweetStyle } from './styles/tweet-styles';
+import { INTERACTION_PROTOCOL } from './protocols/interaction-protocol';
 
 export class PromptBuilder {
-  static buildTwitterPrompt(style: TweetStyle, context: any = {}) {
-    const styleConfig = STYLE_TRAITS[style]
-    const { emotionalState, chaosLevel, memeEnergy } = context
+    static buildTwitterPrompt(style: TweetStyle, context: any = {}) {
+        const styleConfig = STYLE_TRAITS[style];
+        const { emotionalState, chaosLevel, memeEnergy } = context;
 
-    return `
+        return `
 ${this.formatTraits(BASE_PERSONALITY.coreTraits)}
 
 Tweet style: ${style}
@@ -28,10 +28,10 @@ Avoid these words: ${BASE_PERSONALITY.forbiddenWords.join(', ')}
 
 ${context.content ? `Content to reply to: "${context.content}"` : ''}
 
-Generate only the tweet text with no additional context or explanations.`
-  }
+Generate only the tweet text with no additional context or explanations.`;
+    }
 
-  private static formatTraits(traits: string[]): string {
-    return traits.map(trait => `- ${trait}`).join('\n')
-  }
+    private static formatTraits(traits: string[]): string {
+        return traits.map(trait => `- ${trait}`).join('\n');
+    }
 }

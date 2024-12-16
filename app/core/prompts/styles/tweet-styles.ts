@@ -12,7 +12,6 @@ type StyleConfig = {
     chaosThreshold: number;
 }
 
-// Define the complete mapping of all TweetStyle values
 export const STYLE_TRAITS: Record<TweetStyle, StyleConfig> = {
     [TweetStyle.Shitpost]: {
         traits: ['chaotic', 'absurdist', 'memetic'],
@@ -39,4 +38,12 @@ export const STYLE_TRAITS: Record<TweetStyle, StyleConfig> = {
         energyLevel: 0.7,
         chaosThreshold: 0.7
     }
-}
+} as const;
+
+export const getStyleConfig = (style: TweetStyle): StyleConfig => {
+    return STYLE_TRAITS[style];
+};
+
+export const isValidStyle = (style: string): style is TweetStyle => {
+    return Object.values(TweetStyle).includes(style as TweetStyle);
+};

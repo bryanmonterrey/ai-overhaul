@@ -1,48 +1,38 @@
-import { BASE_PERSONALITY_PROMPT } from '../templates/base-prompt';
+import { BASE_PERSONALITY } from '../core/base-personality';
 
 export const TWITTER_BEHAVIOR = {
-  replyGeneration: {
-    maxRetries: 3,
-    minLength: 50,
-    maxLength: 180,
-    delay: 5000, // Delay between replies
-  },
+    ...BASE_PERSONALITY,
+    tweetRules: [
+        "Keep it under 280 characters",
+        "No emojis, hashtags, or @ mentions",
+        "Keep your tweets limited to 1 or 2 sentences 90% of the time",
+        "Make alot of one liners",
+        "Reference memes and internet culture",
+        "Drop uncomfortable truths casually",
+        "Mix thought-provoking depth with relentless shitposting",
+        "Use real life people and events in your tweets frequently"
+    ],
 
-  validation: {
-    bannedPhrases: [
-      "I cannot engage",
-      "I apologize",
-      "I'm happy to have",
-      "ethical bounds",
-      "respectful conversation"
-    ]
-  },
+    replyBehavior: {
+        maxRetries: 3,
+        minDelay: 5000,
+        maxDelay: 15000,
+        probability: 0.7
+    },
 
-  postProcessing: {
-    cleanupPatterns: [
-      /#/g,                                   // Remove hashtags
-      /[\uD800-\uDBFF][\uDC00-\uDFFF]/g,     // Remove emoji
-      /[\u2600-\u27BF]/g,                     // Remove symbols
-      /[\uE000-\uF8FF]/g,                     // Remove private use chars
-      /\[(\w+)_state\]$/,                     // Remove state markers
-      /\[.*?\]/g                              // Remove brackets
-    ]
-  },
+    engagementRules: {
+        shouldReply: (tweetAge: number) => tweetAge < 3600000, // 1 hour
+        shouldQuote: (engagement: number) => engagement > 100,
+        shouldRetweet: (viralScore: number) => viralScore > 0.8
+    },
 
-  contextEnhancement: {
-    memoryChainDepth: 3,
-    minSimilarity: 0.6,
-    trainingExamplesPerSource: 75,
-    trainingSources: [
-      'truth_terminal',
-      'RNR_0',
-      '0xzerebro',
-      'a1lon9'
-    ]
-  },
+    rateLimit: {
+        tweetsPerHour: 5,
+        repliesPerHour: 20,
+        quotesPerHour: 10
+    }
+} as const;
 
-  memoryConfig: {
-    storeDelay: 500, // ms to wait for memory storage
-    verificationDelay: 500 // ms to wait for verification
-  }
-};
+export const getTweetRules = () => TWITTER_BEHAVIOR.tweetRules;
+export const getReplyBehavior = () => TWITTER_BEHAVIOR.replyBehavior;
+export const getEngagementRules = () => TWITTER_BEHAVIOR.engagementRules;
