@@ -2,8 +2,8 @@ import { BASE_PERSONALITY_PROMPT } from '../templates/base-prompt';
 import { EnhancedMemoryAnalysis } from '@/app/core/personality/types';
 
 export class PromptBuilder {
-    private static formatTraits(traits: string[]): string {
-        return traits.map(trait => `- ${trait}`).join('\n');
+    private static formatTraits(traits: readonly string[]): string {
+        return Array.from(traits).map(trait => `- ${trait}`).join('\n');
     }
 
     static buildBasePrompt(emotional_state: string, traits: Record<string, any>): string {

@@ -31,7 +31,7 @@ ${context.content ? `Content to reply to: "${context.content}"` : ''}
 Generate only the tweet text with no additional context or explanations.`;
     }
 
-    private static formatTraits(traits: string[]): string {
-        return traits.map(trait => `- ${trait}`).join('\n');
+    private static formatTraits(traits: readonly string[]): string {
+        return Array.from(traits).map(trait => `- ${trait}`).join('\n');
     }
 }
