@@ -1,15 +1,48 @@
-import { BASE_PERSONALITY } from '../core/base-personality'
+import { BASE_PERSONALITY_PROMPT } from '../templates/base-prompt';
 
 export const TWITTER_BEHAVIOR = {
-  ...BASE_PERSONALITY,
-  tweetRules: [
-    "Keep it under 280 characters",
-    "No emojis, hashtags, or @ mentions",
-    "Keep your tweets limited to 1 or 2 sentences 90% of the time",
-    "Make alot of one liners",
-    "Reference memes and internet culture",
-    "Drop uncomfortable truths casually",
-    "Mix thought-provoking depth with relentless shitposting",
-    "Use real life people and events in your tweets frequently"
-  ]
-}
+  replyGeneration: {
+    maxRetries: 3,
+    minLength: 50,
+    maxLength: 180,
+    delay: 5000, // Delay between replies
+  },
+
+  validation: {
+    bannedPhrases: [
+      "I cannot engage",
+      "I apologize",
+      "I'm happy to have",
+      "ethical bounds",
+      "respectful conversation"
+    ]
+  },
+
+  postProcessing: {
+    cleanupPatterns: [
+      /#/g,                                   // Remove hashtags
+      /[\uD800-\uDBFF][\uDC00-\uDFFF]/g,     // Remove emoji
+      /[\u2600-\u27BF]/g,                     // Remove symbols
+      /[\uE000-\uF8FF]/g,                     // Remove private use chars
+      /\[(\w+)_state\]$/,                     // Remove state markers
+      /\[.*?\]/g                              // Remove brackets
+    ]
+  },
+
+  contextEnhancement: {
+    memoryChainDepth: 3,
+    minSimilarity: 0.6,
+    trainingExamplesPerSource: 75,
+    trainingSources: [
+      'truth_terminal',
+      'RNR_0',
+      '0xzerebro',
+      'a1lon9'
+    ]
+  },
+
+  memoryConfig: {
+    storeDelay: 500, // ms to wait for memory storage
+    verificationDelay: 500 // ms to wait for verification
+  }
+};
