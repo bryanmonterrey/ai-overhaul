@@ -1,7 +1,5 @@
-export type PersonalityTrait = {
-    description: string;
-    weight: number;
-};
+export type ReadonlyTraits = readonly string[];
+export type MutableTraits = string[];
 
 export type EmotionalState = 
     | 'chaotic'
@@ -18,18 +16,11 @@ export interface PromptContext {
     platform: 'twitter' | 'chat';
     style?: string;
     memoryContext?: string;
-    trainingExamples?: string[];
+    trainingExamples?: ReadonlyTraits;
 }
 
-export type ValidationRule = {
-    test: (text: string) => boolean;
-    error: string;
-};
-
-export type InteractionType = 'mention' | 'reply' | 'quote';
-
 export interface StyleConfiguration {
-    traits: string[];
+    traits: ReadonlyTraits;
     energyLevel: number;
     chaosThreshold: number;
 }
@@ -40,3 +31,16 @@ export interface PersonalityConfig {
     emotionalVolatility: number;
     memoryRetention: number;
 }
+
+export interface ValidationRule {
+    test: (text: string) => boolean;
+    error: string;
+}
+
+export interface InteractionConfig {
+    responseStyle: string;
+    maxLength: number;
+    requiredElements: ReadonlyTraits;
+}
+
+export type InteractionType = 'mention' | 'reply' | 'quote';
