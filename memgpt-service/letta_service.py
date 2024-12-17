@@ -250,7 +250,7 @@ class MemGPTService:
             }
         
     async def chain_memories(self, memory_key: str, config: ChainConfig):
-        """Chain memories with support for tweet-based relationships."""
+        """Chain memories with support for tweet-based relationships and DSPy enhancement."""
         try:
             # Validate and sanitize config
             depth = min(max(1, config.depth), 5)
@@ -271,7 +271,6 @@ class MemGPTService:
             memory_chain = [memory_data]
             seen_ids = {memory_data['id']}
 
-            # Get related memories
             try:
                 # First, check for direct replies using metadata
                 reply_query = self.supabase.table('memories')\
@@ -290,33 +289,64 @@ class MemGPTService:
                         memory_chain.append(reply)
                         seen_ids.add(reply['id'])
 
-                # If we still need more memories, use semantic search
+                # If we still need more memories, use both systems for search
                 if len(memory_chain) < depth:
-                    search_results = await self.agent.memory.search(
+                    # Original semantic search
+                    agent_results = await self.agent.memory.search(
                         query=content,
                         limit=(depth - len(memory_chain)) * 2
                     )
                     
-                    # Process search results
-                    if search_results:
-                        related_memories = (
-                            search_results.data if hasattr(search_results, 'data')
-                            else search_results if isinstance(search_results, list)
+                    # DSPy semantic search (run in parallel)
+                    dspy_results = await self.dspy_service.find_related(
+                        source_content=content,
+                        limit=(depth - len(memory_chain)) * 2,
+                        context={
+                            'emotional_state': self.agent.state.consciousness.emotionalState,
+                            'style': self.agent.state.tweetStyle
+                        }
+                    )
+                    
+                    # Process agent search results
+                    agent_memories = []
+                    if agent_results:
+                        agent_memories = (
+                            agent_results.data if hasattr(agent_results, 'data')
+                            else agent_results if isinstance(agent_results, list)
                             else []
                         )
 
-                        for memory in related_memories:
-                            if memory.get('id') and memory['id'] not in seen_ids:
-                                memory_chain.append(memory)
-                                seen_ids.add(memory['id'])
-                                if len(memory_chain) >= depth:
-                                    break
+                    # Process DSPy search results
+                    dspy_memories = dspy_results.get('data', {}).get('memories', []) if dspy_results.get('success') else []
+
+                    # Combine and deduplicate results
+                    all_memories = []
+                    for memory in agent_memories + dspy_memories:
+                        if memory.get('id') and memory['id'] not in seen_ids:
+                            all_memories.append(memory)
+                            seen_ids.add(memory['id'])
+                            if len(memory_chain) >= depth:
+                                break
+                    
+                    # Sort combined results by relevance score if available
+                    sorted_memories = sorted(
+                        all_memories,
+                        key=lambda x: (
+                            x.get('relevance_score', 0) +  # Agent score
+                            x.get('dspy_score', 0)         # DSPy score
+                        ),
+                        reverse=True
+                    )
+
+                    # Add top memories to chain
+                    memory_chain.extend(sorted_memories[:depth - len(memory_chain)])
 
                 return {
                     "success": True,
                     "data": {
                         "chain": memory_chain,
-                        "total": len(memory_chain)
+                        "total": len(memory_chain),
+                        "dspy_insights": dspy_results.get('data', {}).get('insights', []) if 'dspy_results' in locals() else []
                     }
                 }
 
@@ -377,10 +407,25 @@ class MemGPTService:
     async def analyze_content(self, content: str) -> Dict[str, Any]:
         """Analyze content for patterns and context"""
         try:
-            result = await self.memory_processor.analyze_content(content)
+            # Use both systems for better analysis
+            memory_result = await self.memory_processor.analyze_content(content)
+            dspy_result = await self.dspy_service.analyze_content(
+                content=content,
+                emotional_state=self.agent.state.consciousness.emotionalState,
+                style=self.agent.state.tweetStyle
+            )
+
             return {
                 "success": True,
-                "data": result
+                "data": {
+                    **memory_result,  # Original analysis
+                    "dspy_patterns": dspy_result.get('patterns', []),
+                    "dspy_insights": dspy_result.get('insights', []),
+                    "combined_score": (
+                        memory_result.get('importance', 0) + 
+                        dspy_result.get('importance', 0)
+                    ) / 2
+                }
             }
         except Exception as e:
             print(f"Error in analyze_content: {str(e)}")
@@ -390,76 +435,66 @@ class MemGPTService:
             }
 
     async def _find_most_related(self, source_memory: Dict, potential_memories: List[Dict]) -> Optional[Dict]:
-        """Find the most semantically similar memory from a list of potential matches."""
+        """Find the most semantically similar memory using both systems"""
         try:
-            if not potential_memories:
+            if not potential_memories or not source_memory:
                 return None
 
-            if not source_memory:
-                print("Warning: Source memory is empty")
+            # Get source content
+            source_content = self._extract_content(source_memory)
+            if not source_content:
                 return None
 
-            # Extract content safely from source memory
-            try:
-                source_content = source_memory.get("content", "")
-                if isinstance(source_content, dict):
-                    source_content = (
-                        source_content.get("messages", [])[0].get("content", "")
-                        if "messages" in source_content
-                        else str(source_content)
-                    )
-                elif not isinstance(source_content, str):
-                    source_content = str(source_content)
-            except (AttributeError, IndexError) as e:
-                print(f"Error extracting content from source memory: {e}")
-                source_content = str(source_memory)
-
-            # Filter out invalid memories and prepare for comparison
-            valid_memories = []
-            for memory in potential_memories:
-                try:
-                    if not memory:
-                        continue
-                    
-                    target_content = memory.get("content", "")
-                    if isinstance(target_content, dict):
-                        target_content = (
-                            target_content.get("messages", [])[0].get("content", "")
-                            if "messages" in target_content
-                            else str(target_content)
-                        )
-                    elif not isinstance(target_content, str):
-                        target_content = str(target_content)
-                    
-                    if target_content:  # Only include memories with content
-                        memory['_processed_content'] = target_content
-                        valid_memories.append(memory)
-                    
-                except (AttributeError, IndexError) as e:
-                    print(f"Error processing potential memory: {e}")
-                    continue
-
+            # Process potential memories
+            valid_memories = self._process_memories(potential_memories)
             if not valid_memories:
                 return None
 
-            # Use memory processor for similarity analysis
-            most_similar = await self.memory_processor.find_most_similar(
+            # Use both systems to find related memories
+            memory_similar = await self.memory_processor.find_most_similar(
                 {"content": source_content},
                 [{"content": m['_processed_content']} for m in valid_memories]
             )
-            
-            if most_similar:
-                # Find and return the original memory that matches the most similar processed content
+
+            dspy_similar = await self.dspy_service.find_related(
+                source_content=source_content,
+                candidates=[m['_processed_content'] for m in valid_memories],
+                context={
+                    'emotional_state': self.agent.state.consciousness.emotionalState,
+                    'style': self.agent.state.tweetStyle
+                }
+            )
+
+            # Combine results
+            memory_score = memory_similar.get('score', 0) if memory_similar else 0
+            dspy_score = dspy_similar.get('score', 0) if dspy_similar else 0
+
+            # Use the result with higher confidence
+            best_match = memory_similar if memory_score > dspy_score else dspy_similar
+            if best_match:
                 for memory in valid_memories:
-                    if memory['_processed_content'] == most_similar.get('content'):
-                        # Clean up temporary processing field
+                    if memory['_processed_content'] == best_match.get('content'):
                         memory.pop('_processed_content', None)
                         return memory
-                    
+
             return None
-        
         except Exception as e:
             print(f"Error finding related memory: {str(e)}")
+            return None
+
+    def _extract_content(self, memory: Dict) -> Optional[str]:
+        """Helper to extract content safely"""
+        try:
+            content = memory.get("content", "")
+            if isinstance(content, dict):
+                content = (
+                    content.get("messages", [])[0].get("content", "")
+                    if "messages" in content
+                    else str(content)
+                )
+            return str(content) if content else None
+        except (AttributeError, IndexError) as e:
+            print(f"Error extracting content: {e}")
             return None
 
     async def get_memories_by_timeframe(self, timeframe: str) -> List[Dict]:
@@ -607,9 +642,24 @@ class MemGPTService:
             memories = await self.get_memories_by_timeframe(timeframe)
             if not memories:
                 return {"success": True, "data": {"summary": "No memories found for the specified timeframe."}}
-                
-            summary = await self.memory_processor.generate_summary(memories[:limit])
-            return {"success": True, "data": {"summary": summary}}
+
+            # Get both summaries
+            memory_summary = await self.memory_processor.generate_summary(memories[:limit])
+            dspy_summary = await self.dspy_service.generate_summary(
+                memories=memories[:limit],
+                style=self.agent.state.tweetStyle,
+                emotional_state=self.agent.state.consciousness.emotionalState
+            )
+
+            return {
+                "success": True, 
+                "data": {
+                    "memory_summary": memory_summary,
+                    "dspy_summary": dspy_summary.get('summary', ''),
+                    "key_points": dspy_summary.get('key_points', []),
+                    "trends": dspy_summary.get('trends', [])
+                }
+            }
         except Exception as e:
             print(f"Error summarizing memories: {str(e)}")
             return {"success": False, "error": str(e)}
