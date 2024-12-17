@@ -6,3 +6,5 @@ memgpt
 dspy-ai
 openai 
 anthropic
+pydantic
+python-frontmatter
