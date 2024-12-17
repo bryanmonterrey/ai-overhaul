@@ -3,3 +3,6 @@ uvicorn
 python-dotenv
 supabase
 memgpt
+dspy-ai
+openai 
+anthropic
