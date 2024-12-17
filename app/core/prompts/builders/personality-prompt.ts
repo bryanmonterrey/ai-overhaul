@@ -17,8 +17,9 @@ interface PersonalityPromptConfig {
     traits: PersonalityTraits;
     tweetStyle: TweetStyle;
     narrativeMode: NarrativeMode;
-    memoryContext?: string;
-    recentThoughts?: string[];
+    memoryContext: string;
+    recentThoughts: string[];
+    examples?: any[];
 }
 
 interface TweetConfig {
