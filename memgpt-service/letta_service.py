@@ -100,8 +100,6 @@ class AgentState:
         self.tool_rules = []
         self.llm_config = None
 
-
-
 class MemGPTService:
     def __init__(self):
         if not SUPABASE_URL or not SUPABASE_KEY:
@@ -154,6 +152,17 @@ class MemGPTService:
             
             # Initialize memory processor
             self.memory_processor = MemoryProcessor(self.agent)
+
+            # Initialize DSPy service
+            prompt_dir = Path('../app/core/prompts')  # Points to your Next.js prompts
+            self.dspy_service = DSPyService(
+                prompt_dir=prompt_dir,
+                model_config={
+                    'model': "anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
+                    'llm_config': llm_config,
+                    'api_key': ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY
+                }
+            )
             
         except Exception as e:
             raise RuntimeError(f"Failed to initialize MemGPTService: {str(e)}")
@@ -165,19 +174,26 @@ class MemGPTService:
                 raise ValueError("Invalid content provided")
 
             # Use the agent to analyze the content
-            analysis = await self.agent.analyze_content(content, context)
+            agent_analysis = await self.agent.analyze_content(content, context)
+            dspy_analysis = await self.dspy_service.generate_response(
+                input_text=content,
+                emotional_state=agent_analysis.get('emotional_context', 'neutral'),
+                style=self.agent.state.tweetStyle,
+                context=context
+            )
             
-            if not analysis:
+            if not agent_analysis:
                 raise ValueError("Analysis failed to produce results")
 
             return {
-                'sentiment': analysis.get('sentiment', 0),
-                'emotional_context': analysis.get('emotional_context', 'neutral'),
-                'key_concepts': analysis.get('key_concepts', []),
-                'patterns': analysis.get('patterns', []),
-                'importance': analysis.get('importance', 0.5),
-                'associations': analysis.get('associations', []),
-                'summary': analysis.get('summary', '')
+                'sentiment': agent_analysis.get('sentiment', 0),
+                'emotional_context': agent_analysis.get('emotional_context', 'neutral'),
+                'key_concepts': agent_analysis.get('key_concepts', []),
+                'patterns': agent_analysis.get('patterns', []),
+                'importance': agent_analysis.get('importance', 0.5),
+                'associations': agent_analysis.get('associations', []),
+                'summary': agent_analysis.get('summary', ''),
+                'dspy_analysis': dspy_analysis.get('data', {})
             }
         except Exception as e:
             print(f"Error processing content: {str(e)}")
