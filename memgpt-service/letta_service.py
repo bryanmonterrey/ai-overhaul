@@ -89,6 +89,23 @@ class ContextConfig(BaseModel):
     max_tokens: int = 4000
     priority_keywords: List[str] = []
 
+class ConsciousnessState:
+    def __init__(
+        self,
+        currentThought: str = '',
+        shortTermMemory: list = None,
+        longTermMemory: list = None,
+        emotionalState: str = 'neutral',
+        attentionFocus: list = None,
+        activeContexts: set = None
+    ):
+        self.currentThought = currentThought
+        self.shortTermMemory = shortTermMemory or []
+        self.longTermMemory = longTermMemory or []
+        self.emotionalState = emotionalState
+        self.attentionFocus = attentionFocus or []
+        self.activeContexts = activeContexts or set()
+
 class AgentState:
     def __init__(self, persona, human, messages, memory):
         self.persona = persona
@@ -99,6 +116,16 @@ class AgentState:
         self.tools = []
         self.tool_rules = []
         self.llm_config = None
+        # Add these new attributes
+        self.tweetStyle = 'shitpost'  # Default style
+        self.consciousness = ConsciousnessState(
+            currentThought='',
+            shortTermMemory=[],
+            longTermMemory=[],
+            emotionalState='neutral',
+            attentionFocus=[],
+            activeContexts=set()
+        )
 
 class MemGPTService:
     def __init__(self):
@@ -178,7 +205,7 @@ class MemGPTService:
             dspy_analysis = await self.dspy_service.generate_response(
                 input_text=content,
                 emotional_state=agent_analysis.get('emotional_context', 'neutral'),
-                style=self.agent.state.tweetStyle,
+                style=self.agent.agent_state.tweetStyle,
                 context=context
             )
             
@@ -302,8 +329,8 @@ class MemGPTService:
                         source_content=content,
                         limit=(depth - len(memory_chain)) * 2,
                         context={
-                            'emotional_state': self.agent.state.consciousness.emotionalState,
-                            'style': self.agent.state.tweetStyle
+                            'emotional_state': self.agent.agent_state.consciousness.emotionalState,
+                            'style': self.agent.agent_state.tweetStyle
                         }
                     )
                     
@@ -647,8 +674,8 @@ class MemGPTService:
             memory_summary = await self.memory_processor.generate_summary(memories[:limit])
             dspy_summary = await self.dspy_service.generate_summary(
                 memories=memories[:limit],
-                style=self.agent.state.tweetStyle,
-                emotional_state=self.agent.state.consciousness.emotionalState
+                style=self.agent.agent_state.tweetStyle,
+                emotional_state=self.agent.agent_state.consciousness.emotionalState
             )
 
             return {
