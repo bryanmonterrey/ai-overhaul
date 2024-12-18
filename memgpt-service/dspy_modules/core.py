@@ -168,6 +168,9 @@ class PersonalityModule(dspy.Module):
         self.prompt_manager.load_styles()
         self.prompt_manager.load_prompts()
         
+        # Basic prediction configuration
+        self.predictor = None  # We'll use dspy.settings.lm directly
+        
         # Create a simple module that doesn't rely on kwargs
         class DirectPredictor(dspy.Module):
             def __init__(self):
@@ -204,13 +207,22 @@ Chaos Threshold: {style_config.get('chaosThreshold', 0.5)}
 {critical_rules}"""
 
     def predict_step(self, prompt: str) -> dspy.Prediction:
-        """Single prediction step with proper DSPy signature"""
+        """Single prediction step using basic LM completion"""
         try:
-            # Make prediction
-            result = self.predictor(prompt)
+            # Get the LM from settings
+            lm = dspy.settings.lm
+            if not lm:
+                raise ValueError("No language model configured")
+                
+            # Create a basic completion request
+            completion = lm.basic_request(
+                prompt,
+                temperature=0.7,
+                max_tokens=100
+            )
             
-            # Ensure we have a response
-            response_text = result.output if hasattr(result, 'output') else str(result)
+            # Extract the response text
+            response_text = completion.strip() if completion else prompt
             
             return dspy.Prediction(
                 response=response_text,
@@ -221,8 +233,7 @@ Chaos Threshold: {style_config.get('chaosThreshold', 0.5)}
                 }
             )
         except Exception as e:
-            print(f"Prediction error: {str(e)}")
-            # Return the original prompt if prediction fails
+            print(f"Basic prediction error: {str(e)}")
             return dspy.Prediction(
                 response=prompt,
                 reasoning=None,
