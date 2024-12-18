@@ -38,26 +38,39 @@ class TypeScriptParser:
         match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
         if not match:
             return {}
-            
-        # Get the object content and convert to valid Python
-        ts_object = match.group(1)
-        # Replace TypeScript-specific syntax with Python equivalents
-        py_object = (ts_object
-            .replace('true', 'True')
-            .replace('false', 'False')
-            # Handle TweetStyle enum references with proper quoting
-            .replace('[TweetStyle.', '["')
-            .replace(']:', '"],')  # Close the key with proper syntax
-            # Handle the last property in the object
-            .replace(']},', '"]},')
-            .replace(']}', '"]}'))
         
-        # Use ast.literal_eval for safe evaluation
         try:
+            # Get the object content
+            ts_object = match.group(1)
+            
+            # First cleanup: Remove TypeScript type annotations
+            ts_object = re.sub(r': Record<[^>]+>', '=', ts_object)
+            
+            # Handle TweetStyle enum references with proper dictionary format
+            ts_object = re.sub(r'\[TweetStyle\.(\w+)\]:', r'"\1":', ts_object)
+            
+            # Convert TypeScript array syntax to Python
+            ts_object = ts_object.replace('[', '["').replace(']', '"]')
+            ts_object = ts_object.replace('["chaotic"', "['chaotic'")
+            ts_object = ts_object.replace('["analytical"', "['analytical'")
+            ts_object = ts_object.replace('["philosophical"', "['philosophical'")
+            ts_object = ts_object.replace('["energetic"', "['energetic'")
+            ts_object = ts_object.replace('["suggestive"', "['suggestive'")
+            
+            # Convert the rest of the syntax to Python
+            py_object = ts_object.replace('traits:', '"traits":')
+            py_object = py_object.replace('energyLevel:', '"energyLevel":')
+            py_object = py_object.replace('chaosThreshold:', '"chaosThreshold":')
+            
+            # Clean up any trailing commas before closing braces
+            py_object = re.sub(r',(\s*})', r'\1', py_object)
+            
+            # Parse the Python dictionary
             return ast.literal_eval(py_object)
+            
         except Exception as e:
             print(f"Error parsing {const_name}: {e}")
-            print(f"Attempted to parse: {py_object}")
+            print(f"Attempted to parse: {ts_object if 'ts_object' in locals() else 'No content found'}")
             return {}
 
     @staticmethod
@@ -76,7 +89,7 @@ class TypeScriptParser:
                 return match.group(1).strip()
         
         return ""
-
+    
 class PromptManager:
     """Manages loading and parsing TypeScript prompt files"""
     
@@ -155,6 +168,9 @@ class PersonalityModule(dspy.Module):
         self.prompt_manager.load_styles()
         self.prompt_manager.load_prompts()
         
+        # Initialize the predictor
+        self.predictor = dspy.Predict("Input -> Output")
+        
     def get_style_prompt(self, style: str) -> str:
         """Get the complete prompt for a style"""
         style_config = self.prompt_manager.get_style_config(style)
@@ -172,6 +188,35 @@ Chaos Threshold: {style_config.get('chaosThreshold', 0.5)}
 {rules}
 
 {critical_rules}"""
+
+    def predict_step(self, prompt: str) -> dspy.Prediction:
+        """Single prediction step with proper DSPy signature"""
+        try:
+            # Format the input-output prompt
+            formatted_prompt = f"Input -> Output:\n{prompt}"
+            
+            # Make the prediction using DSPy's predictor
+            result = self.predictor(formatted_prompt)
+            
+            # Extract the response after the "->"
+            response_text = result.output.split("->")[-1].strip() if "->" in result.output else result.output
+            
+            return dspy.Prediction(
+                response=response_text,
+                reasoning=None,  # We'll handle reasoning separately if needed
+                metadata={
+                    'input': prompt,
+                    'raw_output': result.output
+                }
+            )
+        except Exception as e:
+            print(f"Prediction error: {str(e)}")
+            # Return empty prediction on error
+            return dspy.Prediction(
+                response="",
+                reasoning=None,
+                metadata={'error': str(e)}
+            )
         
     def forward(self, 
                 input_text: str,
@@ -183,46 +228,58 @@ Chaos Threshold: {style_config.get('chaosThreshold', 0.5)}
         # Get complete style-specific prompt
         style_prompt = self.get_style_prompt(style)
         
-        # Step 1: Analyze context and emotional state
-        analysis = self.predict(dspy.ChainOfThought(
-            f"""Analyze the input and determine appropriate response approach.
-            Input: {input_text}
-            Emotional State: {emotional_state}
-            Style: {style}
+        try:
+            # Step 1: Analyze context and emotional state
+            analysis_prompt = f"""Analyze the input and determine appropriate response approach.
+                Input: {input_text}
+                Emotional State: {emotional_state}
+                Style: {style}
+                
+                {style_prompt}
+                
+                Think through step by step:
+                1. What is the key message or topic?
+                2. How does the emotional state affect our response?
+                3. What style elements should we emphasize?
+                4. What unique perspective can we add?
+                
+                Response:"""
+                
+            analysis = self.predict_step(analysis_prompt)
             
-            {style_prompt}
+            # Step 2: Generate response using analysis
+            response_prompt = f"""Generate a response based on the analysis.
+                Analysis: {analysis.response}
+                
+                {style_prompt}
+                
+                Generate a response that:
+                1. Matches the determined style
+                2. Incorporates the emotional state
+                3. Adds unique value or perspective
+                4. Follows all critical rules
+                
+                Response:"""
+                
+            response = self.predict_step(response_prompt)
             
-            Think through step by step:
-            1. What is the key message or topic?
-            2. How does the emotional state affect our response?
-            3. What style elements should we emphasize?
-            4. What unique perspective can we add?
-            """))
-        
-        # Step 2: Generate response using analysis
-        response = self.predict(dspy.ChainOfThought(
-            f"""Generate a response based on the analysis.
-            Analysis: {analysis.reasoning}
-            
-            {style_prompt}
-            
-            Generate a response that:
-            1. Matches the determined style
-            2. Incorporates the emotional state
-            3. Adds unique value or perspective
-            4. Follows all critical rules
-            """))
-        
-        return dspy.Prediction(
-            response=response.response,
-            reasoning=analysis.reasoning,
-            metadata={
-                'style': style,
-                'emotional_state': emotional_state,
-                'style_config': self.prompt_manager.get_style_config(style),
-                'analysis': analysis
-            }
-        )
+            return dspy.Prediction(
+                response=response.response,
+                reasoning=analysis.response,
+                metadata={
+                    'style': style,
+                    'emotional_state': emotional_state,
+                    'style_config': self.prompt_manager.get_style_config(style),
+                    'analysis': analysis
+                }
+            )
+        except Exception as e:
+            print(f"Forward error: {str(e)}")
+            return dspy.Prediction(
+                response="",
+                reasoning=None,
+                metadata={'error': str(e)}
+            )
 
 # Initialize teleprompter for response optimization
 teleprompter = dspy.teleprompt.BootstrapFewShot(metric='exact_match')
