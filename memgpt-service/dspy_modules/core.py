@@ -169,7 +169,10 @@ class PersonalityModule(dspy.Module):
         self.prompt_manager.load_prompts()
         
         # Initialize the predictor
-        self.predictor = dspy.Predict("Input -> Output")
+        self.predictor = dspy.Predict(signature={
+        "input": str,
+        "output": str
+    })
         
     def get_style_prompt(self, style: str) -> str:
         """Get the complete prompt for a style"""
@@ -195,18 +198,19 @@ Chaos Threshold: {style_config.get('chaosThreshold', 0.5)}
             # Format the input-output prompt
             formatted_prompt = f"Input -> Output:\n{prompt}"
             
-            # Make the prediction using DSPy's predictor
-            result = self.predictor(formatted_prompt)
+            # Make the prediction using DSPy's predictor with named parameter
+            result = self.predictor(input=formatted_prompt)
             
             # Extract the response after the "->"
-            response_text = result.output.split("->")[-1].strip() if "->" in result.output else result.output
+            response_text = result.output.split("->")[-1].strip() if "->" in str(result.output) else str(result.output)
             
             return dspy.Prediction(
                 response=response_text,
                 reasoning=None,  # We'll handle reasoning separately if needed
                 metadata={
                     'input': prompt,
-                    'raw_output': result.output
+                    'raw_output': result.output,
+                    'formatted_prompt': formatted_prompt
                 }
             )
         except Exception as e:
