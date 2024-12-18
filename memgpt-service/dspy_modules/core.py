@@ -168,8 +168,8 @@ class PersonalityModule(dspy.Module):
         self.prompt_manager.load_styles()
         self.prompt_manager.load_prompts()
         
-        # Initialize with correct signature format
-        io_signature = "input, output"  # DSPy format for input/output signature
+        # Initialize with correct arrow signature format
+        io_signature = "input -> output"  # DSPy format requires the arrow
         self.predictor = dspy.Predict(signature=io_signature)
         
     def get_style_prompt(self, style: str) -> str:
@@ -193,7 +193,7 @@ Chaos Threshold: {style_config.get('chaosThreshold', 0.5)}
     def predict_step(self, prompt: str) -> dspy.Prediction:
         """Single prediction step with proper DSPy signature"""
         try:
-            # Just pass the input directly
+            # Pass the input directly via forward
             result = self.predictor.forward(input=prompt)
             
             return dspy.Prediction(
