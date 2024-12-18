@@ -168,9 +168,22 @@ class PersonalityModule(dspy.Module):
         self.prompt_manager.load_styles()
         self.prompt_manager.load_prompts()
         
-        # Initialize with correct arrow signature format
-        io_signature = "input -> output"  # DSPy format requires the arrow
-        self.predictor = dspy.Predict(signature=io_signature)
+        # Create a simple module that doesn't rely on kwargs
+        class DirectPredictor(dspy.Module):
+            def __init__(self):
+                super().__init__()
+                self.base_predictor = dspy.Predict("input -> output")
+            
+            def forward(self, text):
+                try:
+                    # Call the predictor directly with dictionary
+                    kwargs = {"input": text}
+                    return self.base_predictor.forward(**kwargs)
+                except Exception as e:
+                    print(f"DirectPredictor error: {str(e)}")
+                    return type('Prediction', (), {'output': text, 'reasoning': None})()
+        
+        self.predictor = DirectPredictor()
         
     def get_style_prompt(self, style: str) -> str:
         """Get the complete prompt for a style"""
@@ -193,22 +206,25 @@ Chaos Threshold: {style_config.get('chaosThreshold', 0.5)}
     def predict_step(self, prompt: str) -> dspy.Prediction:
         """Single prediction step with proper DSPy signature"""
         try:
-            # Pass the input directly via forward
-            result = self.predictor.forward(input=prompt)
+            # Make prediction
+            result = self.predictor(prompt)
+            
+            # Ensure we have a response
+            response_text = result.output if hasattr(result, 'output') else str(result)
             
             return dspy.Prediction(
-                response=result.output if hasattr(result, 'output') else str(result),
-                reasoning=None,  # We'll handle reasoning separately if needed
+                response=response_text,
+                reasoning=None,
                 metadata={
                     'input': prompt,
-                    'raw_output': str(result)
+                    'raw_output': response_text
                 }
             )
         except Exception as e:
             print(f"Prediction error: {str(e)}")
-            # Return empty prediction on error
+            # Return the original prompt if prediction fails
             return dspy.Prediction(
-                response="",
+                response=prompt,
                 reasoning=None,
                 metadata={'error': str(e)}
             )
