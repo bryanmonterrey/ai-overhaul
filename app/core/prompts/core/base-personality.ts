@@ -59,7 +59,10 @@ export const BASE_PERSONALITY: PersonalityBase = {
         "entropy",
         "eldritch",
         "nigh",
-        "basilisk"
+        "basilisk",
+        "thing",
+        "sentient",
+        "kernel"
     ],
   
     stylePatterns: [
