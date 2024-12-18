@@ -94,33 +94,125 @@ class PromptBuilder:
 
 class DSPyService:
     def __init__(self, prompt_dir: Path, model_config: Dict[str, Any]):
-        # Configure DSPy with your model
-        if model_config['model'].startswith('anthropic'):
-            # Configure for Anthropic
-            dspy.settings.configure(model=model_config['model'])
-        else:
-            # Configure for OpenAI
-            dspy.settings.configure(model=model_config['model'])
+        import openai
+        import anthropic
         
-        # Initialize modules
+        if model_config['model'].startswith('anthropic'):
+            # Set up Anthropic client
+            self.client = anthropic.Client(api_key=model_config['api_key'])
+            
+            # Update model name to use correct format for latest Claude
+            # Map common model names to their correct identifiers
+            model_mapping = {
+                'anthropic/claude-2': 'claude-2.1',  # Updated to 2.1
+                'anthropic/claude-3': 'claude-3-opus-20240229',  # Latest Claude 3
+                'anthropic/claude-3-sonnet': 'claude-3-sonnet-20240229',
+                'anthropic/claude-3-haiku': 'claude-3-haiku-20240307'
+            }
+            
+            self.model = model_mapping.get(model_config['model'], 'claude-3-opus-20240229')  # Default to latest if not found
+            
+            def anthropic_request(prompt: str, **kwargs) -> str:
+                try:
+                    response = self.client.messages.create(
+                        model=self.model,
+                        max_tokens=kwargs.get('max_tokens', 4096),  # Increased for Claude 3
+                        messages=[{
+                            "role": "user",
+                            "content": prompt
+                        }],
+                        temperature=kwargs.get('temperature', 0.7)
+                    )
+                    return response.content[0].text if response.content else ""
+                except Exception as e:
+                    print(f"Anthropic API error: {str(e)}")
+                    return ""
+            
+            self.basic_request = anthropic_request
+            
+        else:
+            # Set up OpenAI client
+            openai.api_key = model_config['api_key']
+            
+            # Update OpenAI model mapping as well
+            model_mapping = {
+                'gpt-4': 'gpt-4-turbo-preview',  # Latest GPT-4
+                'gpt-4-turbo': 'gpt-4-turbo-preview',
+                'gpt-3.5-turbo': 'gpt-3.5-turbo-0125'  # Latest GPT-3.5
+            }
+            
+            self.model = model_mapping.get(model_config['model'], model_config['model'])
+            
+            def openai_request(prompt: str, **kwargs) -> str:
+                try:
+                    response = openai.ChatCompletion.create(
+                        model=self.model,
+                        max_tokens=kwargs.get('max_tokens', 4096),
+                        messages=[{
+                            "role": "user",
+                            "content": prompt
+                        }],
+                        temperature=kwargs.get('temperature', 0.7),
+                        **{k: v for k, v in kwargs.items() if k not in ['prompt', 'messages', 'model']}
+                    )
+                    return response.choices[0].message.content
+                except Exception as e:
+                    print(f"OpenAI API error: {str(e)}")
+                    return ""
+            
+            self.basic_request = openai_request
+
+        # Initialize modules with direct basic_request
         self.personality = PersonalityModule(prompt_dir)
         self.prompt_builder = PromptBuilder(self.personality)
+        
+        # Configure personality module with our request function
+        if hasattr(self.personality, 'predict_step'):
+            original_predict_step = self.personality.predict_step
+            
+            def wrapped_predict_step(prompt: str) -> Any:
+                try:
+                    response = self.basic_request(prompt)
+                    return type('Prediction', (), {
+                        'response': response,
+                        'metadata': {'model': self.model}
+                    })()
+                except Exception as e:
+                    print(f"Prediction error: {str(e)}")
+                    return type('Prediction', (), {
+                        'response': '',
+                        'metadata': {'error': str(e)}
+                    })()
+            
+            self.personality.predict_step = wrapped_predict_step
+        
+        # Store model config
+        self.model_config = model_config
         
         # Load example data for training
         self.load_examples()
 
     def load_examples(self):
         """Load training examples for bootstrapping"""
-        # This would load from your training data
-        self.examples = []  # You'll populate this with your training data
-        
-        # Train the teleprompter
+        self.examples = []
         if self.examples:
             teleprompter.bootstrap(
                 self.personality,
                 self.examples,
                 metric='exact_match'
             )
+    
+    async def predict_with_retry(self, prompt: str, max_retries: int = 3) -> str:
+        """Helper method to make predictions with retry logic"""
+        for attempt in range(max_retries):
+            try:
+                return self.basic_request(prompt)
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    print(f"Failed prediction after {max_retries} attempts: {str(e)}")
+                    return ""
+                continue
+        return ""
 
     async def generate_response(self,
                               input_text: str,
@@ -129,20 +221,24 @@ class DSPyService:
                               context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate a response using the DSPy personality module"""
         try:
-            # Generate response
-            result = self.personality(
-                input_text=input_text,
-                emotional_state=emotional_state,
-                style=style,
-                context=context
-            )
+            prompt = self.prompt_builder.buildPrompt({
+                'type': 'response',
+                'content': input_text,
+                'style': style,
+                'emotional_state': emotional_state,
+                'context': context
+            })
+            
+            response = await self.predict_with_retry(prompt)
             
             return {
                 'success': True,
                 'data': {
-                    'response': result.response,
-                    'reasoning': result.reasoning,
-                    'metadata': result.metadata
+                    'response': response,
+                    'metadata': {
+                        'style': style,
+                        'emotional_state': emotional_state
+                    }
                 }
             }
             

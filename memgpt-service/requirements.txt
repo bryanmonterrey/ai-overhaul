@@ -4,7 +4,7 @@ python-dotenv
 supabase
 memgpt
 dspy-ai
-openai 
-anthropic
+openai>=1.0.0
+anthropic>=0.3.0
 pydantic
 python-frontmatter
