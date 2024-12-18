@@ -95,10 +95,12 @@ class PromptBuilder:
 class DSPyService:
     def __init__(self, prompt_dir: Path, model_config: Dict[str, Any]):
         # Configure DSPy with your model
-        dspy.settings.configure(
-            lm=model_config['model'],
-            rm=model_config.get('retrieval_model', None)
-        )
+        if model_config['model'].startswith('anthropic'):
+            # Configure for Anthropic
+            dspy.settings.configure(model=model_config['model'])
+        else:
+            # Configure for OpenAI
+            dspy.settings.configure(model=model_config['model'])
         
         # Initialize modules
         self.personality = PersonalityModule(prompt_dir)
