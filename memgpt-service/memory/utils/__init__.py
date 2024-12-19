@@ -1,7 +1,8 @@
+import logging
 from .embedding import EmbeddingManager
 from typing import List, Dict, Any, Optional
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 import json
 from collections import defaultdict, Counter
@@ -17,7 +18,41 @@ def batch_process_texts(texts: List[str], batch_size: int = 8):
 
 def calculate_text_complexity(text: str) -> float:
     """Calculate text complexity score"""
-    # Implementation
+    if not text or not isinstance(text, str):
+        return 0.0
+        
+    try:
+        # Calculate complexity based on:
+        # 1. Word length
+        # 2. Sentence length
+        # 3. Unique words ratio
+        
+        words = text.split()
+        if not words:
+            return 0.0
+            
+        # Average word length
+        avg_word_length = sum(len(word) for word in words) / len(words)
+        
+        # Unique words ratio
+        unique_ratio = len(set(words)) / len(words)
+        
+        # Average sentence length
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+        avg_sentence_length = len(words) / (len(sentences) if sentences else 1)
+        
+        # Combine metrics
+        complexity = (
+            0.3 * min(avg_word_length / 10, 1.0) +  # Cap at 1.0
+            0.4 * unique_ratio +
+            0.3 * min(avg_sentence_length / 20, 1.0)  # Cap at 1.0
+        )
+        
+        return float(complexity)
+        
+    except Exception as e:
+        logging.error(f"Error calculating text complexity: {str(e)}")
+        return 0.0  # Return safe default
 
 def extract_temporal_references(text: str) -> List[str]:
     """Extract time-related references"""
@@ -339,12 +374,20 @@ def calculate_memory_statistics(memories: List[Dict[str, Any]]) -> Dict[str, Any
 
 def _calculate_average_age(memories: List[Dict[str, Any]]) -> float:
     """Calculate average age of memories in days"""
-    now = datetime.now()
-    ages = [
-        (now - datetime.fromisoformat(m['created_at'])).days
-        for m in memories
-        if 'created_at' in m
-    ]
+    now = datetime.now(timezone.utc)  # Make timezone-aware
+    ages = []
+    
+    for memory in memories:
+        if 'created_at' in memory:
+            try:
+                # Parse the date and ensure it's timezone-aware
+                created_date = datetime.fromisoformat(memory['created_at'])
+                if created_date.tzinfo is None:
+                    created_date = created_date.replace(tzinfo=timezone.utc)
+                ages.append((now - created_date).days)
+            except Exception as e:
+                continue
+                
     return sum(ages) / len(ages) if ages else 0
 
 def _calculate_emotional_stats(memories: List[Dict[str, Any]]) -> Dict[str, Any]:

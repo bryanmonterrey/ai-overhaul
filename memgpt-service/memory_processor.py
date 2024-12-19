@@ -18,7 +18,7 @@ from memory.utils import (
     calculate_text_complexity
 )
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 
 
@@ -317,50 +317,80 @@ class MemoryProcessor:
             return None
 
     async def combine_and_rank_results(
-        self,
-        db_results: List[Dict],
-        semantic_results: List[Dict],
-        query: Dict
-    ) -> List[Dict]:
+    self,
+    db_results: List[Dict],
+    semantic_results: List[Dict],
+    query: Dict
+) -> List[Dict]:
         """Enhanced result combination"""
         try:
+
             combined = {}
             
             # Add database results
             for result in db_results:
+                if not isinstance(result, dict):
+                    continue
+                    
                 key = result.get('id')
-                if key:
-                    content_score = calculate_text_complexity(result.get('content', ''))
+                if not key:
+                    continue
+                    
+                try:
+                    content = result.get('content', '')
+                    if not content:
+                        continue
+                        
+                    content_score = calculate_text_complexity(content)
                     combined[key] = {
                         'memory': result,
-                        'score': float(0.5 + (content_score * 0.2))   # Base score + complexity
+                        'score': float(0.5 + (content_score * 0.2))
                     }
+                except Exception as e:
+                    self.logger.error(f"Error processing db result: {str(e)}")
+                    continue
             
             # Add semantic results with higher weight
             for result in semantic_results:
+                if not isinstance(result, dict):
+                    continue
+                    
                 key = result.get('id')
-                if key:
+                if not key:
+                    continue
+                    
+                try:
                     semantic_score = 0.8
                     if key in combined:
-                        # Ensure score exists and is a float
-                        if 'score' not in combined[key]:
+                        if not isinstance(combined[key].get('score'), (int, float)):
                             combined[key]['score'] = 0.0
                         combined[key]['score'] += semantic_score
                     else:
                         combined[key] = {
                             'memory': result,
-                            'score': float(semantic_score)  # Ensure float
+                            'score': float(semantic_score)
                         }
                     
                     # Add importance boost
                     importance = float(result.get('importance', 0))
-                    if importance > 0.7 and 'score' in combined[key]:
-                        combined[key]['score'] = float(combined[key]['score'] * 1.2)
+                    if importance > 0.7 and key in combined:
+                        score = combined[key].get('score')
+                        if isinstance(score, (int, float)):
+                            combined[key]['score'] = float(score * 1.2)
+                except Exception as e:
+                    self.logger.error(f"Error processing semantic result: {str(e)}")
+                    continue
+            
+            # Filter out any entries with invalid scores
+            valid_entries = [
+                item for item in combined.values()
+                if isinstance(item.get('score'), (int, float))
+            ]
             
             # Sort by score
             ranked = sorted(
-                [item for item in combined.values() if item.get('score') is not None],
-                key=lambda x: x['score'],
+                valid_entries,
+                key=lambda x: float(x.get('score', 0)),
                 reverse=True
             )
             
