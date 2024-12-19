@@ -14,6 +14,7 @@ class Agent:
         self.memory_processor = None
         self.context_window = []
         self.last_state_update = datetime.now()
+        self.service = None
 
     def _update_agent_state(self, content: str) -> None:
         """Update agent's internal state based on content"""

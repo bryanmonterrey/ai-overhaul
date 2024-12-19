@@ -27,9 +27,11 @@ if TYPE_CHECKING:
 class MemoryProcessor:
     def __init__(self, agent: 'Agent'):
         self.agent = agent
+
+        supabase_client = self.agent.service.supabase
         
         # Initialize memory system
-        self.memory_system = init_memory_system(agent.supabase_client)
+        self.memory_system = init_memory_system(supabase_client)
         self.vector_store = self.memory_system['vector_store']
         self.hierarchy = self.memory_system['hierarchy']
         self.retrieval = self.memory_system['retrieval']

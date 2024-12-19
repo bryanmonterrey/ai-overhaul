@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import asyncio
-from memory import Memory
+from memory_base import Memory
 import uuid
 from dspy_modules.service import DSPyService
 from pathlib import Path
@@ -175,6 +175,7 @@ class MemGPTService:
                 user=user,
                 interface=self.interface
             )
+            self.agent.service = self
             
             # Initialize memory processor
             self.memory_processor = MemoryProcessor(self.agent)
@@ -190,7 +191,7 @@ class MemGPTService:
                 }
             )
 
-            asyncio.create_task(self._memory_maintenance_loop())
+            
             
         except Exception as e:
             raise RuntimeError(f"Failed to initialize MemGPTService: {str(e)}")
@@ -874,18 +875,23 @@ async def get_memory_summary(timeframe: str = 'recent', limit: int = 5):
 if __name__ == "__main__":
     try:
         print("Starting MemGPT Service...")
-        # Initialize event loop for asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         
-        # Create service with maintenance loop
-        service = MemGPTService()
+        async def start_service():
+            # Create service with maintenance loop
+            service = MemGPTService()
+            
+            # Run FastAPI with uvicorn
+            config = uvicorn.Config(
+                app,
+                host="0.0.0.0",
+                port=3001,
+                log_level="info"
+            )
+            server = uvicorn.Server(config)
+            await server.serve()
         
-        # Run the application
-        config = uvicorn.Config(app, host="0.0.0.0", port=3001, log_level="info", loop=loop)
-        server = uvicorn.Server(config)
-        loop.run_until_complete(server.serve())
+        # Run everything in the event loop
+        asyncio.run(start_service())
+        
     except Exception as e:
         print(f"Failed to start service: {str(e)}")
-    finally:
-        loop.close()
