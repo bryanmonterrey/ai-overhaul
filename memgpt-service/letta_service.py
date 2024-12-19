@@ -190,9 +190,21 @@ class MemGPTService:
                     'api_key': ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY
                 }
             )
+
+            asyncio.create_task(self._memory_maintenance_loop())
             
         except Exception as e:
             raise RuntimeError(f"Failed to initialize MemGPTService: {str(e)}")
+        
+    async def _memory_maintenance_loop(self):
+        """Background task for periodic memory maintenance"""
+        while True:
+            try:
+                await self.memory_processor.maintain_memory_system()
+                await asyncio.sleep(3600)  # Run every hour
+            except Exception as e:
+                print(f"Error in memory maintenance loop: {str(e)}")
+                await asyncio.sleep(300)  # Wait 5 minutes before retrying
 
     async def process_memory_content(self, content: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process and analyze content with optional context"""
@@ -848,6 +860,9 @@ async def get_memory_summary(timeframe: str = 'recent', limit: int = 5):
 if __name__ == "__main__":
     try:
         print("Starting MemGPT Service...")
+        # Initialize event loop for asyncio
+        loop = asyncio.get_event_loop()
+        # Run the application
         uvicorn.run(app, host="0.0.0.0", port=3001, log_level="info")
     except Exception as e:
         print(f"Failed to start service: {str(e)}")
