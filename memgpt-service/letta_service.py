@@ -520,6 +520,21 @@ class MemGPTService:
         except Exception as e:
             print(f"Error finding related memory: {str(e)}")
             return None
+        
+    async def _process_memories(self, memories: List[Dict]) -> List[Dict]:
+        """Process and prepare memories for comparison"""
+        try:
+            processed = []
+            for memory in memories:
+                content = self._extract_content(memory)
+                if content:
+                    memory_copy = memory.copy()
+                    memory_copy['_processed_content'] = content
+                    processed.append(memory_copy)
+            return processed
+        except Exception as e:
+            print(f"Error processing memories: {str(e)}")
+            return []
 
     def _extract_content(self, memory: Dict) -> Optional[str]:
         """Helper to extract content safely"""
@@ -861,8 +876,17 @@ if __name__ == "__main__":
     try:
         print("Starting MemGPT Service...")
         # Initialize event loop for asyncio
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Create service with maintenance loop
+        service = MemGPTService()
+        
         # Run the application
-        uvicorn.run(app, host="0.0.0.0", port=3001, log_level="info")
+        config = uvicorn.Config(app, host="0.0.0.0", port=3001, log_level="info", loop=loop)
+        server = uvicorn.Server(config)
+        loop.run_until_complete(server.serve())
     except Exception as e:
         print(f"Failed to start service: {str(e)}")
+    finally:
+        loop.close()

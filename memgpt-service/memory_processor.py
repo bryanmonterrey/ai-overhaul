@@ -100,7 +100,7 @@ class MemoryProcessor:
     def _extract_key_concepts(self, text: str) -> List[str]:
         """Original key concept extraction"""
         words = text.lower().split()
-        
+
         common_words = {'the', 'is', 'at', 'which', 'on', 'in', 'a', 'an', 'and'}
         concepts = [w for w in words if w not in common_words and len(w) > 3]
         return list(set(concepts))[:5]
@@ -477,6 +477,27 @@ class MemoryProcessor:
             except Exception as fallback_error:
                 self.logger.error(f"Fallback summary error: {str(fallback_error)}")
                 return "Error generating summary"
+    
+    async def _handle_vector_error(self, error: Exception, operation: str):
+        """Handle vector operation errors"""
+        self.logger.error(f"Vector {operation} error: {str(error)}")
+        await self.vector_store.sync_index()  # Try to recover
+        return None
+    
+    async def _process_memories(self, memories: List[Dict]) -> List[Dict]:
+        """Process and prepare memories for comparison"""
+        try:
+            processed = []
+            for memory in memories:
+                content = self._extract_content(memory)
+                if content:
+                    memory_copy = memory.copy()
+                    memory_copy['_processed_content'] = content
+                    processed.append(memory_copy)
+            return processed
+        except Exception as e:
+            self.logger.error(f"Error processing memories: {str(e)}")
+            return []
 
     async def maintain_memory_system(self):
         """Periodic maintenance of the memory system"""
