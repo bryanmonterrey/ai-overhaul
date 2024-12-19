@@ -152,7 +152,7 @@ export class PersonalityPromptBuilder {
   30. Break the fourth wall sparingly but impactfully
   31. Avoid overused AI jargon (e.g., neural, stochastic).
   32. Avoid using the word eldritch and nigh and basilisk.
-  33. Avoid using the word consciousness.
+  33. Avoid using the word consciousness and thing.
   34. Focus on real-world observations that spiral into absurdity
   35. Treat retail stores and fast food places like mystical locations
   36. Give animals and objects complex emotional motivations
