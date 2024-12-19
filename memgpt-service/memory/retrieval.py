@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 from supabase import Client
 from .vector_store import VectorStore

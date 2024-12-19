@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import re
 import json
+from collections import Counter
 
 __all__ = [
     'EmbeddingManager'
