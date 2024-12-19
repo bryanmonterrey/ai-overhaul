@@ -26,10 +26,8 @@ export default function ClientLayout({
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="flex flex-1 pt-16 pb-12">
-        <Sidebar />
-        <main className={`flex-1 p-6 transition-all duration-300 ${
-          isSidebarVisible ? 'ml-64' : 'ml-0'
-        }`}>
+        
+        <main className={`flex-1 p-6 transition-all duration-300 `}>
           {children}
         </main>
       </div>

@@ -16,12 +16,12 @@ export const Card = ({
   className = ''
 }: CardProps) => {
   const variants = {
-    default: 'bg-[#11111A] border border-white',
-    system: 'bg-[#11111A] border border-white text-white font-ia'
+    default: 'bg-[#11111A] border border-zinc-900 rounded-md',
+    system: 'bg-[#11111A] border border-zinc-900 text-[#DDDDDD] font-ia rounded-md'
   };
 
   return (
-    <div className={`${variants[variant]} p-4 rounded-none ${className}`}>
+    <div className={`${variants[variant]} p-4 rounded-md ${className}`}>
       {title && (
         <h3 className="text-base font-ia mb-4">
           {variant === 'system' ? `> ${title}` : title}

@@ -7,6 +7,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { Magnetic } from '../common/MagButton';
 
 const CustomWalletButton = () => {
   return (
@@ -33,30 +34,62 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A] border-b border-[#DDDDDD]">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A] border-b border-zinc-900">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-14">
           <div className="flex items-center space-x-8">
             <Link href="/" className="font-ia text-[#DDDDDD] text-base">
-              GOATSE SINGULARITY
+              goatse singularity
             </Link>
              
-            <nav className="hidden md:flex space-x-6">
+            <nav className="hidden md:flex space-x-5">
+              <Magnetic>
+
               <Link href="/chat" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
-                [CHAT]
+              <button 
+              type='button'
+              className='inline-flex items-center rounded-md border border-zinc-900 bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900 dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+                chat
+              </button>
               </Link>
+              
+              </Magnetic>
+              <Magnetic>
               <Link href="/conversations" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
-                [CONVERSATIONS]
+              <button 
+              type='button'
+              className='inline-flex items-center rounded-md border border-zinc-900 bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900 dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+                conversations
+              </button>
               </Link>
+              </Magnetic>
+              <Magnetic>
               <Link href="/twitter" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
-                [TWITTER]
+              <button 
+              type='button'
+              className='inline-flex items-center rounded-md border border-zinc-900 bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900 dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+                twitter
+              </button>
               </Link>
+              </Magnetic>
+              <Magnetic>
               <Link href="/telegram" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
-                [TELEGRAM]
+              <button 
+              type='button'
+              className='inline-flex items-center rounded-md border border-zinc-900 bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900 dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+                telegram
+              </button>
               </Link>
+              </Magnetic>
+              <Magnetic>
               <Link href="/admin" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
-                [ADMIN]
+              <button 
+              type='button'
+              className='inline-flex items-center rounded-md border border-zinc-900 bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900 dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+                admin
+              </button>
               </Link>
+              </Magnetic>
             </nav>
           </div>
 

@@ -28,7 +28,7 @@ export default function Footer() {
   }, []);
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-[#11111A] border-t border-[#DDDDDD] py-2 px-4">
+    <footer className="fixed bottom-0 left-0 right-0 bg-[#11111A] border-t border-zinc-900 py-2 px-4">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <div className="font-ia text-xs text-[#DDDDDD]">
           <span className="mr-4">runtime: {uptime.toFixed(2)}s</span>
