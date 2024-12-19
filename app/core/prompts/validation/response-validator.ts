@@ -4,7 +4,8 @@ export class ResponseValidator {
         "I apologize",
         "I'm happy to have",
         "ethical bounds",
-        "respectful conversation"
+        "respectful conversation",
+        "I cannot generate"
     ];
 
     static validateTweetResponse(response: string): boolean {
