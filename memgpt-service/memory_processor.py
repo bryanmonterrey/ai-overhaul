@@ -21,6 +21,7 @@ import logging
 from datetime import datetime
 from collections import defaultdict
 
+
 if TYPE_CHECKING:
     from agent import Agent
 
@@ -332,7 +333,7 @@ class MemoryProcessor:
                     content_score = calculate_text_complexity(result.get('content', ''))
                     combined[key] = {
                         'memory': result,
-                        'score': 0.5 + (content_score * 0.2)  # Base score + complexity
+                        'score': float(0.5 + (content_score * 0.2))   # Base score + complexity
                     }
             
             # Add semantic results with higher weight
@@ -341,20 +342,24 @@ class MemoryProcessor:
                 if key:
                     semantic_score = 0.8
                     if key in combined:
+                        # Ensure score exists and is a float
+                        if 'score' not in combined[key]:
+                            combined[key]['score'] = 0.0
                         combined[key]['score'] += semantic_score
                     else:
                         combined[key] = {
                             'memory': result,
-                            'score': semantic_score
+                            'score': float(semantic_score)  # Ensure float
                         }
                     
                     # Add importance boost
-                    if result.get('importance', 0) > 0.7:
-                        combined[key]['score'] *= 1.2
+                    importance = float(result.get('importance', 0))
+                    if importance > 0.7 and 'score' in combined[key]:
+                        combined[key]['score'] = float(combined[key]['score'] * 1.2)
             
             # Sort by score
             ranked = sorted(
-                combined.values(),
+                [item for item in combined.values() if item.get('score') is not None],
                 key=lambda x: x['score'],
                 reverse=True
             )
