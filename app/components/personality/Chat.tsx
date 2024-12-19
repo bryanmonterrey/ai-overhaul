@@ -384,7 +384,7 @@ useEffect(() => {
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
               className="flex-1 bg-[#11111A] text-base text-[#DDDDDD] border border-zinc-900 rounded-md px-4 py-2 font-mono disabled:opacity-50"
-              placeholder={isLoading ? 'PROCESSING...' : 'ENTER_COMMAND...'}
+              placeholder={isLoading ? 'processing...' : 'enter command...'}
               disabled={isLoading}
             />
             <button
@@ -392,7 +392,7 @@ useEffect(() => {
               disabled={isLoading || !inputText.trim()}
               className="bg-[#11111A] text-[#DDDDDD] text-base px-4 py-2 rounded-md font-mono border border-zinc-900 disabled:opacity-50 hover:bg-[#11111A] transition-colors"
             >
-              {isLoading ? 'PROCESSING...' : 'EXECUTE'}
+              {isLoading ? 'processing...' : 'execute'}
             </button>
           </div>
         </div>
@@ -402,9 +402,9 @@ useEffect(() => {
   <div className="w-80 border-l border-zinc-900 p-4 space-y-4">
     <button
       onClick={() => setShowAnalytics(!showAnalytics)}
-      className="w-full text-[#DDDDDD] border border-zinc-900 p-2 font-mono text-sm"
+      className="w-full text-[#DDDDDD] border border-zinc-900 rounded-md p-2 font-mono text-sm"
     >
-      {showAnalytics ? '[HIDE_ANALYTICS]' : '[SHOW_ANALYTICS]'}
+      {showAnalytics ? 'hide analytics' : 'show analytics'}
     </button>
 
     {currentMetrics && (
