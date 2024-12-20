@@ -136,4 +136,10 @@ export const config = {
     '/((?!insufficient-tokens|login|api/auth).*)',
     '/api/memory/:path*', // Exclude specific public routes
   ],
+  unstable_allowDynamic: [
+    // Allow dynamic imports from node_modules
+    '/node_modules/@solana/web3.js/**',
+    '/node_modules/rpc-websockets/**',
+  ],
+  runtime: 'nodejs' // Add this line
 };

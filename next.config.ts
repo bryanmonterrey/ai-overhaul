@@ -14,6 +14,21 @@ const nextConfig: NextConfig = {
         if (isServer) {
             config.externals.push('twitter-api-v2')
         }
+        // Add this section for handling buffer in edge runtime
+        if (!isServer) {
+            config.resolve = {
+                ...config.resolve,
+                fallback: {
+                    ...config.resolve?.fallback,
+                    fs: false,
+                    net: false,
+                    tls: false,
+                    crypto: require.resolve('crypto-browserify'),
+                    stream: require.resolve('stream-browserify'),
+                    buffer: require.resolve('buffer/'),
+                }
+            };
+        }
         return config
     },
     // Add environment variables
@@ -30,6 +45,9 @@ const nextConfig: NextConfig = {
     },
     eslint: {
         ignoreDuringBuilds: true,
+    },
+    experimental: {
+        serverComponentsExternalPackages: ['@solana/web3.js', 'rpc-websockets'],
     },
     async rewrites() {
         if (process.env.NODE_ENV === 'development') {
@@ -52,7 +70,7 @@ const nextConfig: NextConfig = {
             }
           ];
         }
-      }      
+    }      
 }
 
 export default nextConfig
