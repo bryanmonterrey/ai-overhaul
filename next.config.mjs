@@ -5,8 +5,7 @@ const nextConfig = {
       '@solana/wallet-adapter-base',
       '@solana/wallet-adapter-react',
       '@solana/wallet-adapter-react-ui',
-      '@solana/wallet-adapter-wallets',
-      'twitter-api-v2'
+      '@solana/wallet-adapter-wallets'
   ],
   webpack: (config, { isServer }) => {
       if (!isServer) {
@@ -28,12 +27,8 @@ const nextConfig = {
           test: /\.m?js$/,
           resolve: {
               fullySpecified: false,
-          },
+          }
       });
-
-      if (isServer) {
-          config.externals = [...(config.externals || [])];
-      }
 
       return config
   },
