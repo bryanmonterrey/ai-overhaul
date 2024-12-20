@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '../../../lib/middleware/auth-middleware';
-import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limiter';
-import { getTwitterManager } from '../../../lib/twitter-manager-instance';
+const { withAuth } = require('../../../lib/middleware/auth-middleware');
+const { checkTwitterRateLimit } = require('../../../lib/middleware/twitter-rate-limiter');
+const { getTwitterManager } = require('../../../lib/twitter-manager-instance');
 
 export async function GET() {
     return withAuth(async (supabase: any, session: any) => {
@@ -10,7 +10,9 @@ export async function GET() {
             
             const twitterManager = getTwitterManager();
             if (!twitterManager) {
-                throw new Error('Twitter manager not initialized');
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized' 
+                }, { status: 500 });
             }
 
             try {
@@ -42,7 +44,7 @@ export async function GET() {
                     status: {},
                     error: innerError.message,
                     stack: process.env.NODE_ENV === 'development' ? innerError.stack : undefined
-                });
+                }, { status: 500 });
             }
         } catch (error: any) {
             console.error('Error in tweets route:', error);
@@ -57,5 +59,5 @@ export async function GET() {
                 { status: error.statusCode || 500 }
             );
         }
-    });
+    }) || NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 }

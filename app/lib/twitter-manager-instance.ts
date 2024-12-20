@@ -1,9 +1,9 @@
-import { TwitterManager } from '../core/twitter/twitter-manager';
-import { PersonalitySystem } from '../core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '../core/personality/config';
-import { getTwitterClient } from '../lib/twitter-client';
-import { getSupabaseClient } from '../lib/supabase/server';
-import { TwitterTrainingService } from '../lib/services/twitter-training';
+const { TwitterManager } = require('../core/twitter/twitter-manager');
+const { PersonalitySystem } = require('../core/personality/PersonalitySystem');
+const { DEFAULT_PERSONALITY } = require('../core/personality/config');
+const { getTwitterClient } = require('./twitter-client');
+const { getSupabaseClient } = require('./supabase/server');
+const { TwitterTrainingService } = require('./services/twitter-training');
 
 let twitterManagerInstance: TwitterManager | null = null;
 
