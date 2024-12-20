@@ -1,5 +1,5 @@
 // app/lib/twitter-client.ts
-import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '@/app/core/twitter/types';
+import { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '.././core/twitter/types';
 import type { TwitterApi as TwitterApiType, TTweetv2Expansion } from 'twitter-api-v2';
 
 let TwitterApi: typeof TwitterApiType;

@@ -1,8 +1,8 @@
 // src/app/lib/supabase/logging.ts
 
 import { supabase } from '../supabase';
-import { Message, QualityMetrics } from '@/app/core/types/chat';
-import { EmotionalState, Platform } from '@/app/core/types';
+import { Message, QualityMetrics } from '../../core/types/chat';
+import { EmotionalState, Platform } from '../../core/types';
 
 interface MessageLog {
   content: string;

@@ -6,7 +6,7 @@ import {
     ChatMemory, 
     TweetMemory, 
     TradingParamsMemory 
-} from '@/app/types/memory';
+} from '../../types/memory';
 
 export function useMemGPT() {
     const [loading, setLoading] = useState(false);

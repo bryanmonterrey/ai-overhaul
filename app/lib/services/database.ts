@@ -1,8 +1,8 @@
 // app/lib/services/database.ts
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { ChatSession, ChatMessage, QualityMetric, TrainingData } from '@/types/database';
-import { Message } from '@/app/core/types/chat';
-import { PromptTemplate } from '@/app/core/personality/training/types';
+import { Message } from '../../core/types/chat';
+import { PromptTemplate } from '../../core/personality/training/types';
 
 interface TrainingDataRecord {
   message_id: string;

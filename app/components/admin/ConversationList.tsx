@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrainingConversation } from '@/app/core/personality/training/types';
+import { TrainingConversation } from '../../core/personality/training/types';
 
 interface ConversationListProps {
   conversations: TrainingConversation[];

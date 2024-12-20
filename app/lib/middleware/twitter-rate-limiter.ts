@@ -1,4 +1,4 @@
-import { RateLimiter } from '@/app/lib/utils/ai';
+import { RateLimiter } from '../../lib/utils/ai';
 
 const rateLimiter = new RateLimiter(
   300,  // requests per 15 minutes

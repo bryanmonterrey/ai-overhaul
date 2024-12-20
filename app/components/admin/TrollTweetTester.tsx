@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TROLL_PATTERNS } from '@/app/core/personality/training/constants';
+import { TROLL_PATTERNS } from '../../core/personality/training/constants';
 
 export const TrollTweetTester: React.FC = () => {
   const [selectedStyle, setSelectedStyle] = useState<string>('');

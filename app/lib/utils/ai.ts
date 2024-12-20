@@ -1,6 +1,6 @@
 // src/app/lib/utils/ai.ts
 
-import { TokenCount, ProviderType, CacheConfig } from '@/app/core/types/ai';
+import { TokenCount, ProviderType, CacheConfig } from '../../core/types/ai';
 import { LRUCache } from 'lru-cache';
 
 // Token counting utility

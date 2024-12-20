@@ -1,7 +1,7 @@
 // src/app/lib/config/schemas.ts
 
 import { z } from 'zod';
-import { EmotionalState, TweetStyle, NarrativeMode } from '@/app/core/personality/types';
+import { EmotionalState, TweetStyle, NarrativeMode } from '../../core/personality/types';
 
 // Basic schemas
 const emotionalStateEnum = z.enum(['neutral', 'excited', 'contemplative', 'chaotic', 'creative', 'analytical']);

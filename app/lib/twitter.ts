@@ -2,7 +2,7 @@
 
 import { TwitterApi, TweetV2, UserV2, TweetV2PostTweetResult } from 'twitter-api-v2';
 import { createClient } from '@supabase/supabase-js';
-import { EnvironmentalFactors } from '@/app/core/types';
+import { EnvironmentalFactors } from '.././core/types';
 import {
   TwitterMetrics,
   TweetMetrics,
@@ -12,11 +12,11 @@ import {
   TweetThread,
   TweetSearchResult
 } from './types/twitter';
-import { TwitterAuthError, TwitterRateLimitError, TwitterNetworkError, TwitterDataError, TwitterError } from '@/app/lib/errors/TwitterErrors';
-import type { EngagementTargetRow } from '@/app/types/supabase';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { Context, TweetStyle } from '@/app/core/personality/types';
-import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { TwitterAuthError, TwitterRateLimitError, TwitterNetworkError, TwitterDataError, TwitterError } from '.././lib/errors/TwitterErrors';
+import type { EngagementTargetRow } from '.././types/supabase';
+import { PersonalitySystem } from '.././core/personality/PersonalitySystem';
+import { Context, TweetStyle } from '.././core/personality/types';
+import { TwitterTrainingService } from '.././lib/services/twitter-training';
 
 interface QueuedTweet {
   id: string;

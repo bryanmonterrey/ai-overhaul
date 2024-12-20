@@ -1,7 +1,7 @@
 // src/app/components/analytics/QualityMetricsDisplay.tsx
 
 import React from 'react';
-import { QualityScore } from '@/app/lib/services/quality-metrics';
+import { QualityScore } from '../../lib/services/quality-metrics';
 
 interface Props {
   metrics: QualityScore;

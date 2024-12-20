@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PromptTemplate } from '@/app/core/personality/training/types';
+import { PromptTemplate } from '../../core/personality/training/types';
 
 interface PromptTemplateFormProps {
   onSubmit: (template: PromptTemplate) => Promise<void>;

@@ -3,8 +3,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { trainingDataService } from '@/app/lib/services/training';
-import { dbService } from '@/app/lib/services/database';
+import { trainingDataService } from '../../lib/services/training';
+import { dbService } from '../../lib/services/database';
 import { ChatMessage } from '@/types/database';
 
 export function TrainingDataManager() {

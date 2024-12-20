@@ -1,6 +1,6 @@
 // app/lib/memory/memory-converters.ts
-import { Memory as CoreMemory } from '@/app/core/types';
-import { Memory as StorageMemory } from '@/app/types/memory';
+import { Memory as CoreMemory } from '../../core/types';
+import { Memory as StorageMemory } from '../../types/memory';
 
 export function convertStorageToCoreMemory(storageMemory: StorageMemory): CoreMemory {
   const lastMessage = storageMemory.data.messages[storageMemory.data.messages.length - 1];

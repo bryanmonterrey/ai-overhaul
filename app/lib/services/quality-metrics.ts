@@ -1,7 +1,7 @@
 // src/app/lib/services/quality-metrics.ts
 
-import { Message } from '@/app/core/types/chat';
-import { PersonalityState } from '@/app/core/types';
+import { Message } from '../../core/types/chat';
+import { PersonalityState } from '../../core/types';
 
 export interface QualityScore {
   overall: number;

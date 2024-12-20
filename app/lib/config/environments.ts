@@ -1,7 +1,7 @@
 // src/app/lib/config/environments.ts
 
 import { type ValidConfig } from './schemas';
-import { EmotionalState, TweetStyle } from '@/app/core/personality/types';
+import { EmotionalState, TweetStyle } from '../../core/personality/types';
 
 type TweetStyleConfig = {
   style: TweetStyle;

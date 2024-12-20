@@ -2,8 +2,8 @@
 
 import { dbService } from './database';
 import { qualityMetricsService } from './quality-metrics';
-import { Message } from '@/app/core/types/chat';
-import { PersonalityState } from '@/app/core/types';
+import { Message } from '../../core/types/chat';
+import { PersonalityState } from '../../core/types';
 
 export interface TrainingExample {
   prompt: string;

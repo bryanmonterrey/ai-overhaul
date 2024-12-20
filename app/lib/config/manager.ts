@@ -5,7 +5,7 @@ import { configSchema, ValidConfig } from './schemas';
 import { developmentConfig, productionConfig, testConfig } from './environments';
 import deepMerge from 'deepmerge';
 import { aiConfigSchema } from './ai-schemas';
-import { AIConfig } from '@/app/core/types/ai';
+import { AIConfig } from '../../core/types/ai';
 
 type ConfigSections = 'personality' | 'system' | 'integrations' | 'ai' | 'emotional';
 

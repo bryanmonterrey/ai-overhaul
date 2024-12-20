@@ -6,7 +6,7 @@ import {
     Memory,
     TweetStyle
   } from '../../core/types';
-import { AIResponse, ProviderType } from '@/app/core/types/ai';
+import { AIResponse, ProviderType } from '../../core/types/ai';
   
   // Chat API types
   export interface ChatResponse {

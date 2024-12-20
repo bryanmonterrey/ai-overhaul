@@ -1,9 +1,9 @@
-import { TwitterManager } from '@/app/core/twitter/twitter-manager';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
-import { getTwitterClient } from '@/app/lib/twitter-client';
+import { TwitterManager } from '.././core/twitter/twitter-manager';
+import { PersonalitySystem } from '.././core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '.././core/personality/config';
+import { getTwitterClient } from '.././lib/twitter-client';
 import { createClient } from '@supabase/supabase-js';
-import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { TwitterTrainingService } from '.././lib/services/twitter-training';
 
 let twitterManagerInstance: TwitterManager | null = null;
 

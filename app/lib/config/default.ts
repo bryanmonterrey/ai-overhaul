@@ -1,6 +1,6 @@
 // src/app/lib/config/default.ts
 
-import { EmotionalState, TweetStyle, NarrativeMode } from '@/app/core/personality/types';
+import { EmotionalState, TweetStyle, NarrativeMode } from '../../core/personality/types';
 import { ValidConfig } from './schemas';
 import { z } from 'zod';
 
