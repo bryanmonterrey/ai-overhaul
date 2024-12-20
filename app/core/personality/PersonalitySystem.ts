@@ -12,16 +12,16 @@ import {
     PersonalityConfig,
     Platform,
     EnhancedMemoryAnalysis,
-  } from '@/app/core/personality/types';
-import { aiService } from '@/app/lib/services/ai';
-import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
-import { LettaClient } from '@/app/lib/memory/letta-client';
+  } from '../../core/personality/types';
+import { aiService } from '../../lib/services/ai';
+import { TwitterTrainingService } from '../../lib/services/twitter-training';
+import { LettaClient } from '../../lib/memory/letta-client';
 import { 
   ChatMemory, 
   MemoryResponse,
   Message,
   Memory as MemGPTMemory 
-} from '@/app/types/memory';
+} from '../../types/memory';
 import { MemorySystem } from './MemorySystem';
 import { EmotionalSystem } from './EmotionalSystem';
 import { PersonalityPromptBuilder } from '../prompts/builders/personality-prompt';

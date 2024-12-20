@@ -3,7 +3,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { dbService } from '@/app/lib/services/database';
+import { dbService } from '../../lib/services/database';
 
 interface AnalyticStats {
   messageCount: number;

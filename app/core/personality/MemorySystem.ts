@@ -1,6 +1,6 @@
 // src/app/core/personality/MemorySystem.ts
 
-import { LettaClient } from '@/app/lib/memory/letta-client';
+import { LettaClient } from '../../lib/memory/letta-client';
 import { createClient } from '@supabase/supabase-js';
 import {
     Memory,
@@ -10,8 +10,8 @@ import {
     MemoryPattern,
     Context,
     EnhancedMemoryAnalysis
-} from '@/app/core/personality/types';
-import { ChatMemory, TweetMemory } from '@/app/types/memory';
+} from '../../core/personality/types';
+import { ChatMemory, TweetMemory } from '../../types/memory';
 
 
 

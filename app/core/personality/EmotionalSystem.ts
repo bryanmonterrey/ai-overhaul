@@ -5,7 +5,7 @@ import {
     EmotionalResponse,
     EmotionalProfile,
     Memory
-  } from '@/app/core/personality/types';
+  } from '../../core/personality/types';
   
   export class EmotionalSystem {
     private profile: EmotionalProfile;
