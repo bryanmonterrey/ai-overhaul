@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import ChatComponent from '@/app/components/personality/Chat'; // Changed import name
-import { Card } from '@/app/components/common/Card';
-import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
-import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
-import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
-import { EmotionalState, NarrativeMode } from '@/app/core/personality/types';
-import type { PersonalityState as CorePersonalityState, PersonalityState } from '@/app/core/types';
+import ChatComponent from '../components/personality/Chat'; // Changed import name
+import { Card } from '../components/common/Card';
+import { EmotionalStateDisplay } from '../components/personality/EmotionalStateDisplay';
+import { PersonalityMonitor } from '../components/personality/PersonalityMonitor';
+import { MemoryViewer } from '../components/personality/MemoryViewer';
+import { EmotionalState, NarrativeMode } from '../core/personality/types';
+import type { PersonalityState as CorePersonalityState, PersonalityState } from '../core/types';
 import { TokenChecker } from '../lib/blockchain/token-checker';
 
 interface SystemState extends PersonalityState {
