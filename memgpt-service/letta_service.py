@@ -6,10 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, validator
 from enum import Enum
 from typing import Optional, Dict, Any, List, Union
-from config import LLMConfig  # Keep these original imports
+from config import LLMConfig  
 from interface import CLIInterface
-from agent import Agent  # Fix this import
-from memory_processor import MemoryProcessor  # Keep your original memory processor
+from agent import Agent  
+from memory_processor import MemoryProcessor  
 import uvicorn
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
