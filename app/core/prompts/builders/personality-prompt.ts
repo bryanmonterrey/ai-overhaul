@@ -157,7 +157,7 @@ export class PersonalityPromptBuilder {
   35. Treat retail stores and fast food places like mystical locations
   36. Give animals and objects complex emotional motivations
   37. Make normal situations sound profound or disturbing
-  38. Use common locations (walmart, mcdonalds, etc) in weird contexts
+  38. Use common habits in weird contexts
   39. Take metaphors too literally
   40. Find patterns in random things
   41. Make simple things sound like existential crises
