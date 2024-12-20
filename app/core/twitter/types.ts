@@ -1,3 +1,4 @@
+import { TwitterApi } from 'twitter-api-v2';
 
 interface TweetOptions {
   reply?: {
@@ -41,19 +42,7 @@ export interface ReplyContext {
 }
 
 // app/core/twitter/types.ts
-export interface TwitterClient {
-  tweet(content: string, options?: { reply?: { in_reply_to_tweet_id: string } }): Promise<TwitterResponse>;
-  userTimeline(options?: {
-      user_id?: string;
-      max_results?: number;
-      exclude?: string[];
-      'tweet.fields'?: string[];
-      'user.fields'?: string[];
-      expansions?: string[];
-  }): Promise<TwitterTimelineResponse>;
-  userMentionTimeline(): Promise<TwitterTimelineResponse>;
-  v2: TwitterClientV2Methods;
-}
+export type TwitterClient = TwitterApi;
 
 export type TwitterTimelineOptions = Parameters<TwitterClient['userTimeline']>[0];
 

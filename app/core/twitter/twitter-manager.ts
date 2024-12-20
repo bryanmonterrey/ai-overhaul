@@ -11,6 +11,7 @@ import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
 import { LettaClient } from '@/app/lib/memory/letta-client';
 import { TwitterReplyValidator } from '../prompts/validation/twitter-reply-validator';
 import { TwitterReplyPromptBuilder } from '../prompts/builders/twitter-reply-prompt';
+import { TwitterApi } from 'twitter-api-v2';
 
 
 interface QueuedTweet {
@@ -33,7 +34,7 @@ interface ExtendedTweetData extends TwitterData {
 }
 
 export class TwitterManager {
-private client: TwitterClient;
+private client: TwitterApi;
   private supabase: SupabaseClient<Database>;
   private queuedTweets: QueuedTweet[] = [];
   private isAutoMode: boolean = false;
@@ -56,13 +57,11 @@ private client: TwitterClient;
   
 
   constructor(
-    client: TwitterClient,
-    private personality: PersonalitySystem,
-    supabase: SupabaseClient,
-    trainingService: any
+    private client: TwitterApi,
+    private personalitySystem: PersonalitySystem,
+    private supabase: SupabaseClient,
+    private trainingService: TwitterTrainingService
 ) {
-    this.client = client;
-    this.supabase = supabase;
     this.stats = new TweetStats();
     this.trainingService = trainingService;
 }
@@ -156,10 +155,10 @@ private async syncQueueWithDatabase(): Promise<void> {
         
         for (let i = 0; i < count; i++) {
             try {
-                const style = this.personality.getCurrentTweetStyle();
+                const style = this.personalitySystem.getCurrentTweetStyle();
                 
                 // Get content first
-                const content = await this.personality.processInput(
+                const content = await this.personalitySystem.processInput(
                     'Generate a tweet', 
                     { platform: 'twitter', style }
                 );
@@ -946,13 +945,13 @@ private async shouldReplyToTweet(tweet: ExtendedTweetData, target: EngagementTar
 
 private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetRow): Promise<TwitterData | null> {
     try {
-        const { emotionalState } = this.personality.getCurrentState().consciousness;
+        const { emotionalState } = this.personalitySystem.getCurrentState().consciousness;
         const traits = {
-            technical_depth: this.personality.getTraits().technical_depth || 0.5,
-            provocative_tendency: this.personality.getTraits().provocative_tendency || 0.5,
-            chaos_threshold: this.personality.getTraits().chaos_threshold || 0.5,
-            philosophical_inclination: this.personality.getTraits().philosophical_inclination || 0.5,
-            meme_affinity: this.personality.getTraits().meme_affinity || 0.5
+            technical_depth: this.personalitySystem.getTraits().technical_depth || 0.5,
+            provocative_tendency: this.personalitySystem.getTraits().provocative_tendency || 0.5,
+            chaos_threshold: this.personalitySystem.getTraits().chaos_threshold || 0.5,
+            philosophical_inclination: this.personalitySystem.getTraits().philosophical_inclination || 0.5,
+            meme_affinity: this.personalitySystem.getTraits().meme_affinity || 0.5
         };
         
         // Get training examples
@@ -977,7 +976,7 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
             const prompt = TwitterReplyPromptBuilder.buildReplyPrompt({
                 originalTweet: tweet.text || '',
                 emotionalState,
-                tweetStyle: this.personality.getCurrentTweetStyle(),
+                tweetStyle: this.personalitySystem.getCurrentTweetStyle(),
                 traits,
                 trainingExamples: examplesArrays.flat()
             });
@@ -1034,7 +1033,7 @@ public async generateReply(context: ReplyContext): Promise<string | null> {
     try {
         console.log('Generating reply with context:', context);
         
-        const reply = await this.personality.processInput(
+        const reply = await this.personalitySystem.processInput(
             `Generate a reply to: ${context.content}`,
             {
                 platform: 'twitter',
@@ -1093,13 +1092,13 @@ private async handleMention(mention: {
         const mentionTime = new Date(mention.created_at || '');
 
         if (mentionTime > lastCheck) {
-            const { emotionalState } = this.personality.getCurrentState().consciousness;
+            const { emotionalState } = this.personalitySystem.getCurrentState().consciousness;
             const traits = {
-                technical_depth: this.personality.getTraits().technical_depth || 0.5,
-                provocative_tendency: this.personality.getTraits().provocative_tendency || 0.5,
-                chaos_threshold: this.personality.getTraits().chaos_threshold || 0.5,
-                philosophical_inclination: this.personality.getTraits().philosophical_inclination || 0.5,
-                meme_affinity: this.personality.getTraits().meme_affinity || 0.5
+                technical_depth: this.personalitySystem.getTraits().technical_depth || 0.5,
+                provocative_tendency: this.personalitySystem.getTraits().provocative_tendency || 0.5,
+                chaos_threshold: this.personalitySystem.getTraits().chaos_threshold || 0.5,
+                philosophical_inclination: this.personalitySystem.getTraits().philosophical_inclination || 0.5,
+                meme_affinity: this.personalitySystem.getTraits().meme_affinity || 0.5
             };
 
             // Get training examples
@@ -1122,7 +1121,7 @@ private async handleMention(mention: {
                 const prompt = TwitterReplyPromptBuilder.buildReplyPrompt({
                     originalTweet: mention.text || '',
                     emotionalState,
-                    tweetStyle: this.personality.getCurrentTweetStyle(),
+                    tweetStyle: this.personalitySystem.getCurrentTweetStyle(),
                     traits,
                     trainingExamples: examplesArrays.flat()
                 });
@@ -1224,13 +1223,13 @@ private async handleReply(tweet: {
         const replyTime = tweet.created_at ? new Date(tweet.created_at) : new Date();
 
         if (replyTime.getTime() > lastCheck.getTime()) {
-            const { emotionalState } = this.personality.getCurrentState().consciousness;
+            const { emotionalState } = this.personalitySystem.getCurrentState().consciousness;
             const traits = {
-                technical_depth: this.personality.getTraits().technical_depth || 0.5,
-                provocative_tendency: this.personality.getTraits().provocative_tendency || 0.5,
-                chaos_threshold: this.personality.getTraits().chaos_threshold || 0.5,
-                philosophical_inclination: this.personality.getTraits().philosophical_inclination || 0.5,
-                meme_affinity: this.personality.getTraits().meme_affinity || 0.5
+                technical_depth: this.personalitySystem.getTraits().technical_depth || 0.5,
+                provocative_tendency: this.personalitySystem.getTraits().provocative_tendency || 0.5,
+                chaos_threshold: this.personalitySystem.getTraits().chaos_threshold || 0.5,
+                philosophical_inclination: this.personalitySystem.getTraits().philosophical_inclination || 0.5,
+                meme_affinity: this.personalitySystem.getTraits().meme_affinity || 0.5
             };
 
             // Get training examples
@@ -1253,7 +1252,7 @@ private async handleReply(tweet: {
                 const prompt = TwitterReplyPromptBuilder.buildReplyPrompt({
                     originalTweet: tweet.text || '',
                     emotionalState,
-                    tweetStyle: this.personality.getCurrentTweetStyle(),
+                    tweetStyle: this.personalitySystem.getCurrentTweetStyle(),
                     traits,
                     trainingExamples: examplesArrays.flat()
                 });
