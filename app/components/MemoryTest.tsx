@@ -7,13 +7,17 @@ import { LettaClient } from '../lib/memory/letta-client';
 export default function MemoryTest() {
   const lettaClient = new LettaClient();
   const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleStoreMemory = async () => {
+  const handleTest = async () => {
     try {
+      setLoading(true);
       const response = await lettaClient.getMemory('test_key', 'tweet_history');
       setResult(response);
-    } catch (err) {
-      console.error('Failed to store memory:', err);
+    } catch (error) {
+      console.error('Memory test error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -21,18 +25,12 @@ export default function MemoryTest() {
     <div className="p-4">
       <h2 className="text-xl font-bold mb-4">Memory Test Component</h2>
       <button 
-        onClick={handleStoreMemory}
+        onClick={handleTest}
         className="bg-blue-500 text-white px-4 py-2 rounded"
         disabled={loading}      
       >
         {loading ? 'Storing...' : 'Store Memory'}
       </button>
-      
-      {error && (
-        <div className="text-red-500 mt-2">
-          Error: {error}
-        </div>
-      )}
       
       {result && (
         <div className="mt-2">
