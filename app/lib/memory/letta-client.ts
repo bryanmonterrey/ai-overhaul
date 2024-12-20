@@ -26,7 +26,7 @@ export class LettaClient {
     private baseUrl: string;
     private retryCount: number = 3;
 
-    constructor(baseUrl = 'http://localhost:3001') {  // Changed to point to Python service
+    constructor(baseUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001') {
         this.baseUrl = baseUrl;
     }
 
