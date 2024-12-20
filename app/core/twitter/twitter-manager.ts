@@ -1491,4 +1491,57 @@ private async getLastInteractionTime(): Promise<Date> {
   public resetTweetStats(): void {
     this.stats?.reset();
   }
+
+  async getEngagementTargets() {
+    try {
+      const { data: targets } = await this.supabase
+        .from('engagement_targets')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      return targets || [];
+    } catch (error) {
+      console.error('Error fetching engagement targets:', error);
+      throw error;
+    }
+  }
+
+  async addEngagementTarget(username: string) {
+    try {
+      const user = await this.client.v2.userByUsername(username);
+      if (!user.data) {
+        throw new Error('User not found');
+      }
+
+      const { data, error } = await this.supabase
+        .from('engagement_targets')
+        .insert({
+          username,
+          twitter_id: user.data.id,
+          topics: [],
+          reply_probability: 0.5,
+          preferred_style: 'casual'
+        });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adding engagement target:', error);
+      throw error;
+    }
+  }
+
+  async removeEngagementTarget(id: string) {
+    try {
+      const { error } = await this.supabase
+        .from('engagement_targets')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error removing engagement target:', error);
+      throw error;
+    }
+  }
 }

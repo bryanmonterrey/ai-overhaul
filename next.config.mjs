@@ -23,6 +23,13 @@ const nextConfig = {
           }
       }
 
+      config.resolve.alias = {
+          ...config.resolve.alias,
+          'twitter-api-v2': isServer 
+              ? 'twitter-api-v2/dist/esm/index.js'
+              : 'twitter-api-v2/dist/esm/index.browser.js'
+      }
+
       config.module.rules.push({
           test: /\.m?js$/,
           resolve: {
@@ -35,8 +42,10 @@ const nextConfig = {
   experimental: {
       serverActions: {
           bodySizeLimit: '2mb'
-      }
+      },
+      esmExternals: true
   },
+  serverExternalPackages: ['twitter-api-v2'],
   typescript: {
       ignoreBuildErrors: true
   },

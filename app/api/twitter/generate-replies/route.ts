@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-const { withAuth } = require('../../../lib/middleware/auth-middleware');
-const { withConfig } = require('../../../lib/middleware/configMiddleware');
-const { checkTwitterRateLimit } = require('../../../lib/middleware/twitter-rate-limiter');
+import { withAuth } from '../../../lib/middleware/auth-middleware';
+import { withConfig } from '../../../lib/middleware/configMiddleware';
+import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limiter';
 import { aiService } from '../../../lib/services/ai';
 import { TwitterTrainingService } from '../../../lib/services/twitter-training';
 import { LettaClient } from '../../../lib/memory/letta-client';
@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PromptBuilder } from '../../../core/prompts/prompt-builder';
 import { ResponseValidator } from '../../../core/prompts/validation/response-validator';
 import { STYLE_TRAITS } from '../../../core/prompts/styles/tweet-styles';
+import { createClient } from '@supabase/supabase-js'; // Add this import
 
 // Helper function to build enhanced context
 function buildEnhancedContext(
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
             );
-            
+
             const trainingService = new TwitterTrainingService(supabase); 
 
             // Initial memory storage

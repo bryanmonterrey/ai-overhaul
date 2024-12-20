@@ -1,9 +1,11 @@
-const { TwitterManager } = require('../core/twitter/twitter-manager');
-const { PersonalitySystem } = require('../core/personality/PersonalitySystem');
-const { DEFAULT_PERSONALITY } = require('../core/personality/config');
-const { getTwitterClient } = require('./twitter-client');
-const { getSupabaseClient } = require('./supabase/server');
-const { TwitterTrainingService } = require('./services/twitter-training');
+import { TwitterManager } from '../core/twitter/twitter-manager';
+import { PersonalitySystem } from '../core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '../core/personality/config';
+import { getTwitterClient } from './twitter-client';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { Database } from '@/types/supabase';
+import { TwitterTrainingService } from './services/twitter-training';
 
 let twitterManagerInstance: TwitterManager | null = null;
 
@@ -16,7 +18,7 @@ export function getTwitterManager(): TwitterManager {
       }
 
       const personalitySystem = new PersonalitySystem(DEFAULT_PERSONALITY);
-      const supabase = getSupabaseClient();
+      const supabase = createRouteHandlerClient<Database>({ cookies });
       const trainingService = new TwitterTrainingService(supabase);
 
       twitterManagerInstance = new TwitterManager(

@@ -1,8 +1,7 @@
-// app/api/twitter/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-const { withAuth } = require('../../lib/middleware/auth-middleware');
-const { withConfig } = require('../../lib/middleware/configMiddleware');
-const { checkTwitterRateLimit } = require('../../lib/middleware/twitter-rate-limiter');
+import { withAuth } from '../../lib/middleware/auth-middleware';
+import { withConfig } from '../../lib/middleware/configMiddleware';
+import { checkTwitterRateLimit } from '../../lib/middleware/twitter-rate-limiter';
 import { TwitterManager } from '../../core/twitter/twitter-manager';
 import { IntegrationManager } from '../../core/personality/IntegrationManager';
 import { configManager } from '../../lib/config/manager';
@@ -17,6 +16,9 @@ import { LLMManager } from '../../core/llm/model_manager';
 import { TwitterApiClient } from '../../lib/twitter-client';
 import { createClient } from '@supabase/supabase-js';
 import { TwitterTrainingService } from '../../lib/services/twitter-training';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/supabase';
+import { cookies } from 'next/headers';
 
 const twitterInputSchema = z.object({
     type: z.string(),
@@ -88,6 +90,7 @@ const integrationManager = new IntegrationManager(
 );
 
 export async function POST(request: NextRequest) {
+    const supabase = createRouteHandlerClient<Database>({ cookies });
     return withConfig(withAuth(async (supabase: any, session: any) => {
         try {
             await checkTwitterRateLimit('post_tweet');

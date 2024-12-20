@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/types/supabase.types';
-const { withAuth } = require('../../../../lib/middleware/auth-middleware');
-const { withConfig } = require('../../../../lib/middleware/configMiddleware');
-const { checkTwitterRateLimit } = require('../../../../lib/middleware/twitter-rate-limiter');
-const { getTwitterManager } = require('../../../../lib/twitter-manager-instance');
+import { withAuth } from '../../../../lib/middleware/auth-middleware';
+import { withConfig } from '../../../../lib/middleware/configMiddleware';
+import { checkTwitterRateLimit } from '../../../../lib/middleware/twitter-rate-limiter';
+import { getTwitterManager } from '../../../../lib/twitter-manager-instance';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 export async function PATCH(

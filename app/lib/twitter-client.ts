@@ -1,4 +1,4 @@
-import TwitterApi from 'twitter-api-v2';
+import { TwitterApi } from 'twitter-api-v2';
 import type { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '../core/twitter/types';
 import type { TTweetv2Expansion } from 'twitter-api-v2';
 
@@ -42,7 +42,7 @@ const ENDPOINTS = {
    USER_LOOKUP: '/2/users/:id'
 } as const;
 
-export class TwitterApiClient implements TwitterClient {
+export class TwitterApiClient extends TwitterApi {
    private client: TwitterApi;
    private endpointRateLimits: Map<string, {
        limit: number;
@@ -64,34 +64,23 @@ export class TwitterApiClient implements TwitterClient {
        accessToken: string;
        accessSecret: string;
    }) {
-       try {
-           this.client = new TwitterApi({
-               appKey: credentials.apiKey,
-               appSecret: credentials.apiSecret,
-               accessToken: credentials.accessToken,
-               accessSecret: credentials.accessSecret,
+       super({
+           appKey: credentials.apiKey,
+           appSecret: credentials.apiSecret,
+           accessToken: credentials.accessToken,
+           accessSecret: credentials.accessSecret,
+       });
+       
+       // Initialize rate limits after super()
+       Object.values(ENDPOINTS).forEach(endpoint => {
+           this.endpointRateLimits.set(endpoint, {
+               limit: RATE_LIMITS[endpoint]?.LIMIT || 15,
+               remaining: RATE_LIMITS[endpoint]?.LIMIT || 15,
+               reset: Date.now() + (RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000),
+               window: RATE_LIMITS[endpoint]?.WINDOW || 15 * 60 * 1000,
+               minDelay: RATE_LIMITS[endpoint]?.MIN_DELAY || 30 * 1000
            });
-
-           Object.values(ENDPOINTS).forEach(endpoint => {
-               const limits = RATE_LIMITS[endpoint] || {
-                   WINDOW: 15 * 60 * 1000,
-                   LIMIT: 15,
-                   MIN_DELAY: 30 * 1000
-               };
-
-               this.endpointRateLimits.set(endpoint, {
-                   limit: limits.LIMIT,
-                   remaining: limits.LIMIT,
-                   reset: Date.now() + limits.WINDOW,
-                   lastRequest: undefined,
-                   window: limits.WINDOW,
-                   minDelay: limits.MIN_DELAY
-               });
-           });
-       } catch (e) {
-           console.error('Failed to initialize Twitter client:', e);
-           throw e;
-       }
+       });
    }
 
    private async enforceMinDelay(endpoint: string): Promise<void> {

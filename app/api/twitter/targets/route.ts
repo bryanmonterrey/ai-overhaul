@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-const { withAuth } = require('../../../lib/middleware/auth-middleware');
-const { withConfig } = require('../../../lib/middleware/configMiddleware');
-const { checkTwitterRateLimit } = require('../../../lib/middleware/twitter-rate-limiter');
-const { getTwitterManager } = require('../../../lib/twitter-manager-instance');
+import { withAuth } from '../../../lib/middleware/auth-middleware';
+import { withConfig } from '../../../lib/middleware/configMiddleware';
+import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limiter';
+import { getTwitterManager } from '../../../lib/twitter-manager-instance';
 
 export async function GET(req: NextRequest) {
     return withConfig(withAuth(async (supabase: any, session: any) => {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
             }
 
             const targets = await twitterManager.getEngagementTargets();
-            return NextResponse.json({ targets });
+            return NextResponse.json(targets);
         } catch (error: any) {
             console.error('Error fetching engagement targets:', error);
             return NextResponse.json(
