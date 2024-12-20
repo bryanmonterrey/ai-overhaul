@@ -735,6 +735,11 @@ class AnalyzeRequest(BaseModel):
     content: str = Field(..., description="Content to analyze")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
 
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+
 @app.post("/analyze")
 async def analyze_content(request: AnalyzeRequest):
     try:
