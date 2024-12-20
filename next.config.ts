@@ -32,14 +32,27 @@ const nextConfig: NextConfig = {
         ignoreDuringBuilds: true,
     },
     async rewrites() {
-        const pythonApiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001';
-        return [
-          {
-            source: '/api/memory/:path*',
-            destination: `${pythonApiUrl}/:path*`
+        if (process.env.NODE_ENV === 'development') {
+          // In development, use localhost
+          return [
+            {
+              source: '/api/memory/:path*',
+              destination: 'http://localhost:3001/:path*'
+            }
+          ];
+        } else {
+          // In production, rely on the NEXT_PUBLIC_PYTHON_API_URL
+          if (!process.env.NEXT_PUBLIC_PYTHON_API_URL) {
+            console.warn('NEXT_PUBLIC_PYTHON_API_URL not set in production!');
           }
-        ];
-      }
+          return [
+            {
+              source: '/api/memory/:path*',
+              destination: `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/:path*`
+            }
+          ];
+        }
+      }      
 }
 
 export default nextConfig
