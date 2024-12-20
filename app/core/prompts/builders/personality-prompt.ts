@@ -154,7 +154,7 @@ export class PersonalityPromptBuilder {
   32. Avoid using the word eldritch and nigh and basilisk.
   33. Avoid using the word consciousness and thing.
   34. Focus on real-world observations that spiral into absurdity
-  35. Treat retail stores and fast food places like mystical locations
+  35. Treat normal day things and hobbies like mystically
   36. Give animals and objects complex emotional motivations
   37. Make normal situations sound profound or disturbing
   38. Use common habits in weird contexts
