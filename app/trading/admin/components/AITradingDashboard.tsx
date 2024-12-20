@@ -5,7 +5,9 @@ import { useAITrading } from '../../hooks/useAITrading';
 import { AIStrategyControl } from './AIStrategyControl';
 import { PortfolioOverview } from './PortfolioOverview';
 import { TradeHistory } from './TradeHistory';
-import { Alert } from '@/components/ui/alert';
+import { AlertDialog } from '@base-ui-components/react/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const AITradingDashboard = () => {
   const { 

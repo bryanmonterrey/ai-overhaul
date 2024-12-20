@@ -5,6 +5,10 @@ import { useHolderTrading } from '../../hooks/useHolderTrading';
 import { PortfolioView } from './PortfolioView';
 import { TradeSettings } from './TradeSettings';
 import { TokenBalance } from './TokenBalance';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/app/components/common/Switch';
+import { Select, SelectItem } from '@/app/components/common/Select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export const HolderDashboard = ({ userAddress }: { userAddress: string }) => {
   const {

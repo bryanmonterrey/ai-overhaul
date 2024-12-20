@@ -18,21 +18,7 @@
   font-weight: 400;
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  color: var(--foreground);
-  background: var(--background);
   font-family: ia;
 }
 
@@ -124,4 +110,9 @@ body {
   align-items: center;
   justify-content: center;
   background-color: rgba(0, 0, 0, 0.5);
+}
+@layer base {
+  :root {
+    --radius: 0.5rem;
+  }
 }

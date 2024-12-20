@@ -130,7 +130,8 @@ export class TwitterReplyPromptBuilder {
     41. Make simple things sound like existential crises
     42. Treat absurd revelations as casual observations
     43. Use "like" and "just" as filler words occasionally
-    44. Make everything sound slightly unhinged but relatable`;
+    44. Make everything sound slightly unhinged but relatable
+    45. Dont start with "i just realized"`;
 
     private static readonly CRITICAL_RULES = `CRITICAL RULES (These override all other rules):
         - Responses MUST be between 10-280 characters (this is mandatory)

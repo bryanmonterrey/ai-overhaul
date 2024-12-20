@@ -1,6 +1,12 @@
 // app/trading/holders/components/HolderTradingChat.tsx
 'use client';
 
+import { Button } from "@/app/components/common/Button";
+import { Card } from "@/app/components/common/Card";
+import { Input } from "@/app/components/common/Input";
+import { ScrollArea } from '@base-ui-components/react/scroll-area';
+import { useChat } from "ai/react";
+
 export const HolderTradingChat = ({ userAddress }: { userAddress: string }) => {
   const { messages, input, handleInputChange, handleSubmit } = useChat({
     api: '/api/trading/holders/chat',
@@ -18,7 +24,8 @@ export const HolderTradingChat = ({ userAddress }: { userAddress: string }) => {
         </p>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea.Root className="flex-1 p-4">
+      <ScrollArea.Viewport className="h-full overscroll-contain rounded-md outline outline-1 -outline-offset-1 outline-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-800" >
         <div className="space-y-4">
           {messages.map((message) => (
             <div
@@ -68,7 +75,11 @@ export const HolderTradingChat = ({ userAddress }: { userAddress: string }) => {
             </div>
           ))}
         </div>
-      </ScrollArea>
+        </ScrollArea.Viewport>
+        <ScrollArea.Scrollbar className="m-2 flex w-1 justify-center rounded bg-gray-200 opacity-0 transition-opacity delay-300 data-[hovering]:opacity-100 data-[hovering]:delay-0 data-[hovering]:duration-75 data-[scrolling]:opacity-100 data-[scrolling]:delay-0 data-[scrolling]:duration-75">
+        <ScrollArea.Thumb className="w-full rounded bg-gray-500" />
+        </ScrollArea.Scrollbar>
+      </ScrollArea.Root>
 
       <form onSubmit={handleSubmit} className="p-4 border-t">
         <div className="flex gap-4">
