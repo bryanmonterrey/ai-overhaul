@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Pusher from 'pusher-js';
-import AdminControls from '@/app/components/personality/AdminControls';
-import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
-import { PersonalityMonitor } from '@/app/components/personality/PersonalityMonitor';
-import { MemoryViewer } from '@/app/components/personality/MemoryViewer';
-import { Card } from '@/app/components/common/Card';
+import AdminControls from '../components/personality/AdminControls';
+import { EmotionalStateDisplay } from '../components/personality/EmotionalStateDisplay';
+import { PersonalityMonitor } from '../components/personality/PersonalityMonitor';
+import { MemoryViewer } from '../components/personality/MemoryViewer';
+import { Card } from '../components/common/Card';
 import { EmotionalState } from '../core/types';
 import { NarrativeMode, TweetStyle } from '../core/types';
 
