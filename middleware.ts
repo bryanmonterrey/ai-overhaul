@@ -134,12 +134,12 @@ export const config = {
     '/twitter/:path*',
     '/telegram/:path*',
     '/((?!insufficient-tokens|login|api/auth).*)',
-    '/api/memory/:path*', // Exclude specific public routes
+    '/api/memory/:path*',
   ],
+  runtime: 'nodejs',
   unstable_allowDynamic: [
-    // Allow dynamic imports from node_modules
-    '/node_modules/@solana/web3.js/**',
-    '/node_modules/rpc-websockets/**',
-  ],
-  runtime: 'nodejs' // Add this line
+    '**/node_modules/@solana/web3.js/**',
+    '**/node_modules/rpc-websockets/**',
+    '**/node_modules/buffer/**',
+  ]
 };
