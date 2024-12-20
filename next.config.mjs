@@ -6,7 +6,7 @@ const nextConfig = {
       '@solana/wallet-adapter-react',
       '@solana/wallet-adapter-react-ui',
       '@solana/wallet-adapter-wallets',
-      'twitter-api-v2'  // Add this back
+      'twitter-api-v2'
   ],
   webpack: (config, { isServer }) => {
       if (!isServer) {
@@ -24,16 +24,29 @@ const nextConfig = {
           }
       }
 
-      config.module.rules.push({
-          test: /\.m?js$/,
-          type: 'commonjs',
-          resolve: {
-              fullySpecified: false,
-          },
-      });
+      config.module = {
+          ...config.module,
+          exprContextCritical: false,
+          rules: [
+              ...config.module.rules,
+              {
+                  test: /\.m?js$/,
+                  type: 'commonjs',
+                  resolve: {
+                      fullySpecified: false
+                  },
+              },
+              {
+                  test: /twitter-api-v2/,
+                  resolve: {
+                      fullySpecified: false
+                  }
+              }
+          ]
+      };
 
       if (isServer) {
-          config.externals = [...config.externals || [], 'twitter-api-v2'];  // Ensure externals is an array
+          config.externals = [...(config.externals || []), 'twitter-api-v2'];
       }
 
       return config
@@ -49,7 +62,7 @@ const nextConfig = {
   eslint: {
       ignoreDuringBuilds: true
   },
-  async headers() {
+  headers() {
       return [
           {
               source: '/api/twitter/:path*',

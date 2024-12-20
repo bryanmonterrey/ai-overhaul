@@ -1,5 +1,5 @@
 // app/lib/twitter-client.ts
-const { TwitterApi } = require('twitter-api-v2');
+import TwitterApi from 'twitter-api-v2';
 import type { TwitterClient, TwitterData, TwitterResponse, TwitterTimelineResponse } from '../core/twitter/types';
 import type { TTweetv2Expansion } from 'twitter-api-v2';
 
