@@ -1,84 +1,80 @@
-import { NextResponse } from 'next/server';
-import { withAuth } from '../../../lib/middleware/auth-middleware';
-import type { Database } from '../../../types/supabase';
-import type { EngagementTargetRow } from '../../../types/supabase';
+import { NextRequest, NextResponse } from 'next/server';
+const { withAuth } = require('../../../lib/middleware/auth-middleware');
+const { withConfig } = require('../../../lib/middleware/configMiddleware');
+const { checkTwitterRateLimit } = require('../../../lib/middleware/twitter-rate-limiter');
+const { getTwitterManager } = require('../../../lib/twitter-manager-instance');
 
-export async function GET() {
-    return withAuth(async (supabase: any, session: any) => {
+export async function GET(req: NextRequest) {
+    return withConfig(withAuth(async (supabase: any, session: any) => {
         try {
-            const { data: targets, error } = await supabase
-                .from('engagement_targets')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Database error:', error);
-                throw new Error('Failed to fetch targets');
+            await checkTwitterRateLimit('targets');
+            
+            const twitterManager = getTwitterManager();
+            if (!twitterManager) {
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
+                }, { status: 500 });
             }
 
-            return NextResponse.json(targets);
+            const targets = await twitterManager.getEngagementTargets();
+            return NextResponse.json({ targets });
         } catch (error: any) {
-            console.error('Server error:', error);
+            console.error('Error fetching engagement targets:', error);
             return NextResponse.json(
                 { 
                     error: 'Internal server error',
                     message: error.message,
+                    code: error.code || 'TARGETS_FETCH_ERROR',
                     stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 }, 
-                { status: 500 }
+                { status: error.statusCode || 500 }
             );
         }
-    });
+    }))(req);
 }
 
-export async function POST(req: Request) {
-    return withAuth(async (supabase: any, session: any) => {
+export async function POST(req: NextRequest) {
+    return withConfig(withAuth(async (supabase: any, session: any) => {
         try {
+            await checkTwitterRateLimit('targets_add');
+            
+            const twitterManager = getTwitterManager();
+            if (!twitterManager) {
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
+                }, { status: 500 });
+            }
+
             const body = await req.json();
+            const { username } = body;
 
-            // Validate required fields
-            if (!body.username || !body.twitter_id) {
-                return NextResponse.json(
-                    { error: 'Missing required fields' },
-                    { status: 400 }
-                );
+            if (!username) {
+                return NextResponse.json({ 
+                    error: 'Username is required',
+                    code: 'MISSING_USERNAME'
+                }, { status: 400 });
             }
 
-            const target = {
-                username: body.username,
-                topics: body.topics || [],
-                twitter_id: body.twitter_id,
-                reply_probability: body.replyProbability || 0.5,
-                relationship_level: 'new' as const,
-                preferred_style: body.preferredStyle || 'default',
-                last_interaction: null
-            };
-
-            const { data, error } = await supabase
-                .from('engagement_targets')
-                .insert([target])
-                .select()
-                .single();
-
-            if (error) {
-                console.error('Database error:', error);
-                throw new Error('Failed to create target');
-            }
+            await twitterManager.addEngagementTarget(username);
+            const targets = await twitterManager.getEngagementTargets();
 
             return NextResponse.json({
                 success: true,
-                data
+                targets
             });
         } catch (error: any) {
-            console.error('Server error:', error);
+            console.error('Error adding engagement target:', error);
             return NextResponse.json(
                 { 
                     error: 'Internal server error',
                     message: error.message,
+                    code: error.code || 'TARGET_ADD_ERROR',
                     stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 }, 
-                { status: 500 }
+                { status: error.statusCode || 500 }
             );
         }
-    });
+    }))(req);
 }

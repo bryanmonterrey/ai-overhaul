@@ -1,17 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 const { withAuth } = require('../../../lib/middleware/auth-middleware');
+const { withConfig } = require('../../../lib/middleware/configMiddleware');
 const { checkTwitterRateLimit } = require('../../../lib/middleware/twitter-rate-limiter');
 const { getTwitterManager } = require('../../../lib/twitter-manager-instance');
 
-export async function GET() {
-    return withAuth(async (supabase: any, session: any) => {
+export async function GET(req: NextRequest) {
+    return withConfig(withAuth(async (supabase: any, session: any) => {
         try {
-            await checkTwitterRateLimit();
+            await checkTwitterRateLimit('tweets');
             
             const twitterManager = getTwitterManager();
             if (!twitterManager) {
                 return NextResponse.json({ 
-                    error: 'Twitter manager not initialized' 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
                 }, { status: 500 });
             }
 
@@ -43,6 +45,7 @@ export async function GET() {
                     tweets: [], 
                     status: {},
                     error: innerError.message,
+                    code: 'TWEET_PROCESSING_ERROR',
                     stack: process.env.NODE_ENV === 'development' ? innerError.stack : undefined
                 }, { status: 500 });
             }
@@ -59,5 +62,5 @@ export async function GET() {
                 { status: error.statusCode || 500 }
             );
         }
-    }) || NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }))(req);
 }

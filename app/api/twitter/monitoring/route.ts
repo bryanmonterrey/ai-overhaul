@@ -1,13 +1,20 @@
-import { NextResponse } from 'next/server';
-import { withAuth } from '../../../lib/middleware/auth-middleware';
-import { getTwitterManager } from '../../../lib/twitter-manager-instance';
+import { NextRequest, NextResponse } from 'next/server';
+const { withAuth } = require('../../../lib/middleware/auth-middleware');
+const { withConfig } = require('../../../lib/middleware/configMiddleware');
+const { checkTwitterRateLimit } = require('../../../lib/middleware/twitter-rate-limiter');
+const { getTwitterManager } = require('../../../lib/twitter-manager-instance');
 
-export async function POST(request: Request) {
-    return withAuth(async (supabase, session) => {
+export async function POST(request: NextRequest) {
+    return withConfig(withAuth(async (supabase: any, session: any) => {
         try {
+            await checkTwitterRateLimit('monitoring');
+            
             const twitterManager = getTwitterManager();
             if (!twitterManager) {
-                throw new Error('Twitter manager not initialized');
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
+                }, { status: 500 });
             }
 
             await twitterManager.startMonitoring();
@@ -21,20 +28,26 @@ export async function POST(request: Request) {
                 { 
                     error: true, 
                     message: error.message || 'Failed to start monitoring',
+                    code: error.code || 'MONITORING_START_ERROR',
                     stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 }, 
                 { status: 500 }
             );
         }
-    });
+    }))(request);
 }
 
-export async function GET() {
-    return withAuth(async (supabase, session) => {
+export async function GET(request: NextRequest) {
+    return withConfig(withAuth(async (supabase: any, session: any) => {
         try {
+            await checkTwitterRateLimit('monitoring_status');
+            
             const twitterManager = getTwitterManager();
             if (!twitterManager) {
-                throw new Error('Twitter manager not initialized');
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
+                }, { status: 500 });
             }
 
             const status = await twitterManager.getMonitoringStatus();
@@ -45,10 +58,11 @@ export async function GET() {
                 { 
                     error: true, 
                     message: error.message || 'Failed to get monitoring status',
+                    code: error.code || 'MONITORING_STATUS_ERROR',
                     stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 }, 
                 { status: 500 }
             );
         }
-    });
+    }))(request);
 }

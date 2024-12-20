@@ -1,109 +1,91 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
-import { Database } from '@/types/supabase.types';
+import { NextRequest, NextResponse } from 'next/server';
+const { withAuth } = require('../../../lib/middleware/auth-middleware');
+const { withConfig } = require('../../../lib/middleware/configMiddleware');
+const { checkTwitterRateLimit } = require('../../../lib/middleware/twitter-rate-limiter');
+const { getTwitterManager } = require('../../../lib/twitter-manager-instance');
 
-export async function POST(request: Request) {
-    try {
-        const { content, source, themes } = await request.json();
-        
-        const cookieStore = cookies();
-        const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+export async function GET(req: NextRequest) {
+    return withConfig(withAuth(async (supabase: any, session: any) => {
+        try {
+            await checkTwitterRateLimit('training');
+            
+            const twitterManager = getTwitterManager();
+            if (!twitterManager) {
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
+                }, { status: 500 });
+            }
 
-        const { data, error } = await supabase
-            .from('tweet_training_data')
-            .insert([{
-                content,
-                source,
-                themes: themes || [],
-                engagement_score: 0
-            }])
-            .select();
+            const { searchParams } = new URL(req.url);
+            const username = searchParams.get('username');
+            const limit = parseInt(searchParams.get('limit') || '100', 10);
 
-        if (error) throw error;
+            if (!username) {
+                return NextResponse.json({ 
+                    error: 'Username is required',
+                    code: 'MISSING_USERNAME'
+                }, { status: 400 });
+            }
 
-        return NextResponse.json({ success: true, data });
-    } catch (error) {
-        console.error('Training data error:', error);
-        return NextResponse.json(
-            { error: 'Error saving training data' }, 
-            { status: 500 }
-        );
-    }
-}
-
-// CSV upload endpoint
-export async function PUT(request: Request) {
-    try {
-        const formData = await request.formData();
-        const file = formData.get('file') as File;
-        
-        if (!file) {
-            throw new Error('No file uploaded');
-        }
-
-        const csvText = await file.text();
-        const rows = csvText.split('\n').map(row => {
-            // Handle possible quoted CSV values
-            const matches = row.match(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g);
-            if (!matches) return [];
-            return matches.map(val => 
-                val.replace(/^,?"?|"?$/g, '') // Remove commas and quotes
-                   .replace(/""/g, '"')  // Replace double quotes with single quotes
-                   .trim()
+            const trainingData = await twitterManager.getTrainingData(username, limit);
+            return NextResponse.json({ data: trainingData });
+            
+        } catch (error: any) {
+            console.error('Error fetching training data:', error);
+            return NextResponse.json(
+                { 
+                    error: 'Internal server error',
+                    message: error.message,
+                    code: error.code || 'TRAINING_FETCH_ERROR',
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                }, 
+                { status: error.statusCode || 500 }
             );
-        });
-        
-        const cookieStore = cookies();
-        const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
-
-        // Skip header row and process data
-        const tweets = rows.slice(1).map(row => ({
-            content: row[0],
-            source: row[1] || 'csv_import',
-            themes: row[2] ? row[2].split(';').map(t => t.trim()) : [],
-            engagement_score: 0
-        })).filter(t => t.content); // Filter out empty rows
-
-        const { data, error } = await supabase
-            .from('tweet_training_data')
-            .insert(tweets)
-            .select();
-
-        if (error) throw error;
-
-        return NextResponse.json({ 
-            success: true, 
-            inserted: data?.length 
-        });
-    } catch (error) {
-        console.error('CSV upload error:', error);
-        return NextResponse.json(
-            { error: 'Error processing CSV' }, 
-            { status: 500 }
-        );
-    }
+        }
+    }))(req);
 }
 
-// Get training data
-export async function GET() {
-    try {
-        const cookieStore = cookies();
-        const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+export async function POST(req: NextRequest) {
+    return withConfig(withAuth(async (supabase: any, session: any) => {
+        try {
+            await checkTwitterRateLimit('training_add');
+            
+            const twitterManager = getTwitterManager();
+            if (!twitterManager) {
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
+                }, { status: 500 });
+            }
 
-        const { data, error } = await supabase
-            .from('tweet_training_data')
-            .select('*')
-            .order('created_at', { ascending: false });
+            const body = await req.json();
+            const { username, tweets } = body;
 
-        if (error) throw error;
+            if (!username || !tweets) {
+                return NextResponse.json({ 
+                    error: 'Username and tweets are required',
+                    code: 'MISSING_PARAMETERS'
+                }, { status: 400 });
+            }
 
-        return NextResponse.json(data);
-    } catch (error) {
-        console.error('Error fetching training data:', error);
-        return NextResponse.json(
-            { error: 'Error fetching training data' }, 
-            { status: 500 }
-        );
-    }
+            await twitterManager.addTrainingData(username, tweets);
+            return NextResponse.json({
+                success: true,
+                message: 'Training data added successfully'
+            });
+            
+        } catch (error: any) {
+            console.error('Error adding training data:', error);
+            return NextResponse.json(
+                { 
+                    error: 'Internal server error',
+                    message: error.message,
+                    code: error.code || 'TRAINING_ADD_ERROR',
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                }, 
+                { status: error.statusCode || 500 }
+            );
+        }
+    }))(req);
 }

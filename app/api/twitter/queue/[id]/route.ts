@@ -1,19 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/types/supabase.types';
-import { getTwitterManager } from '../../../../lib/twitter-manager-instance';
-import { withAuth } from '../../../../lib/middleware/auth-middleware';
+const { withAuth } = require('../../../../lib/middleware/auth-middleware');
+const { withConfig } = require('../../../../lib/middleware/configMiddleware');
+const { checkTwitterRateLimit } = require('../../../../lib/middleware/twitter-rate-limiter');
+const { getTwitterManager } = require('../../../../lib/twitter-manager-instance');
 import { SupabaseClient } from '@supabase/supabase-js';
 
 export async function PATCH(
     req: NextRequest,
     context: { params: { id: string } }
 ) {
-    return withAuth(async (supabase: SupabaseClient<Database>, session: any) => {
+    return withConfig(withAuth(async (supabase: SupabaseClient<Database>, session: any) => {
         try {
+            await checkTwitterRateLimit('queue_update');
+            
             const { id } = context.params;
+            if (!id) {
+                return NextResponse.json({ 
+                    error: 'Missing tweet ID',
+                    code: 'MISSING_TWEET_ID'
+                }, { status: 400 });
+            }
+
             const twitterManager = getTwitterManager();
             if (!twitterManager) {
-                throw new Error('Twitter manager not initialized');
+                return NextResponse.json({ 
+                    error: 'Twitter manager not initialized',
+                    code: 'TWITTER_INIT_ERROR'
+                }, { status: 500 });
             }
 
             const body = await req.json();
@@ -30,10 +44,11 @@ export async function PATCH(
                 { 
                     error: 'Internal server error',
                     message: error.message,
+                    code: error.code || 'QUEUE_UPDATE_ERROR',
                     stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 }, 
-                { status: 500 }
+                { status: error.statusCode || 500 }
             );
         }
-    });
+    }))(req);
 }
