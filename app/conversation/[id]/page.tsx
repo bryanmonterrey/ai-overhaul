@@ -211,10 +211,10 @@ interface ChatMessage {
               key={msg.id} 
               className={`p-3 border ${
                 msg.sender === 'user'
-                  ? 'border-[#DDDDDD]/30 ml-auto'
+                  ? 'border-zinc-800/30 ml-auto'
                   : msg.error
                   ? 'border-red-500/20'
-                  : 'border-[#DDDDDD]/30'
+                  : 'border-zinc-800/30'
               } max-w-[80%] font-ia`}
             >
               <div className="text-xs mb-2 opacity-75">
@@ -253,7 +253,7 @@ interface ChatMessage {
         <div className="mt-8 mb-8 flex items-center space-x-4 font-ia">
           <button
             onClick={handleUpvote}
-            className="bg-[#11111A] text-[#DDDDDD] px-4 py-2 border border-[#DDDDDD] hover:bg-[#DDDDDD]/10"
+            className="bg-[#11111A] text-[#DDDDDD] px-4 py-2 border border-zinc-800 hover:bg-[#DDDDDD]/10"
           >
             ↑ {conversation.upvotes} Upvotes
           </button>

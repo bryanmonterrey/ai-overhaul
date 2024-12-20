@@ -7,6 +7,13 @@ import { Card } from '@/app/components/common/Card';
 import { Button } from '@/app/components/common/Button';
 import { TweetStyle } from '@/app/core/types';
 import { v4 as uuidv4 } from 'uuid'; 
+import { 
+  Select,
+  SelectContent, 
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from '@/app/components/common/Select';
 
 interface GeneratedReply {
   content: string;
@@ -93,7 +100,7 @@ export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGenera
             value={originalTweet}
             onChange={(e) => setOriginalTweet(e.target.value)}
             rows={3}
-            className="w-full bg-[#11111A] text-white border border-white p-2 font-mono text-sm resize-none focus:outline-none focus:border-white"
+            className="w-full bg-[#11111A] text-white border border-zinc-800 p-2 font-mono text-sm resize-none focus:outline-none focus:border-zinc-800"
             placeholder="Paste tweet to reply to..."
           />
         </div>
@@ -105,17 +112,18 @@ export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGenera
         )}
 
         <div className="flex space-x-2">
-          <select
-            value={selectedStyle}
-            onChange={(e) => setSelectedStyle(e.target.value as TweetStyle)}
-            className="bg-[#11111A] text-white border border-white px-2 py-1 font-mono text-sm focus:outline-none focus:border-white"
-          >
-            <option value="shitpost">SHITPOST</option>
-            <option value="rant">RANT</option>
-            <option value="hornypost">HORNYPOST</option>
-            <option value="metacommentary">METACOMMENTARY</option>
-            <option value="existential">EXISTENTIAL</option>
-          </select>
+          <Select value={selectedStyle} onValueChange={(value: TweetStyle) => setSelectedStyle(value)}>
+            <SelectTrigger className="bg-[#11111A] text-white border border-zinc-800 px-2 py-1 font-mono text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shitpost">SHITPOST</SelectItem>
+              <SelectItem value="rant">RANT</SelectItem>
+              <SelectItem value="hornypost">HORNYPOST</SelectItem>
+              <SelectItem value="metacommentary">METACOMMENTARY</SelectItem>
+              <SelectItem value="existential">EXISTENTIAL</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Button
             variant="system"
@@ -132,7 +140,7 @@ export default function ReplyGenerator({ onReplySelect, isLoading }: ReplyGenera
             <span className="text-xs">Generated Replies</span>
             <div className="space-y-2">
               {generatedReplies.map((reply, index) => (
-                <div key={index} className="p-2 border border-white bg-[#11111A]">
+                <div key={index} className="p-2 border border-zinc-800 bg-[#11111A]">
                   <p className="font-mono text-sm mb-2">{reply.content}</p>
                   <div className="flex justify-between items-center">
                     <span className="text-xs">style: {reply.style}</span>

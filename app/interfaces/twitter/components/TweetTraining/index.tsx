@@ -72,7 +72,7 @@ export default function TweetTraining() {
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         placeholder="Enter tweet text"
-                        className="min-h-[100px] w-full p-2 bg-[#11111A] text-[#DDDDDD] border border-[#DDDDDD] resize-none"
+                        className="min-h-[100px] w-full p-2 bg-[#11111A] text-[#DDDDDD] border border-zinc-800 resize-none"
                     />
                     <Input
                         value={source}
@@ -91,7 +91,7 @@ export default function TweetTraining() {
                     <Input
                         type="file"
                         accept=".csv"
-                        className='space-x-5 bg-[#11111A] border border-[#DDDDDD] text-[#DDDDDD] gap-x-3'
+                        className='space-x-5 bg-[#11111A] border border-zinc-800 text-[#DDDDDD] gap-x-3'
                         onChange={handleFileUpload}
                     />
                     <Button 

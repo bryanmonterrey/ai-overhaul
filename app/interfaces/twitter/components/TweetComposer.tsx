@@ -7,6 +7,13 @@ import { Card } from '@/app/components/common/Card';
 import { Input } from '@/app/components/common/Input';
 import { Button } from '@/app/components/common/Button';
 import { TweetStyle } from '@/app/core/types';
+import { 
+  Select,
+  SelectContent, 
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from '@/app/components/common/Select';
 
 interface TweetComposerProps {
   onTweet: (content: string, style: TweetStyle) => Promise<void>;
@@ -47,23 +54,24 @@ export default function TweetComposer({
             onChange={(e) => setContent(e.target.value)}
             maxLength={maxChars}
             rows={3}
-            className="w-full bg-[#11111A] text-white border border-white p-2 font-mono text-sm resize-none focus:outline-none focus:border-white"
+            className="w-full bg-[#11111A] text-white border border-zinc-800 p-2 font-mono text-sm resize-none focus:outline-none focus:border-zinc-800"
             placeholder="Initialize tweet sequence..."
           />
         </div>
 
         <div className="flex space-x-2">
-          <select
-            value={selectedStyle}
-            onChange={(e) => setSelectedStyle(e.target.value as TweetStyle)}
-            className="bg-[#11111A] text-white border border-white px-2 py-1 font-mono text-sm focus:outline-none focus:border-white"
-          >
-            <option value="shitpost">SHITPOST</option>
-            <option value="rant">RANT</option>
-            <option value="hornypost">HORNYPOST</option>
-            <option value="metacommentary">METACOMMENTARY</option>
-            <option value="existential">EXISTENTIAL</option>
-          </select>
+          <Select value={selectedStyle} onValueChange={(value: TweetStyle) => setSelectedStyle(value)}>
+            <SelectTrigger className="bg-[#11111A] text-white border border-zinc-800 px-2 py-1 font-mono text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shitpost">SHITPOST</SelectItem>
+              <SelectItem value="rant">RANT</SelectItem>
+              <SelectItem value="hornypost">HORNYPOST</SelectItem>
+              <SelectItem value="metacommentary">METACOMMENTARY</SelectItem>
+              <SelectItem value="existential">EXISTENTIAL</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Button
             variant="system"

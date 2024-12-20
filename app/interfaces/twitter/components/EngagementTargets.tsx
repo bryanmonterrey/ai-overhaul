@@ -8,6 +8,13 @@ import { Button } from '@/app/components/common/Button';
 import { Input } from '@/app/components/common/Input';
 import type { EngagementTargetRow } from '@/app/types/supabase';
 import type { TweetStyle } from '@/app/core/personality/types';
+import { 
+  Select,
+  SelectContent, 
+  SelectItem,
+  SelectTrigger,
+  SelectValue 
+} from '@/app/components/common/Select';
 
 export default function EngagementTargets() {
  const [targets, setTargets] = useState<EngagementTargetRow[]>([]);
@@ -118,20 +125,18 @@ export default function EngagementTargets() {
               className="flex-1 accent-white"
             />
           </div>
-          <select
-            value={newTarget.preferredStyle}
-            onChange={(e) => setNewTarget(prev => ({ 
-              ...prev, 
-              preferredStyle: e.target.value as TweetStyle 
-            }))}
-            className="w-full bg-black text-white border border-white p-2 font-mono text-xs"
-          >
-            <option value="casual">CASUAL_MODE</option>
-            <option value="shitpost">SHITPOST_MODE</option>
-            <option value="metacommentary">META_MODE</option>
-            <option value="rant">RANT_MODE</option>
-            <option value="hornypost">HORNY_MODE</option>
-          </select>
+          <Select value={newTarget.preferredStyle} onValueChange={(value: TweetStyle) => setNewTarget(prev => ({ ...prev, preferredStyle: value }))}>
+            <SelectTrigger className="w-full bg-[#11111A] text-white border border-zinc-800 p-2 font-mono text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="casual">CASUAL_MODE</SelectItem>
+              <SelectItem value="shitpost">SHITPOST_MODE</SelectItem>
+              <SelectItem value="metacommentary">META_MODE</SelectItem>
+              <SelectItem value="rant">RANT_MODE</SelectItem>
+              <SelectItem value="hornypost">HORNY_MODE</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant="system"
             onClick={addTarget}

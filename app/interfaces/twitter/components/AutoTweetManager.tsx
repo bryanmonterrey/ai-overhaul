@@ -199,13 +199,13 @@ export default function AutoTweetManager() {
 
         {!isLoading && (
           <div className="grid grid-cols-3 gap-2 text-xs font-mono">
-            <div className="border border-white/20 p-2">
+            <div className="border border-zinc-800/20 p-2">
               TOTAL: {queuedTweets.length}
             </div>
-            <div className="border border-white/20 p-2">
+            <div className="border border-zinc-800/20 p-2">
               PENDING: {queuedTweets.filter(t => t.status === 'pending').length}
             </div>
-            <div className="border border-white/20 p-2">
+            <div className="border border-zinc-800/20 p-2">
               APPROVED: {queuedTweets.filter(t => t.status === 'approved').length}
             </div>
           </div>
@@ -213,7 +213,7 @@ export default function AutoTweetManager() {
 
         <div className="space-y-2">
           {queuedTweets.map(tweet => (
-            <div key={tweet.id} className="p-2 border border-white font-mono text-xs">
+            <div key={tweet.id} className="p-2 border border-zinc-800 font-mono text-xs">
               <div className="flex justify-between items-start mb-2">
                 <div className="opacity-70">
                   {tweet.style.toUpperCase()}_MODE | {
@@ -232,7 +232,7 @@ export default function AutoTweetManager() {
                 </div>
               </div>
               
-              <div className="mb-2 whitespace-pre-wrap border-l-2 border-white/20 pl-2">
+              <div className="mb-2 whitespace-pre-wrap border-l-2 border-zinc-800/20 pl-2">
                 {tweet.content}
               </div>
               

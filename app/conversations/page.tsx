@@ -138,7 +138,7 @@ export default function ConversationsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search conversations..."
-            className="flex-1 bg-[#11111A] border border-[#DDDDDD] p-2 text-[#DDDDDD] font-ia"
+            className="flex-1 bg-[#11111A] border border-zinc-800 p-2 text-[#DDDDDD] font-ia"
           />
         </div>
       </div>
@@ -149,8 +149,8 @@ export default function ConversationsPage() {
           onClick={() => setSortBy('recent')}
           className={`font-mono px-4 py-2 border ${
             sortBy === 'recent' 
-              ? 'bg-[#11111A] text-[#DDDDDD] border-[#DDDDDD]' 
-              : 'border-[#DDDDDD] text-[#DDDDDD]'
+              ? 'bg-[#11111A] text-[#DDDDDD] border-zinc-800' 
+              : 'border-zinc-800 text-[#DDDDDD]'
           }`}
         >
           SORT_BY_RECENT
@@ -159,8 +159,8 @@ export default function ConversationsPage() {
           onClick={() => setSortBy('upvoted')}
           className={`font-mono px-4 py-2 border ${
             sortBy === 'upvoted' 
-              ? 'bg-[#11111A] text-[#DDDDDD] border-[#DDDDDD]' 
-              : 'border-[#DDDDDD] text-[#DDDDDD]'
+              ? 'bg-[#11111A] text-[#DDDDDD] border-zinc-800' 
+              : 'border-zinc-800 text-[#DDDDDD]'
           }`}
         >
           SORT_BY_UPVOTES
@@ -172,7 +172,7 @@ export default function ConversationsPage() {
         {filteredConversations.map(conv => (
           <div 
             key={conv.id}
-            className="border border-[#DDDDDD] p-4 font-ia"
+            className="border border-zinc-800 p-4 font-ia"
           >
             <div className="flex justify-between items-start mb-2">
               <Link 
@@ -188,7 +188,7 @@ export default function ConversationsPage() {
               <div className="flex flex-col items-end ml-4">
                 <button
                   onClick={() => handleUpvote(conv.id)}
-                  className="text-xs border border-[#DDDDDD] px-2 py-1 hover:bg-white/10"
+                  className="text-xs border border-zinc-800 px-2 py-1 hover:bg-white/10"
                 >
                   ↑ {conv.upvotes}
                 </button>

@@ -336,10 +336,10 @@ useEffect(() => {
               key={message.id}
               className={`p-4 rounded-md ${
                 message.sender === 'user'
-                  ? 'bg-[#11111A] border border-zinc-900 ml-auto'
+                  ? 'bg-[#11111A] border border-zinc-800 ml-auto'
                   : message.error
-                  ? 'bg-[#11111A] border border-zinc-900'
-                  : 'bg-[#11111A] border border-zinc-900'
+                  ? 'bg-[#11111A] border border-zinc-800'
+                  : 'bg-[#11111A] border border-zinc-800'
               } max-w-[80%]`}
             >
               {message.sender === 'ai' && (
@@ -373,7 +373,7 @@ useEffect(() => {
           ))}
         </div>
 
-        <div className="border-t border-zinc-900 p-4 pb-8 md:pb-4 bg-[#11111A]">
+        <div className="border-t border-zinc-800 p-4 pb-8 md:pb-4 bg-[#11111A]">
           <div className="text-xs text-[#DDDDDD] mb-2">
             TOKEN_COUNT: {tokenCount}
           </div>
@@ -383,14 +383,14 @@ useEffect(() => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
-              className="flex-1 bg-[#11111A] text-base text-[#DDDDDD] border border-zinc-900 rounded-md px-4 py-2 font-mono disabled:opacity-50"
+              className="flex-1 bg-[#11111A] text-base text-[#DDDDDD] border border-zinc-800 rounded-md px-4 py-2 font-mono disabled:opacity-50"
               placeholder={isLoading ? 'processing...' : 'enter command...'}
               disabled={isLoading}
             />
             <button
               onClick={() => sendMessage()}
               disabled={isLoading || !inputText.trim()}
-              className="bg-[#11111A] text-[#DDDDDD] text-base px-4 py-2 rounded-md font-mono border border-zinc-900 disabled:opacity-50 hover:bg-[#11111A] transition-colors"
+              className="bg-[#11111A] text-[#DDDDDD] text-base px-4 py-2 rounded-md font-mono border border-zinc-800 disabled:opacity-50 hover:bg-[#11111A] transition-colors"
             >
               {isLoading ? 'processing...' : 'execute'}
             </button>
@@ -399,10 +399,10 @@ useEffect(() => {
       </div>
 
       {isAnalyticsVisible && (
-  <div className="w-80 border-l border-zinc-900 p-4 space-y-4">
+  <div className="w-80 border-l border-zinc-800 p-4 space-y-4">
     <button
       onClick={() => setShowAnalytics(!showAnalytics)}
-      className="w-full text-[#DDDDDD] border border-zinc-900 rounded-md p-2 font-mono text-sm"
+      className="w-full text-[#DDDDDD] border border-zinc-800 rounded-md p-2 font-mono text-sm"
     >
       {showAnalytics ? 'hide analytics' : 'show analytics'}
     </button>
