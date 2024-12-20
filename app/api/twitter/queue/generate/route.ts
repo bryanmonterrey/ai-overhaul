@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import { Database } from '@/types/supabase.types';
-import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
+import { getTwitterManager } from '../../../../lib/twitter-manager-instance';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 

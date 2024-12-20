@@ -1,19 +1,19 @@
 // app/api/twitter/route.ts
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '@/app/core/twitter/twitter-manager';
-import { IntegrationManager } from '@/app/core/personality/IntegrationManager';
-import { configManager } from '@/app/lib/config/manager';
-import { EnvironmentalFactors, Platform } from '@/app/core/types';
-import { validateAIInput, withRetry } from '@/app/lib/utils/ai-error-utils';
-import { AIError, handleAIError } from '@/app/core/errors/AIError';
+import { TwitterManager } from '../../core/twitter/twitter-manager';
+import { IntegrationManager } from '../../core/personality/IntegrationManager';
+import { configManager } from '../../lib/config/manager';
+import { EnvironmentalFactors, Platform } from '../../core/types';
+import { validateAIInput, withRetry } from '../../lib/utils/ai-error-utils';
+import { AIError, handleAIError } from '../../core/errors/AIError';
 import { z } from 'zod';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
-import { MemorySystem } from '@/app/core/personality/MemorySystem';
-import { LLMManager } from '@/app/core/llm/model_manager';
-import { TwitterApiClient } from '@/app/lib/twitter-client';
+import { PersonalitySystem } from '../../core/personality/PersonalitySystem';
+import { EmotionalSystem } from '../../core/personality/EmotionalSystem';
+import { MemorySystem } from '../../core/personality/MemorySystem';
+import { LLMManager } from '../../core/llm/model_manager';
+import { TwitterApiClient } from '../../lib/twitter-client';
 import { createClient } from '@supabase/supabase-js';
-import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { TwitterTrainingService } from '../../lib/services/twitter-training';
 
 
 const twitterInputSchema = z.object({

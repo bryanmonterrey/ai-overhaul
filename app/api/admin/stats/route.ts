@@ -2,7 +2,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Pusher from 'pusher';
-import { MetricsCollector } from '@/app/core/monitoring/MetricsCollector';
+import { MetricsCollector } from '../../../core/monitoring/MetricsCollector';
 
 // Initialize Pusher
 const pusher = new Pusher({

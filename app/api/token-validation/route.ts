@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { TokenChecker } from '@/app/lib/blockchain/token-checker';
+import { TokenChecker } from '../../lib/blockchain/token-checker';
 import { Database } from '@/supabase/functions/supabase.types';
 
 export async function POST(req: Request) {

@@ -1,6 +1,6 @@
-import { withAuth } from '@/app/lib/middleware/auth-middleware';
-import { withConfig } from '@/app/lib/middleware/configMiddleware';
-import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
+import { withAuth } from '../../../lib/middleware/auth-middleware';
+import { withConfig } from '../../../lib/middleware/configMiddleware';
+import { getTwitterManager } from '../../../lib/twitter-manager-instance';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest): Promise<NextResponse> {

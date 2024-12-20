@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Anthropic } from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { configManager } from '@/app/lib/config/manager';
-import { aiSettingsSchema } from '@/app/lib/config/ai-schemas';
-import type { AISettings } from '@/app/core/types/ai';
+import { configManager } from '../../lib/config/manager';
+import { aiSettingsSchema } from '../../lib/config/ai-schemas';
+import type { AISettings } from '../../core/types/ai';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!

@@ -1,18 +1,18 @@
 // src/app/api/chat/route.ts
 
 import { NextResponse } from 'next/server';
-import { IntegrationManager } from '@/app/core/personality/IntegrationManager';
-import { LLMManager } from '@/app/core/llm/model_manager';
-import { AIError, handleAIError } from '@/app/core/errors/AIError';
-import { configManager } from '@/app/lib/config/manager';
-import { validateAIInput, withRetry } from '@/app/lib/utils/ai-error-utils';
+import { IntegrationManager } from '../../core/personality/IntegrationManager';
+import { LLMManager } from '../../core/llm/model_manager';
+import { AIError, handleAIError } from '../../core/errors/AIError';
+import { configManager } from '../../lib/config/manager';
+import { validateAIInput, withRetry } from '../../lib/utils/ai-error-utils';
 import { z } from 'zod';
-import { Platform } from '@/app/core/types';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
-import { MemorySystem } from '@/app/core/personality/MemorySystem';
-import { EmotionalState } from '@/app/core/personality/types';
-import { LettaClient } from '@/app/lib/memory/letta-client';
+import { Platform } from '../../core/types';
+import { PersonalitySystem } from '../../core/personality/PersonalitySystem';
+import { EmotionalSystem } from '../../core/personality/EmotionalSystem';
+import { MemorySystem } from '../../core/personality/MemorySystem';
+import { EmotionalState } from '../../core/personality/types';
+import { LettaClient } from '../../lib/memory/letta-client';
 
 // Input validation schema
 const chatInputSchema = z.object({

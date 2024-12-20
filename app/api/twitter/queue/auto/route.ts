@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/types/supabase.types';
-import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
-import { withAuth, AuthenticatedHandler } from '@/app/lib/middleware/auth-middleware';
+import { getTwitterManager } from '../../../../lib/twitter-manager-instance';
+import { withAuth, AuthenticatedHandler } from '../../../../lib/middleware/auth-middleware';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {

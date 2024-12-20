@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '@/app/core/twitter/twitter-manager';
+import { TwitterManager } from '../../../core/twitter/twitter-manager';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase.types';
-import { getTwitterClient } from '@/app/lib/twitter-client';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
-import { withAuth } from '@/app/lib/middleware/auth-middleware';
-import { checkTwitterRateLimit } from '@/app/lib/middleware/twitter-rate-limiter';
-import { getTwitterManager } from '@/app/lib/twitter-manager-instance';
+import { getTwitterClient } from '../../../lib/twitter-client';
+import { PersonalitySystem } from '../../../core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '../../../core/personality/config';
+import { withAuth } from '../../../lib/middleware/auth-middleware';
+import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limiter';
+import { getTwitterManager } from '../../../lib/twitter-manager-instance';
 
 interface TwitterStatus {
   account?: {

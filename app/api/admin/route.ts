@@ -1,20 +1,20 @@
 // src/app/interfaces/admin/api/route.ts
 
 import { NextResponse } from 'next/server';
-import { IntegrationManager } from '@/app/core/personality/IntegrationManager';
-import { configManager } from '@/app/lib/config/manager';
-import { supabase } from '@/app/lib/supabase';
+import { IntegrationManager } from '../../core/personality/IntegrationManager';
+import { configManager } from '../../lib/config/manager';
+import { supabase } from '../../lib/supabase';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { PostgrestSingleResponse } from '@supabase/supabase-js';
-import { AIError, handleAIError } from '@/app/core/errors/AIError';
-import { validateAIInput, withRetry } from '@/app/lib/utils/ai-error-utils';
+import { AIError, handleAIError } from '../../core/errors/AIError';
+import { validateAIInput, withRetry } from '../../lib/utils/ai-error-utils';
 import { z } from 'zod';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
-import { MemorySystem } from '@/app/core/personality/MemorySystem';
-import { LLMManager } from '@/app/core/llm/model_manager';
-import { EmotionalState } from '@/app/core/types';
+import { PersonalitySystem } from '../../core/personality/PersonalitySystem';
+import { EmotionalSystem } from '../../core/personality/EmotionalSystem';
+import { MemorySystem } from '../../core/personality/MemorySystem';
+import { LLMManager } from '../../core/llm/model_manager';
+import { EmotionalState } from '../../core/types';
 
 // Validation schemas
 const updateActionSchema = z.object({

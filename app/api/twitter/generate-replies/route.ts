@@ -1,18 +1,18 @@
 // app/api/twitter/generate-replies/route.ts
 import { NextResponse } from 'next/server';
-import { aiService } from '@/app/lib/services/ai';
-import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
-import { LettaClient } from '@/app/lib/memory/letta-client';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
-import { Platform } from '@/app/core/personality/types';
-import { TweetStyle } from '@/app/core/prompts/styles/tweet-styles';
+import { aiService } from '../../../lib/services/ai';
+import { TwitterTrainingService } from '../../../lib/services/twitter-training';
+import { LettaClient } from '../../../lib/memory/letta-client';
+import { PersonalitySystem } from '../../../core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '../../../core/personality/config';
+import { Platform } from '../../../core/personality/types';
+import { TweetStyle } from '../../../core/prompts/styles/tweet-styles';
 import { v4 as uuidv4 } from 'uuid';
 
 // Import our new prompt system
-import { PromptBuilder } from '@/app/core/prompts/prompt-builder';
-import { ResponseValidator } from '@/app/core/prompts/validation/response-validator';
-import { STYLE_TRAITS } from '@/app/core/prompts/styles/tweet-styles';
+import { PromptBuilder } from '../../../core/prompts/prompt-builder';
+import { ResponseValidator } from '../../../core/prompts/validation/response-validator';
+import { STYLE_TRAITS } from '../../../core/prompts/styles/tweet-styles';
 
 // Helper function to build enhanced context
 function buildEnhancedContext(

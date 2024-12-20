@@ -1,10 +1,10 @@
 // app/api/twitter/monitoring/route.ts
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '@/app/core/twitter/twitter-manager';
-import { TwitterApiClient } from '@/app/lib/twitter-client';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
+import { TwitterManager } from '../../../core/twitter/twitter-manager';
+import { TwitterApiClient } from '../../../lib/twitter-client';
+import { PersonalitySystem } from '../../../core/personality/PersonalitySystem';
 import { createClient } from '@supabase/supabase-js';
-import { TwitterTrainingService } from '@/app/lib/services/twitter-training';
+import { TwitterTrainingService } from '../../../lib/services/twitter-training';
 
 const client = new TwitterApiClient({
     apiKey: process.env.TWITTER_API_KEY!,

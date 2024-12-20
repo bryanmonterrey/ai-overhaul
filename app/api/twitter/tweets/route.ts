@@ -1,12 +1,12 @@
 // app/api/twitter/tweets/route.ts
 
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '@/app/core/twitter/twitter-manager';
-import { getTwitterClient } from '@/app/lib/twitter-client';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '@/app/core/personality/config';
-import { withAuth } from '@/app/lib/middleware/auth-middleware';
-import { checkTwitterRateLimit } from '@/app/lib/middleware/twitter-rate-limiter';
+import { TwitterManager } from '../../../core/twitter/twitter-manager';
+import { getTwitterClient } from '../../../lib/twitter-client';
+import { PersonalitySystem } from '../../../core/personality/PersonalitySystem';
+import { DEFAULT_PERSONALITY } from '../../../core/personality/config';
+import { withAuth } from '../../../lib/middleware/auth-middleware';
+import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limiter';
 
 export async function GET() {
     return withAuth(async (supabase: any, session: any) => {
