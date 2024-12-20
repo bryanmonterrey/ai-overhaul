@@ -24,29 +24,15 @@ const nextConfig = {
           }
       }
 
-      config.module = {
-          ...config.module,
-          exprContextCritical: false,
-          rules: [
-              ...config.module.rules,
-              {
-                  test: /\.m?js$/,
-                  type: 'commonjs',
-                  resolve: {
-                      fullySpecified: false
-                  },
-              },
-              {
-                  test: /twitter-api-v2/,
-                  resolve: {
-                      fullySpecified: false
-                  }
-              }
-          ]
-      };
+      config.module.rules.push({
+          test: /\.m?js$/,
+          resolve: {
+              fullySpecified: false,
+          },
+      });
 
       if (isServer) {
-          config.externals = [...(config.externals || []), 'twitter-api-v2'];
+          config.externals = [...(config.externals || [])];
       }
 
       return config
