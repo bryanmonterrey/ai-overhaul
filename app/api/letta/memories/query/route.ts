@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         }
 
         // Forward to Python service
-        const response = await fetch('http://localhost:3001/query', {
+        const response = await fetch('https://ai-overhaul.onrender.com/query', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

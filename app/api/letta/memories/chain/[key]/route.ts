@@ -55,7 +55,7 @@ export async function POST(
         };
 
         // Forward the request to the Python service
-        const response = await fetch(`http://localhost:3001/memories/chain/${key}`, {
+        const response = await fetch(`https://ai-overhaul.onrender.com/memories/chain/${key}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

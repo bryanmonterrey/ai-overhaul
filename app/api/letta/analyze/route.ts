@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         };
 
         // Get Letta service analysis
-        const lettaResponse = await fetch('http://localhost:3001/analyze', {
+        const lettaResponse = await fetch('https://ai-overhaul.onrender.com/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content, context })

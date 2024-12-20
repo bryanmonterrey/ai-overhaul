@@ -19,7 +19,7 @@ export async function POST(request: Request) {
         }
 
         // Forward to Python service
-        const lettaResponse = await fetch('http://localhost:3001/store', {
+        const lettaResponse = await fetch('https://ai-overhaul.onrender.com/store', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
         }
 
         // Forward to Python service
-        const lettaResponse = await fetch(`http://localhost:3001/memories/${key}${type ? `?type=${type}` : ''}`, {
+        const lettaResponse = await fetch(`https://ai-overhaul.onrender.com/memories/${key}${type ? `?type=${type}` : ''}`, {
             method: 'GET'
         });
 

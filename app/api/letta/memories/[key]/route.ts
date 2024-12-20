@@ -34,7 +34,7 @@ export async function GET(
             console.warn('Memory not found in Supabase:', supabaseError || 'No data');
             // Try the Letta service as fallback
             const lettaResponse = await fetch(
-                `http://localhost:3001/memories/${key}${type ? `?type=${type}` : ''}`,
+                `https://ai-overhaul.onrender.com/memories/${key}${type ? `?type=${type}` : ''}`,
                 {
                     method: 'GET',
                     headers: {

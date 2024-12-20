@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         if (error) throw error;
 
         // Then store in Letta service
-        const lettaResponse = await fetch('http://localhost:3001/store', {
+        const lettaResponse = await fetch('https://ai-overhaul.onrender.com/store', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
