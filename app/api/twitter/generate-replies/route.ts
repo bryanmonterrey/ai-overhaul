@@ -259,9 +259,11 @@ export async function POST(request: NextRequest) {
                 console.error('Error in context processing:', error);
                 return NextResponse.json({ 
                     error: true,
-                    message: 'Failed to process context',
+                    message: error instanceof Error ? error.message : 'Failed to process context',
                     code: 'CONTEXT_PROCESSING_ERROR',
-                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                    stack: process.env.NODE_ENV === 'development' ? 
+                        error instanceof Error ? error.stack : undefined 
+                        : undefined
                 }, { status: 500 });
             }
             

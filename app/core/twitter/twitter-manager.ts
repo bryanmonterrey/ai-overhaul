@@ -1544,4 +1544,75 @@ private async getLastInteractionTime(): Promise<Date> {
       throw error;
     }
   }
+
+  public async startAutoQueue(): Promise<void> {
+    try {
+      this.isAutoMode = true;
+      await this.persistAutoMode(true);
+      await this.scheduleNextTweet();
+    } catch (error) {
+      console.error('Error starting auto queue:', error);
+      throw error;
+    }
+  }
+
+  public async stopAutoQueue(): Promise<void> {
+    this.isAutoMode = false;
+    await this.persistAutoMode(false);
+    if (this.nextTweetTimeout) {
+      clearTimeout(this.nextTweetTimeout);
+    }
+  }
+
+  public async getAutoQueueStatus(): Promise<{ enabled: boolean }> {
+    return { enabled: this.isAutoMode };
+  }
+
+  async updateEngagementTarget(id: string, data: Partial<EngagementTargetRow>) {
+    try {
+      const { error } = await this.supabase
+        .from('engagement_targets')
+        .update(data)
+        .eq('id', id);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating engagement target:', error);
+      throw error;
+    }
+  }
+
+  async getTrainingData(username: string, limit: number = 100) {
+    try {
+      const { data, error } = await this.supabase
+        .from('training_data')
+        .select('*')
+        .eq('username', username)
+        .limit(limit);
+        
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching training data:', error);
+      throw error;
+    }
+  }
+
+  async addTrainingData(username: string, tweets: any[]) {
+    try {
+      const { error } = await this.supabase
+        .from('training_data')
+        .insert(tweets.map(tweet => ({
+          username,
+          content: tweet.content,
+          metadata: tweet.metadata || {},
+          created_at: new Date().toISOString()
+        })));
+        
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error adding training data:', error);
+      throw error;
+    }
+  }
 }

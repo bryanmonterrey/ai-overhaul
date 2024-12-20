@@ -16,11 +16,17 @@ const ENDPOINTS = {
   targets_update: new RateLimiter(100, 15 * 60 * 1000),
   queue: new RateLimiter(300, 15 * 60 * 1000),
   queue_update: new RateLimiter(200, 15 * 60 * 1000),
+  auto_queue: new RateLimiter(100, 15 * 60 * 1000),
+  auto_queue_status: new RateLimiter(100, 15 * 60 * 1000),
   generate_tweets: new RateLimiter(50, 15 * 60 * 1000),
   post_tweet: new RateLimiter(200, 15 * 60 * 1000),
   monitoring: new RateLimiter(300, 15 * 60 * 1000),
+  monitoring_status: new RateLimiter(300, 15 * 60 * 1000),
   analytics: new RateLimiter(300, 15 * 60 * 1000),
   replies: new RateLimiter(150, 15 * 60 * 1000),
+  training: new RateLimiter(100, 15 * 60 * 1000),
+  training_add: new RateLimiter(100, 15 * 60 * 1000),
+  get_status: new RateLimiter(300, 15 * 60 * 1000),
   default: new RateLimiter(
     DEFAULT_RATE_LIMIT.points, 
     DEFAULT_RATE_LIMIT.duration

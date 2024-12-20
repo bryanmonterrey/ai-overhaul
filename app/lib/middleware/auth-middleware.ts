@@ -28,12 +28,17 @@ export function withAuth(handler: (supabase: any, session: any) => Promise<NextR
         // Wrap the handler in try-catch to ensure we always return a NextResponse
         try {
           const response = await handler(supabase, mockSession);
-          return response instanceof NextResponse ? response : 
-                 NextResponse.json(response);
+          if (response instanceof NextResponse) {
+            return response;
+          }
+          
+          // Safely serialize the response
+          const safeResponse = JSON.parse(JSON.stringify(response));
+          return NextResponse.json(safeResponse);
         } catch (error) {
           console.error('Handler error in development:', error);
           return NextResponse.json(
-            { error: error.message || 'Internal server error' },
+            { error: error instanceof Error ? error.message : 'Internal server error' },
             { status: 500 }
           );
         }
@@ -71,8 +76,13 @@ export function withAuth(handler: (supabase: any, session: any) => Promise<NextR
       // Wrap the handler in try-catch to ensure we always return a NextResponse
       try {
         const response = await handler(supabase, session);
-        return response instanceof NextResponse ? response : 
-               NextResponse.json(response);
+        if (response instanceof NextResponse) {
+          return response;
+        }
+        
+        // Safely serialize the response
+        const safeResponse = JSON.parse(JSON.stringify(response));
+        return NextResponse.json(safeResponse);
       } catch (error) {
         console.error('Handler error:', error);
         return NextResponse.json(

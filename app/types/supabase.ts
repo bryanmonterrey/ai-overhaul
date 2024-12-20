@@ -9,11 +9,16 @@ export interface EngagementTargetRow {
   twitter_id: string;
   topics: string[];
   reply_probability: number;
-  last_interaction: string | null;
-  relationship_level: 'new' | 'familiar' | 'close';
   preferred_style: string;
   created_at: string;
-  total_interactions: number;
+}
+
+export interface TrainingDataRow {
+  id: string;
+  username: string;
+  content: string;
+  metadata: Record<string, any>;
+  created_at: string;
 }
 
 export interface EngagementHistoryRow {
@@ -41,46 +46,23 @@ export interface EngagementRules {
 }
 
 // Fixed Database interface
-export type Database = BaseDatabase & {
+export type Database = {
   public: {
     Tables: {
-      replied_tweets: {
-        Row: {
-            tweet_id: string;
-            target_id: string;
-            replied_at: string;
-            reply_tweet_id: string;
-        };
-        Insert: {
-            tweet_id: string;
-            target_id: string;
-            replied_at?: string;
-            reply_tweet_id: string;
-        };
-        Update: {
-            tweet_id?: string;
-            target_id?: string;
-            replied_at?: string;
-            reply_tweet_id?: string;
-        };
-    };
       engagement_targets: {
-        Row: EngagementTargetRow
-        Insert: Omit<EngagementTargetRow, 'id' | 'created_at'>
-        Update: Partial<Omit<EngagementTargetRow, 'id' | 'created_at'>>
-      }
-      engagement_history: {
-        Row: EngagementHistoryRow
-        Insert: Omit<EngagementHistoryRow, 'id' | 'created_at'>
-        Update: Partial<Omit<EngagementHistoryRow, 'id' | 'created_at'>>
-      }
-    } & BaseDatabase['public']['Tables']
-    Views: BaseDatabase['public']['Views']
-    Functions: BaseDatabase['public']['Functions']
-    Enums: BaseDatabase['public']['Enums']
-    CompositeTypes: BaseDatabase['public']['CompositeTypes']
-  }
-}
+        Row: EngagementTargetRow;
+        Insert: Omit<EngagementTargetRow, 'id' | 'created_at'>;
+        Update: Partial<EngagementTargetRow>;
+      };
+      training_data: {
+        Row: TrainingDataRow;
+        Insert: Omit<TrainingDataRow, 'id' | 'created_at'>;
+        Update: Partial<TrainingDataRow>;
+      };
+      // Add other tables as needed
+    };
+  };
+};
 
 // Helper functions for engagement targets
 export async function getEngagementTargets() {
