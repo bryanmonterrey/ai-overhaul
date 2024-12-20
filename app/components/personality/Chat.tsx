@@ -3,22 +3,22 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { MemoryType, PersonalityState, Platform, Memory, EmotionalState } from '@/app/core/types';
-import { PersonalityState as SimulatorState } from '@/app/core/personality/types';
-import { Message } from '@/app/core/types/chat';
-import { AIResponse } from '@/app/core/types/ai';
-import { TokenCounter } from '@/app/lib/utils/ai';
-import { AIError, AIRateLimitError } from '@/app/core/errors/AIError';
-import { Alert, AlertDescription, AlertTitle } from '@/app/components/common/Alert';
-import { ChatLogger } from '@/app/lib/logging/chat';
-import { dbService } from '@/app/lib/services/database';
-import { qualityMetricsService } from '@/app/lib/services/quality-metrics';
-import { trainingDataService } from '@/app/lib/services/training';
+import { MemoryType, PersonalityState, Platform, Memory, EmotionalState } from '../../core/types';
+import { PersonalityState as SimulatorState } from '../../core/personality/types';
+import { Message } from '../../core/types/chat';
+import { AIResponse } from '../../core/types/ai';
+import { TokenCounter } from '../../lib/utils/ai';
+import { AIError, AIRateLimitError } from '../../core/errors/AIError';
+import { Alert, AlertDescription, AlertTitle } from '../../components/common/Alert';
+import { ChatLogger } from '../../lib/logging/chat';
+import { dbService } from '../../lib/services/database';
+import { qualityMetricsService } from '../../lib/services/quality-metrics';
+import { trainingDataService } from '../../lib/services/training';
 import { QualityMetricsDisplay } from '../analytics/QualityMetricsDisplay';
-import { ChatAnalytics } from '@/app/components/analytics/ChatAnalytics';
-import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
-import { SimulatorSystem } from '@/app/core/personality/SimulatorSystem';
-import { defaultConfig } from '@/app/lib/config/default';
+import { ChatAnalytics } from '../../components/analytics/ChatAnalytics';
+import { PersonalitySystem } from '../../core/personality/PersonalitySystem';
+import { SimulatorSystem } from '../../core/personality/SimulatorSystem';
+import { defaultConfig } from '../../lib/config/default';
 
 interface ChatMetrics {
   coherence: number;
