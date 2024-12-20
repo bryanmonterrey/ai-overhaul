@@ -1,4 +1,4 @@
-// Refactored configMiddleware.ts
+// Updated configMiddleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { configManager } from '../config/manager';
@@ -8,24 +8,23 @@ export function withConfig(handler: Function) {
     try {
       const allowedDomains = ['terminal.goatse.app'];
       const hostname = req.headers.get('host');
-      
-      if (process.env.NODE_ENV === 'production' && 
-          hostname && 
-          !allowedDomains.includes(hostname)) {
-        console.error(`Invalid domain: ${hostname}`);
+
+      if (
+        process.env.NODE_ENV === 'production' && 
+        hostname && 
+        !allowedDomains.includes(hostname)
+      ) {
         return NextResponse.json(
           { error: 'Invalid domain' },
           { status: 403 }
         );
       }
-      
+
       if (process.env.NODE_ENV === 'development') {
         return handler(req, ...args);
       }
 
-      const isValidConfig = configManager.validateConfig();
-      if (!isValidConfig) {
-        console.error('Configuration validation failed');
+      if (!configManager.validateConfig()) {
         return NextResponse.json(
           { error: 'Invalid system configuration' },
           { status: 500 }
@@ -33,8 +32,10 @@ export function withConfig(handler: Function) {
       }
 
       const path = req.nextUrl.pathname;
-      if (path.startsWith('/api/twitter') && !configManager.get('integrations', 'twitter')?.enabled) {
-        console.error('Twitter integration is disabled in production');
+      if (
+        path.startsWith('/api/twitter') && 
+        !configManager.get('integrations', 'twitter')?.enabled
+      ) {
         return NextResponse.json(
           { error: 'Twitter integration is disabled' },
           { status: 403 }

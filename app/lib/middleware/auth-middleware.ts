@@ -1,4 +1,4 @@
-// Refactored auth-middleware.ts
+// Updated auth-middleware.ts
 import { NextResponse } from 'next/server';
 import { getSupabaseClient } from '../supabase/server';
 
@@ -8,24 +8,24 @@ export async function withAuth(handler: Function) {
 
     if (process.env.NODE_ENV === 'development') {
       const mockSession = {
-        user: { 
+        user: {
           id: 'dev-user',
-          role: 'admin'
-        }
+          role: 'admin',
+        },
       };
       return handler(supabase, mockSession);
     }
 
-    const sessionResponse = await supabase.auth.getSession();
-    if (!sessionResponse.data.session) {
-      console.error('No active session found');
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    return handler(supabase, sessionResponse.data.session);
+    return handler(supabase, session);
   } catch (error) {
     console.error('Auth middleware error:', error);
     return NextResponse.json(
