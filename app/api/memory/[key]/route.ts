@@ -26,7 +26,7 @@ export async function GET(
     if (error) throw error
 
     // Get from MemGPT service
-    const memgptResponse = await fetch(`http://localhost:3001/memory/${params.key}`)
+    const memgptResponse = await fetch(`https://ai-overhaul.onrender.com/memory/${params.key}`)
     const memgptData = await memgptResponse.json()
 
     return NextResponse.json({
