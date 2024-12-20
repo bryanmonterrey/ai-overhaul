@@ -104,7 +104,13 @@ export async function POST(request: NextRequest) {
                 ...DEFAULT_PERSONALITY,
                 platform: 'twitter' as Platform
             });
-            const trainingService = new TwitterTrainingService();
+
+            const supabase = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            );
+            
+            const trainingService = new TwitterTrainingService(supabase); 
 
             // Initial memory storage
             try {

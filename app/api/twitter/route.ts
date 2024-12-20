@@ -63,15 +63,17 @@ const personalityConfig = {
 
 const personalitySystem = new PersonalitySystem(personalityConfig);
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 // Now twitterManager can use personalitySystem
 const twitterManager = new TwitterManager(
-    client,
-    personalitySystem,
-    createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ),
-    new TwitterTrainingService()
+  client,
+  personalitySystem,
+  supabase,  // Pass the same supabase instance
+  new TwitterTrainingService(supabase)  // Pass supabase to TwitterTrainingService
 );
 
 const emotionalSystem = new EmotionalSystem();
