@@ -509,23 +509,31 @@ async userTimeline(options?: {
 let twitterClientInstance: TwitterApiClient | null = null;
 
 export function getTwitterClient(): TwitterApiClient {
-   if (!twitterClientInstance) {
-       const credentials = {
-           apiKey: process.env.TWITTER_API_KEY || '',
-           apiSecret: process.env.TWITTER_API_SECRET || '',
-           accessToken: process.env.TWITTER_ACCESS_TOKEN || '',
-           accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET || '',
-       };
-
-       if (!credentials.apiKey || !credentials.apiSecret || 
-           !credentials.accessToken || !credentials.accessSecret) {
-           throw new Error('Missing Twitter API credentials');
-       }
-
-       twitterClientInstance = new TwitterApiClient(credentials);
-       console.log('Twitter client initialized with rate limits:', 
-           twitterClientInstance.getRateLimitStatus()
-       );
-   }
-   return twitterClientInstance;
-}
+    if (!twitterClientInstance) {
+        // Check env vars first
+        if (!process.env.TWITTER_API_KEY ||
+            !process.env.TWITTER_API_SECRET ||
+            !process.env.TWITTER_ACCESS_TOKEN ||
+            !process.env.TWITTER_ACCESS_TOKEN_SECRET
+        ) {
+            console.error('Twitter API credentials missing');
+            throw new Error('Twitter API credentials not configured');
+        }
+ 
+        const credentials = {
+            apiKey: process.env.TWITTER_API_KEY,
+            apiSecret: process.env.TWITTER_API_SECRET,
+            accessToken: process.env.TWITTER_ACCESS_TOKEN,
+            accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+        };
+ 
+        try {
+            twitterClientInstance = new TwitterApiClient(credentials);
+            console.log('Twitter client initialized');
+        } catch (error) {
+            console.error('Failed to initialize Twitter client:', error);
+            throw error;
+        }
+    }
+    return twitterClientInstance;
+ }
