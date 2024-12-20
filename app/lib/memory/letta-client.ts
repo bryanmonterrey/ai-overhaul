@@ -225,22 +225,20 @@ export class LettaClient {
     private async handleResponse(response: Response) {
         try {
             if (!response.ok) {
-                const text = await response.text();
-                try {
-                    const errorData = JSON.parse(text);
-                    if (Array.isArray(errorData.detail)) {
-                        // Handle validation errors
-                        const errors = errorData.detail.map((e: any) => e.msg).join(', ');
-                        throw new Error(`Validation error: ${errors}`);
-                    }
-                    throw new Error(errorData?.detail || errorData?.error || `HTTP error! status: ${response.status}`);
-                } catch (jsonError) {
-                    throw new Error(text || `HTTP error! status: ${response.status}`);
-                }
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-    
-            const data = await response.json();
-            return data.success ? data.data : data;
+
+            // Clone the response before reading it
+            const clonedResponse = response.clone();
+            
+            try {
+                const data = await response.json();
+                return data.success ? data.data : data;
+            } catch (error) {
+                // If JSON parsing fails, try reading the cloned response
+                const data = await clonedResponse.json();
+                return data.success ? data.data : data;
+            }
         } catch (error) {
             console.error('Error handling response:', {
                 error,
