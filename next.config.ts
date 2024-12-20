@@ -9,7 +9,12 @@ const nextConfig: NextConfig = {
         '@solana/wallet-adapter-react-ui',
         '@solana/wallet-adapter-wallets',
     ],
-    serverExternalPackages: ['twitter-api-v2'],
+    // Changed from serverExternalPackages to include the Solana packages
+    serverExternalPackages: [
+        'twitter-api-v2',
+        '@solana/web3.js',
+        'rpc-websockets'
+    ],
     webpack: (config, { isServer }) => {
         if (isServer) {
             config.externals.push('twitter-api-v2')
@@ -47,7 +52,8 @@ const nextConfig: NextConfig = {
         ignoreDuringBuilds: true,
     },
     experimental: {
-        serverComponentsExternalPackages: ['@solana/web3.js', 'rpc-websockets'],
+        // Removed serverComponentsExternalPackages as it's deprecated
+        esmExternals: 'loose' // Add this to help with ESM compatibility
     },
     async rewrites() {
         if (process.env.NODE_ENV === 'development') {
