@@ -9,3 +9,4 @@ anthropic>=0.3.0
 pydantic
 python-frontmatter
 faiss-cpu
+networkx
