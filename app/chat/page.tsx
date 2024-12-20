@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import ChatComponent from '../components/personality/Chat'; // Changed import name
+import ChatComponent from '../components/personality/Chat';
 import { Card } from '../components/common/Card';
 import { EmotionalStateDisplay } from '../components/personality/EmotionalStateDisplay';
 import { PersonalityMonitor } from '../components/personality/PersonalityMonitor';
