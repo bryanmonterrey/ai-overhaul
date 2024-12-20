@@ -13,9 +13,9 @@ import {
 import { LLMManager } from '../llm/model_manager';
 import type { EnvironmentalFactors, MemoryType } from '../types/index';
 import type { PersonalityState as CorePersonalityState } from '../types/index';
-import { Memory, MemoryQueryResult, Message, StorageMemory } from '@/app/types/memory';
-import { LettaClient } from '@/app/lib/memory/letta-client';
-import { convertCoreToStorageMemory } from '@/app/lib/memory/memory-converters';
+import { Memory, MemoryQueryResult, Message, StorageMemory } from '../../types/memory';
+import { LettaClient } from '../../lib/memory/letta-client';
+import { convertCoreToStorageMemory } from '../../lib/memory/memory-converters';
 import { Memory as CoreMemory } from './types';
 
 interface SystemState {

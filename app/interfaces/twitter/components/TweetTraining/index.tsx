@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button } from '@/app/components/common/Button';
-import { Input } from '@/app/components/common/Input';
-import { Card } from '@/app/components/common/Card';
-import { Alert } from '@/app/components/common/Alert';
+import { Button } from '../../../../components/common/Button';
+import { Input } from '../../../../components/common/Input';
+import { Card } from '../../../../components/common/Card';
+import { Alert } from '../../../../components/common/Alert';
 
 export default function TweetTraining() {
     const [content, setContent] = useState('');

@@ -1,7 +1,7 @@
 // src/app/interfaces/telegram/components/MessageHandler.tsx
 
 import React from 'react';
-import { Card } from '@/app/components/common/Card';
+import { Card } from '../../../components/common/Card';
 
 interface QueuedMessage {
   id: string;

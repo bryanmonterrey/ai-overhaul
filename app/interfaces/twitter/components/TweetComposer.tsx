@@ -3,17 +3,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card } from '@/app/components/common/Card';
-import { Input } from '@/app/components/common/Input';
-import { Button } from '@/app/components/common/Button';
-import { TweetStyle } from '@/app/core/types';
+import { Card } from '../../../components/common/Card';
+import { Input } from '../../../components/common/Input';
+import { Button } from '../../../components/common/Button';
+import { TweetStyle } from '../../../core/types';
 import { 
   Select,
   SelectContent, 
   SelectItem,
   SelectTrigger,
   SelectValue 
-} from '@/app/components/common/Select';
+} from '../../../components/common/Select';
 
 interface TweetComposerProps {
   onTweet: (content: string, style: TweetStyle) => Promise<void>;

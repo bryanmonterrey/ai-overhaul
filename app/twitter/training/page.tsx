@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import TweetTraining from '@/app/interfaces/twitter/components/TweetTraining';
-import { ErrorBoundary } from '@/app/components/common/ErrorBoundary';
+import TweetTraining from '../../interfaces/twitter/components/TweetTraining';
+import { ErrorBoundary } from '../../components/common/ErrorBoundary';
 
 export default function TrainingPage() {
     return (

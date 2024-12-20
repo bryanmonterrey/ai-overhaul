@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Input } from '@/app/components/common/Input';
-import { Button } from '@/app/components/common/Button';
+import { Input } from '../../../components/common/Input';
+import { Button } from '../../../components/common/Button';
 
 interface ChatInputProps {
   onSend: (message: string) => void;

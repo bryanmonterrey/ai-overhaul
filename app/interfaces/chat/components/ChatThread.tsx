@@ -3,8 +3,8 @@
 import React from 'react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
-import { Card } from '@/app/components/common/Card';
-import { EmotionalState } from '@/app/core/types';
+import { Card } from '../../../components/common/Card';
+import { EmotionalState } from '../../../core/types';
 
 interface ChatThreadProps {
   messages: any[];

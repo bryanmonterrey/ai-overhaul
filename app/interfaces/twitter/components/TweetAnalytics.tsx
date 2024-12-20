@@ -1,7 +1,7 @@
 // src/app/interfaces/twitter/components/TweetAnalytics.tsx
 
 import React from 'react';
-import { Card } from '@/app/components/common/Card';
+import { Card } from '../../../components/common/Card';
 
 interface AnalyticsData {
   engagement: {

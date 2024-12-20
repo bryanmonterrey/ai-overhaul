@@ -3,18 +3,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card } from '@/app/components/common/Card';
-import { Button } from '@/app/components/common/Button';
-import { Input } from '@/app/components/common/Input';
-import type { EngagementTargetRow } from '@/app/types/supabase';
-import type { TweetStyle } from '@/app/core/personality/types';
+import { Card } from '../../../components/common/Card';
+import { Button } from '../../../components/common/Button';
+import { Input } from '../../../components/common/Input';
+import type { EngagementTargetRow } from '../../../types/supabase';
+import type { TweetStyle } from '../../../core/personality/types';
 import { 
   Select,
   SelectContent, 
   SelectItem,
   SelectTrigger,
   SelectValue 
-} from '@/app/components/common/Select';
+} from '../../../components/common/Select';
 
 export default function EngagementTargets() {
  const [targets, setTargets] = useState<EngagementTargetRow[]>([]);

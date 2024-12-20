@@ -1,11 +1,11 @@
 'use client';
 
-import { WalletConnection } from '@/app/components/WalletConnection';
+import { WalletConnection } from '../components/WalletConnection';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { TokenChecker } from '@/app/lib/blockchain/token-checker';
+import { TokenChecker } from '../lib/blockchain/token-checker';
 
 export default function LoginPage() {
   const supabase = createClientComponentClient();

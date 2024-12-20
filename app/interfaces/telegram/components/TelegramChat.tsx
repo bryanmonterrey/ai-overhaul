@@ -3,9 +3,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Card } from '@/app/components/common/Card';
-import { Button } from '@/app/components/common/Button';
-import { Input } from '@/app/components/common/Input';
+import { Card } from '../../../components/common/Card';
+import { Button } from '../../../components/common/Button';
+import { Input } from '../../../components/common/Input';
 
 interface Message {
   id: string;

@@ -3,9 +3,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card } from '@/app/components/common/Card';
-import { Button } from '@/app/components/common/Button';
-import { TweetStyle } from '@/app/core/types';
+import { Card } from '../../../components/common/Card';
+import { Button } from '../../../components/common/Button';
+import { TweetStyle } from '../../../core/types';
 import { v4 as uuidv4 } from 'uuid'; 
 import { 
   Select,
@@ -13,7 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue 
-} from '@/app/components/common/Select';
+} from '../../../components/common/Select';
 
 interface GeneratedReply {
   content: string;

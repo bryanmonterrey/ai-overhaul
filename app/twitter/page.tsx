@@ -3,15 +3,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import TweetComposer from '@/app/interfaces/twitter/components/TweetComposer';
-import TweetStream from '@/app/interfaces/twitter/components/TweetStream';
-import TweetAnalytics from '@/app/interfaces/twitter/components/TweetAnalytics';
-import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
-import { TweetStyle } from '@/app/core/types';
+import TweetComposer from '../interfaces/twitter/components/TweetComposer';
+import TweetStream from '../interfaces/twitter/components/TweetStream';
+import TweetAnalytics from '../interfaces/twitter/components/TweetAnalytics';
+import { EmotionalStateDisplay } from '../components/personality/EmotionalStateDisplay';
+import { TweetStyle } from '../core/types';
 import EngagementTargets from '../interfaces/twitter/components/EngagementTargets';
 import AutoTweetManager from '../interfaces/twitter/components/AutoTweetManager';
-import { ErrorBoundary } from '@/app/components/common/ErrorBoundary';
-import TweetTraining from '@/app/interfaces/twitter/components/TweetTraining';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
+import TweetTraining from '../interfaces/twitter/components/TweetTraining';
 import ReplyGenerator from '../interfaces/twitter/components/ReplyGenerator';
 
 

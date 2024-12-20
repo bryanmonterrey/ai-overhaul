@@ -3,10 +3,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import TelegramChat from '@/app/interfaces/telegram/components/TelegramChat';
-import MessageHandler from '@/app/interfaces/telegram/components/MessageHandler';
-import TelegramStats from '@/app/interfaces/telegram/components/TelegramStats';
-import { EmotionalStateDisplay } from '@/app/components/personality/EmotionalStateDisplay';
+import TelegramChat from '../interfaces/telegram/components/TelegramChat';
+import MessageHandler from '../interfaces/telegram/components/MessageHandler';
+import TelegramStats from '../interfaces/telegram/components/TelegramStats';
+import { EmotionalStateDisplay } from '../components/personality/EmotionalStateDisplay';
 
 export default function TelegramPage() {
   const [messages, setMessages] = useState<any[]>([]);

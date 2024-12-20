@@ -4,9 +4,9 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js'; 
-import { Card } from '@/app/components/common/Card';
-import { Button } from '@/app/components/common/Button';
-import { Switch } from '@/app/components/common/Switch';
+import { Card } from '../../../components/common/Card';
+import { Button } from '../../../components/common/Button';
+import { Switch } from '../../../components/common/Switch';
 
 interface QueuedTweet {
   id: string;

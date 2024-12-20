@@ -6,7 +6,7 @@ import {
     Memory, 
     TweetStyle,
     PersonalityState
-  } from '@/app/core/personality/types';
+  } from '../../core/personality/types';
   
   interface ConsciousnessState {
     emotionalState: EmotionalState;
