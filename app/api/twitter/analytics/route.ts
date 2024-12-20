@@ -1,11 +1,4 @@
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '../../../core/twitter/twitter-manager';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { Database } from '@/types/supabase.types';
-import { getTwitterClient } from '../../../lib/twitter-client';
-import { PersonalitySystem } from '../../../core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '../../../core/personality/config';
 import { withAuth } from '../../../lib/middleware/auth-middleware';
 import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limiter';
 import { getTwitterManager } from '../../../lib/twitter-manager-instance';
@@ -27,14 +20,13 @@ interface TwitterStatus {
 interface EnvironmentalFactors {
     platformActivity: number;
     socialContext: string[];
-    marketConditions: {  // Now this is required, not optional
+    marketConditions: {
         sentiment: number;
         volatility: number;
         momentum: number;
         trends?: string[];
     };
 }
-
 
 export async function GET() {
     return withAuth(async (supabase: any, session: any) => {
@@ -46,7 +38,6 @@ export async function GET() {
                 throw new Error('Twitter manager not initialized');
             }
 
-            // Get basic stats first
             const baseStats = {
                 engagement: {
                     total_likes: 0,
@@ -70,7 +61,6 @@ export async function GET() {
                 const status = await twitterManager.getStatus();
                 const environmentalFactors = await twitterManager.getEnvironmentalFactors();
 
-                // Safely merge the data
                 if (status?.account) {
                     baseStats.engagement = {
                         total_likes: status.account.total_likes ?? 0,
@@ -95,20 +85,27 @@ export async function GET() {
                         momentum: (environmentalFactors as EnvironmentalFactors).marketConditions.momentum ?? 0,
                     };
                 }
-            } catch (innerError) {
-                console.error('Error fetching detailed analytics:', innerError);
-                // Continue with base stats if detailed fetch fails
-            }
 
-            return NextResponse.json(baseStats);
-            
+                return NextResponse.json(baseStats);
+            } catch (innerError: any) {
+                console.error('Error fetching analytics data:', innerError);
+                return NextResponse.json({ 
+                    error: true,
+                    message: innerError.message,
+                    code: 'ANALYTICS_DATA_ERROR',
+                    details: innerError.stack
+                }, { 
+                    status: 500 
+                });
+            }
         } catch (error: any) {
             console.error('Error in analytics route:', error);
             return NextResponse.json(
                 { 
                     error: true,
                     message: error.message || 'Failed to fetch analytics',
-                    code: error.code || 'ANALYTICS_ERROR'
+                    code: error.code || 'ANALYTICS_ERROR',
+                    details: error.stack
                 },
                 { status: error.statusCode || 500 }
             );

@@ -1,31 +1,22 @@
-// app/api/twitter/tweets/route.ts
-
 import { NextResponse } from 'next/server';
-import { TwitterManager } from '../../../core/twitter/twitter-manager';
-import { getTwitterClient } from '../../../lib/twitter-client';
-import { PersonalitySystem } from '../../../core/personality/PersonalitySystem';
-import { DEFAULT_PERSONALITY } from '../../../core/personality/config';
 import { withAuth } from '../../../lib/middleware/auth-middleware';
 import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limiter';
+import { getTwitterManager } from '../../../lib/twitter-manager-instance';
 
 export async function GET() {
     return withAuth(async (supabase: any, session: any) => {
         try {
             await checkTwitterRateLimit();
 
-            const twitterClient = getTwitterClient();
-            if (!twitterClient) {
-                throw new Error('Twitter client not initialized');
+            const twitterManager = getTwitterManager();
+            if (!twitterManager) {
+                throw new Error('Twitter manager not initialized');
             }
-
-            const personalitySystem = new PersonalitySystem(DEFAULT_PERSONALITY);
-            const twitterManager = new TwitterManager(twitterClient, personalitySystem, supabase);
             
             try {
                 const status = await twitterManager.getStatus();
                 const recentTweets = await twitterManager.getRecentTweets();
 
-                // Safely handle different tweet formats
                 const tweets = Array.isArray(recentTweets) ? recentTweets : 
                              recentTweets instanceof Map ? Array.from(recentTweets.values()) : 
                              [];
@@ -44,9 +35,16 @@ export async function GET() {
                     })),
                     status: status || {}
                 });
-            } catch (innerError) {
+            } catch (innerError: any) {
                 console.error('Error processing tweets:', innerError);
-                return NextResponse.json({ tweets: [], status: {} });
+                return NextResponse.json({ 
+                    error: true,
+                    message: innerError.message,
+                    code: innerError.code || 'TWEET_PROCESS_ERROR',
+                    details: innerError.stack
+                }, { 
+                    status: innerError.statusCode || 500 
+                });
             }
         } catch (error: any) {
             console.error('Error in tweets route:', error);
@@ -55,6 +53,7 @@ export async function GET() {
                     error: true,
                     message: error.message || 'Failed to fetch tweets',
                     code: error.code || 'TWEET_FETCH_ERROR',
+                    details: error.stack,
                     tweets: []
                 },
                 { status: error.statusCode || 500 }

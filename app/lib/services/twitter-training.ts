@@ -1,11 +1,11 @@
-import { createClientComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase.types';
 
 export class TwitterTrainingService {
-    private supabase;
+    private supabase: SupabaseClient;
 
-    constructor() {
-        this.supabase = createClientComponentClient();
+    constructor(supabaseClient: SupabaseClient) {
+        this.supabase = supabaseClient;
     }
 
     async saveTweet(content: string, source: string, themes?: string[]) {
@@ -36,9 +36,8 @@ export class TwitterTrainingService {
             query = query.eq('source', source);
         }
         
-        // Change to use built-in PostgreSQL random ordering
         const { data, error } = await query
-            .order('created_at') // Or any other column
+            .order('created_at')
             .limit(count);
     
         if (error) {
@@ -53,7 +52,6 @@ export class TwitterTrainingService {
         const defaultThemes = ["consciousness", "data", "existence"];
         const results = [];
         
-        // Process in batches
         for (let i = 0; i < tweets.length; i += batchSize) {
             const batch = tweets.slice(i, i + batchSize);
             
