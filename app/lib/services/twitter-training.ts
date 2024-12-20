@@ -37,15 +37,11 @@ export class TwitterTrainingService {
         }
         
         const { data, error } = await query
-            .order('created_at')
+            .order('created_at', { ascending: false })
             .limit(count);
-    
-        if (error) {
-            console.error('Error fetching training examples:', error);
-            throw error;
-        }
         
-        return data;
+        if (error) throw error;
+        return data || [];
     }
 
     async bulkImportTweets(tweets: string[], source: string = 'truth_terminal', batchSize: number = 1000) {

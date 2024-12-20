@@ -10,26 +10,20 @@ export async function GET(req: NextRequest) {
             await checkTwitterRateLimit('targets');
             
             const twitterManager = getTwitterManager();
-            if (!twitterManager) {
-                return NextResponse.json({ 
-                    error: 'Twitter manager not initialized',
-                    code: 'TWITTER_INIT_ERROR'
-                }, { status: 500 });
-            }
-
             const targets = await twitterManager.getEngagementTargets();
-            return NextResponse.json(targets);
+            
+            return NextResponse.json({ 
+                success: true,
+                targets 
+            });
         } catch (error: any) {
-            console.error('Error fetching engagement targets:', error);
-            return NextResponse.json(
-                { 
-                    error: 'Internal server error',
-                    message: error.message,
-                    code: error.code || 'TARGETS_FETCH_ERROR',
-                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-                }, 
-                { status: error.statusCode || 500 }
-            );
+            console.error('Error fetching targets:', error);
+            return NextResponse.json({ 
+                error: true,
+                message: error.message || 'Failed to fetch targets'
+            }, { 
+                status: error.statusCode || 500 
+            });
         }
     }))(req);
 }

@@ -34,8 +34,7 @@ interface ExtendedTweetData extends TwitterData {
 }
 
 export class TwitterManager {
-private client: TwitterApi;
-  private supabase: SupabaseClient<Database>;
+    
   private queuedTweets: QueuedTweet[] = [];
   private isAutoMode: boolean = false;
   private nextTweetTimeout?: NodeJS.Timeout;
@@ -43,7 +42,7 @@ private client: TwitterApi;
   private recentTweets = new Map<string, any>();
   private hourlyEngagementWeights: Record<number, number> = {};
   private stats: TweetStats;
-  private trainingService: any;
+
   private is24HourMode = false;
   private monitoringInterval?: NodeJS.Timeout;
   private lastTweetTime: Date | null = null;
@@ -57,13 +56,15 @@ private client: TwitterApi;
   
 
   constructor(
-    private client: TwitterApi,
+    private twitterClient: TwitterApi,
     private personalitySystem: PersonalitySystem,
-    private supabase: SupabaseClient,
+    private supabaseClient: SupabaseClient,
     private trainingService: TwitterTrainingService
 ) {
+    if (!supabaseClient) {
+        throw new Error('Supabase client is required');
+    }
     this.stats = new TweetStats();
-    this.trainingService = trainingService;
 }
 
   // Your existing methods
@@ -75,7 +76,7 @@ private client: TwitterApi;
             throw new TwitterDataError('Tweet exceeds Twitter Premium character limit');
         }
 
-        if (!this.client?.tweet) {
+        if (!this.twitterClient?.tweet) {
             throw new TwitterError('Twitter client not initialized', 'INITIALIZATION_ERROR', 500);
         }
 
@@ -90,7 +91,7 @@ private client: TwitterApi;
         }
 
         try {
-            const result = await this.client.tweet(content);
+            const result = await this.twitterClient.v2.tweet(content);
             this.lastTweetTime = new Date();
             this.recentTweets.set(result.data.id, {
                 ...result.data,
@@ -108,7 +109,7 @@ private client: TwitterApi;
                 const waitTime = 15 * 60 * 1000 + (Math.random() * 60000);
                 console.log(`Rate limit hit, waiting ${Math.round(waitTime/1000)}s`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
-                const retryResult = await this.client.tweet(content);
+                const retryResult = await this.twitterClient.v2.tweet(content);
                 return retryResult.data;
             }
             throw tweetError;
@@ -243,7 +244,7 @@ private async syncQueueWithDatabase(): Promise<void> {
             isAutoMode: this.isAutoMode
         });
  
-        const { data, error } = await this.supabase
+        const { data, error } = await this.supabaseClient
             .from('tweet_queue')
             .update({ 
                 status,
@@ -332,7 +333,7 @@ public toggleAutoMode(enabled: boolean): void {
 
 
   private async persistAutoMode(enabled: boolean): Promise<void> {
-    const { error } = await this.supabase
+    const { error } = await this.supabaseClient
         .from('system_settings')
         .upsert({ 
             key: 'twitter_auto_mode',
@@ -358,7 +359,7 @@ public toggleAutoMode(enabled: boolean): void {
 
   private async persistScheduledTweet(tweetId: string, scheduledTime: Date): Promise<void> {
     try {
-        const { error } = await this.supabase
+        const { error } = await this.supabaseClient
             .from('tweet_queue')
             .update({
                 scheduled_for: scheduledTime.toISOString()
@@ -429,7 +430,7 @@ private async scheduleNextTweet(): Promise<void> {
               await this.postTweet(nextTweet.content);
               
               // Remove from database and local queue
-              await this.supabase
+              await this.supabaseClient
                   .from('tweet_queue')
                   .delete()
                   .eq('id', nextTweet.id);
@@ -452,7 +453,7 @@ private async scheduleNextTweet(): Promise<void> {
 public async getQueuedTweets(): Promise<QueuedTweet[]> {
   try {
       // First check if table exists by attempting a count
-      const { count, error: countError } = await this.supabase
+      const { count, error: countError } = await this.supabaseClient
           .from('tweet_queue')
           .select('*', { count: 'exact', head: true });
 
@@ -468,7 +469,7 @@ public async getQueuedTweets(): Promise<QueuedTweet[]> {
       }
 
       // If table exists, get tweets
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseClient
           .from('tweet_queue')
           .select('*')
           .order('created_at', { ascending: false });
@@ -518,7 +519,7 @@ public async getQueuedTweets(): Promise<QueuedTweet[]> {
 }
 
 public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> {
-  const { error } = await this.supabase
+  const { error } = await this.supabaseClient
       .from('tweet_queue')
       .insert(
           tweets.map(tweet => ({
@@ -561,7 +562,11 @@ public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> 
         // Get timeline with error handling
         let timeline;
         try {
-            timeline = await this.client.userTimeline();
+            timeline = await this.twitterClient.v2.userTimeline(process.env.TWITTER_USER_ID!, {
+                max_results: 10,
+                'tweet.fields': ['created_at', 'public_metrics', 'author_id'],
+                'user.fields': ['username', 'name']
+            });
         } catch (timelineError) {
             console.warn('Timeline fetch failed:', timelineError);
             timeline = { data: { data: [] } };
@@ -570,7 +575,11 @@ public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> 
         // Get mentions with error handling
         let mentions;
         try {
-            mentions = await this.client.userMentionTimeline();
+            mentions = await this.twitterClient.v2.userMentionTimeline(process.env.TWITTER_USER_ID!, {
+                max_results: 10,
+                'tweet.fields': ['created_at', 'public_metrics', 'author_id'],
+                'user.fields': ['username', 'name']
+            });
         } catch (mentionsError) {
             console.warn('Mentions fetch failed:', mentionsError);
             mentions = { data: { data: [] } };
@@ -609,7 +618,11 @@ public async addTweetsToQueue(tweets: Omit<QueuedTweet, 'id'>[]): Promise<void> 
   // Add this method after getEnvironmentalFactors
   private async trackEngagement() {
     try {
-        const timeline = await this.client.userTimeline();
+        const timeline = await this.twitterClient.v2.userTimeline(process.env.TWITTER_USER_ID!, {
+            max_results: 10,
+            'tweet.fields': ['created_at', 'public_metrics', 'author_id'],
+            'user.fields': ['username', 'name']
+        });
         const tweets = timeline.data.data || []; // Access the correct data property
         
         // Analyze engagement patterns
@@ -687,27 +700,11 @@ private getEngagementBasedDelay(): number {
             twitter_id: target.twitter_id
         });
 
-        const timelineResponse = await this.client.userTimeline({
-            user_id: target.twitter_id, // Using the stored twitter_id
+        const timelineResponse = await this.twitterClient.v2.userTimeline(target.twitter_id, {
             max_results: 5,
-            'tweet.fields': [
-                'created_at',
-                'public_metrics',
-                'author_id',
-                'in_reply_to_user_id',
-                'referenced_tweets'
-            ],
-            'user.fields': [
-                'username',
-                'name',
-                'id'
-            ],
-            expansions: [
-                'author_id',
-                'referenced_tweets.id',
-                'in_reply_to_user_id'
-            ]
-        } satisfies TwitterTimelineOptions);
+            'tweet.fields': ['created_at', 'public_metrics', 'author_id'],
+            'user.fields': ['username', 'name']
+        });
 
         // Get author info from includes with proper typing
         const users: TwitterUser[] = timelineResponse.data.includes?.users || [];
@@ -737,8 +734,7 @@ private getEngagementBasedDelay(): number {
                 tweet_id: tweet.id,
                 author_id: tweet.author_id,
                 found_author: !!author,
-                author_username: author?.username,
-                target_id: target.twitter_id
+                author_username: author?.username || undefined
             });
             return {
                 ...tweet,
@@ -822,7 +818,7 @@ private getEngagementBasedDelay(): number {
 
         // Update last interaction time for this target
         if (sortedTweets.length > 0) {
-            const { error } = await this.supabase
+            const { error } = await this.supabaseClient
                 .from('engagement_targets')  // Changed from last_interaction to engagement_targets
                 .update({
                     last_interaction: new Date().toISOString()
@@ -847,7 +843,7 @@ private backoffDelay = 1000; // Start with 1 second
 private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
     try {
         // Use select count instead of single()
-        const { data, error } = await this.supabase
+        const { data, error } = await this.supabaseClient
             .from('replied_tweets')
             .select('tweet_id')
             .eq('tweet_id', tweetId);
@@ -869,7 +865,7 @@ private async hasRepliedToTweet(tweetId: string): Promise<boolean> {
 
 private async trackReply(originalTweetId: string, targetId: string, replyTweetId: string): Promise<void> {
     try {
-        const { data: existing } = await this.supabase
+        const { data: existing } = await this.supabaseClient
             .from('replied_tweets')
             .select('tweet_id')
             .eq('tweet_id', originalTweetId);
@@ -879,7 +875,7 @@ private async trackReply(originalTweetId: string, targetId: string, replyTweetId
             return;
         }
 
-        const { error } = await this.supabase
+        const { error } = await this.supabaseClient
             .from('replied_tweets')
             .insert({
                 tweet_id: originalTweetId,
@@ -1008,7 +1004,7 @@ private async generateAndSendReply(tweet: TwitterData, target: EngagementTargetR
                 attempts
             });
 
-            const result = await this.client.tweet(validReply, {
+            const result = await this.twitterClient.v2.tweet(validReply, {
                 reply: {
                     in_reply_to_tweet_id: tweet.id
                 }
@@ -1061,7 +1057,7 @@ private async handleMention(mention: {
     try {
 
         // Get all targets first to check if mention is from a target
-        const { data: targets } = await this.supabase
+        const { data: targets } = await this.supabaseClient
             .from('engagement_targets')
             .select('*');
 
@@ -1153,11 +1149,11 @@ private async handleMention(mention: {
                     attempts
                 });
 
-                await this.client.tweet(validReply, {
+                await this.twitterClient.v2.tweet(validReply, {
                     reply: { in_reply_to_tweet_id: mention.id }
                 });
                 
-                await this.supabase
+                await this.supabaseClient
                     .from('last_interaction')
                     .upsert({
                         id: 1,
@@ -1181,7 +1177,7 @@ private async handleReply(tweet: {
 }): Promise<void> {
     try {
 
-        const { data: targets } = await this.supabase
+        const { data: targets } = await this.supabaseClient
             .from('engagement_targets')
             .select('*');
 
@@ -1284,11 +1280,11 @@ private async handleReply(tweet: {
                     attempts
                 });
 
-                await this.client.tweet(validReply, {
+                await this.twitterClient.v2.tweet(validReply, {
                     reply: { in_reply_to_tweet_id: tweet.id }
                 });
                 
-                await this.supabase
+                await this.supabaseClient
                     .from('last_interaction')
                     .upsert({
                         id: 1,
@@ -1338,7 +1334,7 @@ private async runMonitoringCycle(): Promise<void> {
         this.backoffDelay = 1000;
 
         // Monitor engagement targets
-        const { data: targets, error: targetsError } = await this.supabase
+        const { data: targets, error: targetsError } = await this.supabaseClient
             .from('engagement_targets')
             .select('*');
 
@@ -1362,14 +1358,17 @@ private async runMonitoringCycle(): Promise<void> {
 
         console.log('Fetching mentions and replies...');
         const [mentions, replies] = await Promise.all([
-            this.client.userMentionTimeline(),
-            this.client.userTimeline({
-                user_id: process.env.TWITTER_USER_ID!,
+            this.twitterClient.v2.userMentionTimeline(process.env.TWITTER_USER_ID!, {
+                max_results: 10,
+                'tweet.fields': ['created_at', 'public_metrics', 'author_id'],
+                'user.fields': ['username', 'name']
+            }),
+            this.twitterClient.v2.userTimeline(process.env.TWITTER_USER_ID!, {
                 max_results: 10,
                 'tweet.fields': ['created_at', 'public_metrics', 'author_id', 'in_reply_to_user_id'],
                 'user.fields': ['username', 'name'],
                 expansions: ['author_id']
-            } satisfies TwitterTimelineOptions)
+            })
         ]);
 
         console.log('Processing mentions and replies:', {
@@ -1461,7 +1460,7 @@ private async schedule24Hours() {
 
 private async getLastInteractionTime(): Promise<Date> {
     try {
-        const { data, error } = await this.supabase
+        const { data, error } = await this.supabaseClient
             .from('last_interaction')
             .select('timestamp')
             .single();
@@ -1494,26 +1493,27 @@ private async getLastInteractionTime(): Promise<Date> {
 
   async getEngagementTargets() {
     try {
-      const { data: targets } = await this.supabase
-        .from('engagement_targets')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      return targets || [];
+        const { data, error } = await this.supabaseClient
+            .from('engagement_targets')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        return data || [];
     } catch (error) {
-      console.error('Error fetching engagement targets:', error);
-      throw error;
+        console.error('Error fetching engagement targets:', error);
+        throw error;
     }
   }
 
   async addEngagementTarget(username: string) {
     try {
-      const user = await this.client.v2.userByUsername(username);
+      const user = await this.twitterClient.v2.userByUsername(username);
       if (!user.data) {
         throw new Error('User not found');
       }
 
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseClient
         .from('engagement_targets')
         .insert({
           username,
@@ -1533,7 +1533,7 @@ private async getLastInteractionTime(): Promise<Date> {
 
   async removeEngagementTarget(id: string) {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.supabaseClient
         .from('engagement_targets')
         .delete()
         .eq('id', id);
@@ -1570,7 +1570,7 @@ private async getLastInteractionTime(): Promise<Date> {
 
   async updateEngagementTarget(id: string, data: Partial<EngagementTargetRow>) {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.supabaseClient
         .from('engagement_targets')
         .update(data)
         .eq('id', id);
@@ -1584,7 +1584,7 @@ private async getLastInteractionTime(): Promise<Date> {
 
   async getTrainingData(username: string, limit: number = 100) {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.supabaseClient
         .from('training_data')
         .select('*')
         .eq('username', username)
@@ -1600,7 +1600,7 @@ private async getLastInteractionTime(): Promise<Date> {
 
   async addTrainingData(username: string, tweets: any[]) {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.supabaseClient
         .from('training_data')
         .insert(tweets.map(tweet => ({
           username,

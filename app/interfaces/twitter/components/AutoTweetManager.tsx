@@ -52,7 +52,23 @@ export default function AutoTweetManager() {
 }, []);
 
   useEffect(() => {
-    fetchQueuedTweets();
+    const fetchQueue = async () => {
+        try {
+            setIsLoading(true);
+            const response = await fetch('/api/twitter/queue');
+            const data = await response.json();
+            if (data.tweets) {
+                setQueuedTweets(data.tweets);
+            }
+        } catch (error) {
+            console.error('Error fetching queue:', error);
+            setError('Failed to fetch tweet queue');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    fetchQueue();
   }, []);
 
   const fetchQueuedTweets = async () => {

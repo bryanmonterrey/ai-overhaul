@@ -53,44 +53,41 @@ interface PersonalitySystemConfig {
     private state: PersonalityState;
     private config: PersonalityConfig;
     private traits: Map<string, number> = new Map();
-    private trainingService: TwitterTrainingService;
     private memgpt: LettaClient;
     private memorySystem: MemorySystem;
     private emotionalSystem: EmotionalSystem;
 
-    constructor(config: PersonalitySystemConfig) {
-      this.config = {
-          ...config,
-          platform: config.platform || 'chat'  // Provide default value
-      } as PersonalityConfig;
-      this.state = this.initializeState();
-      this.initializeTraits();
-      this.trainingService = new TwitterTrainingService();
-      this.memgpt = new LettaClient();
-      this.memorySystem = new MemorySystem(this.memgpt);
-      this.emotionalSystem = new EmotionalSystem();
-      // Test MemGPT connection
-      this.testMemGPTConnection();
-  }
-
-  private async testMemGPTConnection() {
-    try {
-        const response = await this.memgpt.storeMemory({
-            key: `init-${Date.now()}`,
-            memory_type: 'chat_history',
-            data: { 
-                messages: [{
-                    role: 'assistant',
-                    content: 'Personality System Initialization',
-                    timestamp: new Date().toISOString()
-                }]
-            }
-        });
-        console.log('MemGPT connection established:', response.success);
-    } catch (error) {
-        console.error('Failed to connect to MemGPT service:', error);
+    constructor(
+        config: PersonalityConfig,
+        private readonly trainingService: TwitterTrainingService
+    ) {
+        this.config = config;
+        this.state = this.initializeState();
+        this.initializeTraits();
+        this.memgpt = new LettaClient();
+        this.memorySystem = new MemorySystem(this.memgpt);
+        this.emotionalSystem = new EmotionalSystem();
+        this.testMemGPTConnection();
     }
-}
+
+    private async testMemGPTConnection() {
+        try {
+            const response = await this.memgpt.storeMemory({
+                key: `init-${Date.now()}`,
+                memory_type: 'chat_history',
+                data: { 
+                    messages: [{
+                        role: 'assistant',
+                        content: 'Personality System Initialization',
+                        timestamp: new Date().toISOString()
+                    }]
+                }
+            });
+            console.log('MemGPT connection established:', response.success);
+        } catch (error) {
+            console.error('Failed to connect to MemGPT service:', error);
+        }
+    }
 
     private initializeTraits(): void {
       this.traits.set('technical_depth', 0.8);

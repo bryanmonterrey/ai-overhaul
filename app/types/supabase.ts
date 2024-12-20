@@ -11,6 +11,7 @@ export interface EngagementTargetRow {
   reply_probability: number;
   preferred_style: string;
   created_at: string;
+  last_interaction: string | null;
 }
 
 export interface TrainingDataRow {
@@ -55,6 +56,11 @@ export type Database = {
         Update: Partial<EngagementTargetRow>;
       };
       training_data: {
+        Row: TrainingDataRow;
+        Insert: Omit<TrainingDataRow, 'id' | 'created_at'>;
+        Update: Partial<TrainingDataRow>;
+      };
+      tweet_training_data: {
         Row: TrainingDataRow;
         Insert: Omit<TrainingDataRow, 'id' | 'created_at'>;
         Update: Partial<TrainingDataRow>;

@@ -36,11 +36,16 @@ export default function EngagementTargets() {
     try {
       setLoading(true);
       const response = await fetch('/api/twitter/targets');
-      if (!response.ok) throw new Error('Failed to fetch targets');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
-      setTargets(Array.isArray(data) ? data : []);
+      if (data.error) {
+        throw new Error(data.message || 'Failed to fetch targets');
+      }
+      setTargets(data.targets || []);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching targets:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch targets');
       setTargets([]);
     } finally {
