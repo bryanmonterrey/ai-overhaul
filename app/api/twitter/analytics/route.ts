@@ -4,17 +4,17 @@ import { checkTwitterRateLimit } from '../../../lib/middleware/twitter-rate-limi
 import { getTwitterManager } from '../../../lib/twitter-manager-instance';
 
 interface TwitterStatus {
-  account?: {
-    total_likes?: number;
-    total_retweets?: number;
-    total_replies?: number;
-    engagement_rate?: number;
-  };
-  activity?: {
-    optimal_style?: string;
-    peak_hours?: string[];
-    top_themes?: string[];
-  };
+    account?: {
+        total_likes?: number;
+        total_retweets?: number;
+        total_replies?: number;
+        engagement_rate?: number;
+    };
+    activity?: {
+        optimal_style?: string;
+        peak_hours?: string[];
+        top_themes?: string[];
+    };
 }
 
 interface EnvironmentalFactors {
@@ -80,9 +80,9 @@ export async function GET() {
 
                 if (environmentalFactors && 'marketConditions' in environmentalFactors) {
                     baseStats.trends = {
-                        sentiment: (environmentalFactors as EnvironmentalFactors).marketConditions.sentiment ?? 0,
-                        volatility: (environmentalFactors as EnvironmentalFactors).marketConditions.volatility ?? 0,
-                        momentum: (environmentalFactors as EnvironmentalFactors).marketConditions.momentum ?? 0,
+                        sentiment: environmentalFactors.marketConditions.sentiment ?? 0,
+                        volatility: environmentalFactors.marketConditions.volatility ?? 0,
+                        momentum: environmentalFactors.marketConditions.momentum ?? 0,
                     };
                 }
 
@@ -90,12 +90,9 @@ export async function GET() {
             } catch (innerError: any) {
                 console.error('Error fetching analytics data:', innerError);
                 return NextResponse.json({ 
-                    error: true,
-                    message: innerError.message,
-                    code: 'ANALYTICS_DATA_ERROR',
-                    details: innerError.stack
-                }, { 
-                    status: 500 
+                    ...baseStats,
+                    error: innerError.message,
+                    stack: process.env.NODE_ENV === 'development' ? innerError.stack : undefined
                 });
             }
         } catch (error: any) {
@@ -105,7 +102,7 @@ export async function GET() {
                     error: true,
                     message: error.message || 'Failed to fetch analytics',
                     code: error.code || 'ANALYTICS_ERROR',
-                    details: error.stack
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 },
                 { status: error.statusCode || 500 }
             );

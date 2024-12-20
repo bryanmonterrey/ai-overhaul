@@ -1,67 +1,84 @@
-// app/api/twitter/targets/route.ts
-
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { withAuth } from '../../../lib/middleware/auth-middleware';
 import type { Database } from '../../../types/supabase';
 import type { EngagementTargetRow } from '../../../types/supabase';
 
 export async function GET() {
-  try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
-    const session = await supabase.auth.getSession();
-    
-    if (!session.data.session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const { data: targets, error } = await supabase
-      .from('engagement_targets')
-      .select('*')
-      .order('created_at', { ascending: false });
+    return withAuth(async (supabase: any, session: any) => {
+        try {
+            const { data: targets, error } = await supabase
+                .from('engagement_targets')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to fetch targets' }, { status: 500 });
-    }
+            if (error) {
+                console.error('Database error:', error);
+                throw new Error('Failed to fetch targets');
+            }
 
-    return NextResponse.json(targets);
-  } catch (error) {
-    console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+            return NextResponse.json(targets);
+        } catch (error: any) {
+            console.error('Server error:', error);
+            return NextResponse.json(
+                { 
+                    error: 'Internal server error',
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                }, 
+                { status: 500 }
+            );
+        }
+    });
 }
 
 export async function POST(req: Request) {
-  try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-    const body = await req.json();
+    return withAuth(async (supabase: any, session: any) => {
+        try {
+            const body = await req.json();
 
-    const target = {
-      username: body.username,
-      topics: body.topics,
-      twitter_id: body.twitter_id,
-      reply_probability: body.replyProbability,
-      relationship_level: 'new' as const,
-      preferred_style: body.preferredStyle,
-      last_interaction: null
-    };
+            // Validate required fields
+            if (!body.username || !body.twitter_id) {
+                return NextResponse.json(
+                    { error: 'Missing required fields' },
+                    { status: 400 }
+                );
+            }
 
-    const { data, error } = await supabase
-      .from('engagement_targets')
-      .insert([target])
-      .select()
-      .single();
+            const target = {
+                username: body.username,
+                topics: body.topics || [],
+                twitter_id: body.twitter_id,
+                reply_probability: body.replyProbability || 0.5,
+                relationship_level: 'new' as const,
+                preferred_style: body.preferredStyle || 'default',
+                last_interaction: null
+            };
 
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to create target' }, { status: 500 });
-    }
+            const { data, error } = await supabase
+                .from('engagement_targets')
+                .insert([target])
+                .select()
+                .single();
 
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+            if (error) {
+                console.error('Database error:', error);
+                throw new Error('Failed to create target');
+            }
+
+            return NextResponse.json({
+                success: true,
+                data
+            });
+        } catch (error: any) {
+            console.error('Server error:', error);
+            return NextResponse.json(
+                { 
+                    error: 'Internal server error',
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                }, 
+                { status: 500 }
+            );
+        }
+    });
 }

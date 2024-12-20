@@ -7,12 +7,12 @@ export async function GET() {
     return withAuth(async (supabase: any, session: any) => {
         try {
             await checkTwitterRateLimit();
-
+            
             const twitterManager = getTwitterManager();
             if (!twitterManager) {
                 throw new Error('Twitter manager not initialized');
             }
-            
+
             try {
                 const status = await twitterManager.getStatus();
                 const recentTweets = await twitterManager.getRecentTweets();
@@ -38,12 +38,10 @@ export async function GET() {
             } catch (innerError: any) {
                 console.error('Error processing tweets:', innerError);
                 return NextResponse.json({ 
-                    error: true,
-                    message: innerError.message,
-                    code: innerError.code || 'TWEET_PROCESS_ERROR',
-                    details: innerError.stack
-                }, { 
-                    status: innerError.statusCode || 500 
+                    tweets: [], 
+                    status: {},
+                    error: innerError.message,
+                    stack: process.env.NODE_ENV === 'development' ? innerError.stack : undefined
                 });
             }
         } catch (error: any) {
@@ -53,8 +51,8 @@ export async function GET() {
                     error: true,
                     message: error.message || 'Failed to fetch tweets',
                     code: error.code || 'TWEET_FETCH_ERROR',
-                    details: error.stack,
-                    tweets: []
+                    tweets: [],
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 },
                 { status: error.statusCode || 500 }
             );

@@ -1,57 +1,77 @@
-// app/api/twitter/targets/[id]/route.ts
-
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '../../../../lib/middleware/auth-middleware';
 import type { Database } from '../../../../types/supabase';
 
 export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
+    req: NextRequest,
+    context: { params: { id: string } }
 ) {
-  try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-    const body = await req.json();
+    return withAuth(async (supabase: any, session: any) => {
+        try {
+            const { id } = context.params;
+            const updates = await req.json();
 
-    const { data, error } = await supabase
-      .from('engagement_targets')
-      .update(body)
-      .eq('id', params.id)
-      .select()
-      .single();
+            const { data, error } = await supabase
+                .from('engagement_targets')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
 
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to update target' }, { status: 500 });
-    }
+            if (error) {
+                console.error('Database error:', error);
+                throw new Error('Failed to update target');
+            }
 
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+            return NextResponse.json({
+                success: true,
+                data
+            });
+        } catch (error: any) {
+            console.error('Server error:', error);
+            return NextResponse.json(
+                { 
+                    error: 'Internal server error',
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                }, 
+                { status: 500 }
+            );
+        }
+    });
 }
 
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+    req: NextRequest,
+    context: { params: { id: string } }
 ) {
-  try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    return withAuth(async (supabase: any, session: any) => {
+        try {
+            const { id } = context.params;
 
-    const { error } = await supabase
-      .from('engagement_targets')
-      .delete()
-      .eq('id', params.id);
+            const { error } = await supabase
+                .from('engagement_targets')
+                .delete()
+                .eq('id', id);
 
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: 'Failed to delete target' }, { status: 500 });
-    }
+            if (error) {
+                console.error('Database error:', error);
+                throw new Error('Failed to delete target');
+            }
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Server error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+            return NextResponse.json({
+                success: true
+            });
+        } catch (error: any) {
+            console.error('Server error:', error);
+            return NextResponse.json(
+                { 
+                    error: 'Internal server error',
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                }, 
+                { status: 500 }
+            );
+        }
+    });
 }
