@@ -11,8 +11,8 @@ import { Platform } from '@/app/core/types';
 import { PersonalitySystem } from '@/app/core/personality/PersonalitySystem';
 import { EmotionalSystem } from '@/app/core/personality/EmotionalSystem';
 import { MemorySystem } from '@/app/core/personality/MemorySystem';
-import { MemGPTClient } from '@/app/lib/memory/letta-client';
 import { EmotionalState } from '@/app/core/personality/types';
+import { LettaClient } from '@/app/lib/memory/letta-client';
 
 // Input validation schema
 const chatInputSchema = z.object({
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       );
 
       // Store new memory with enhanced metadata
-      const memClient = new MemGPTClient();
+      const memClient = new LettaClient();
       await memClient.storeMemory({
         key: `chat-${Date.now()}`,
         memory_type: 'chat_history',
