@@ -9,9 +9,7 @@ const nextConfig: NextConfig = {
         '@solana/wallet-adapter-react-ui',
         '@solana/wallet-adapter-wallets',
     ],
-    experimental: {
-        serverComponentsExternalPackages: ['twitter-api-v2']
-    },
+    serverExternalPackages: ['twitter-api-v2'],
     webpack: (config, { isServer }) => {
         if (isServer) {
             config.externals.push('twitter-api-v2')
@@ -34,13 +32,14 @@ const nextConfig: NextConfig = {
         ignoreDuringBuilds: true,
     },
     async rewrites() {
+        const pythonApiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001';
         return [
-            {
-                source: '/api/memory/:path*',
-                destination: 'http://localhost:3001/:path*'
-            }
-        ]
-    }
+          {
+            source: '/api/memory/:path*',
+            destination: `${pythonApiUrl}/:path*`
+          }
+        ];
+      }
 }
 
 export default nextConfig
