@@ -1,7 +1,7 @@
 # memgpt-service/letta_service.py
 import os
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, validator
 from enum import Enum
@@ -22,8 +22,8 @@ from pathlib import Path
 from .trading.websocket.event_handler import WebSocketEventHandler
 from .trading.realtime import RealTimeMonitor
 from .trading.memory.trading_memory import TradingMemory
-
-
+import logging
+from dataclasses import asdict
 
 load_dotenv()
 
@@ -786,22 +786,100 @@ class MemGPTService:
             return {"success": False, "error": str(e)}
 
     async def handle_ai_trading(self, command: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle AI trading operations"""
+        """Handle AI trading operations with realtime monitoring and consciousness integration"""
         try:
+            # Update realtime monitor with command
+            await self.realtime_monitor.process_command(command)
+            
+            # Get current consciousness state for context
+            consciousness_state = self.agent.agent_state.consciousness
+            
             command_type = command.get('type')
+            
+            # Enhance command with consciousness context
+            command["context"] = {
+                "emotional_state": consciousness_state.emotionalState,
+                "attention_focus": consciousness_state.attentionFocus,
+                "current_thought": consciousness_state.currentThought
+            }
+            
+            # Store command in trading memory
+            await self.trading_memory.store_trade_execution({
+                "type": "command",
+                "data": command,
+                "timestamp": datetime.now().isoformat()
+            })
+
+            # Process command based on type
+            result = None
             if command_type == 'execute_trade':
-                return await self._execute_ai_trade(command)
+                result = await self._execute_ai_trade(command)
+                
+                # Update realtime monitor with trade result
+                if result.get("success"):
+                    await self.realtime_monitor.process_trade(result["data"])
+                    
             elif command_type == 'update_strategy':
-                return await self._update_ai_strategy(command)
+                result = await self._update_ai_strategy(command)
+                
+                # Update realtime monitor with new strategy
+                if result.get("success"):
+                    await self.realtime_monitor.update_strategy(result["data"])
+                    
             elif command_type == 'get_status':
-                return await self._get_ai_trading_status()
+                # Get status from both trading system and realtime monitor
+                ai_status = await self._get_ai_trading_status()
+                monitor_metrics = await self.realtime_monitor.get_current_metrics()
+                
+                result = {
+                    "success": True,
+                    "data": {
+                        **ai_status.get("data", {}),
+                        "realtime_metrics": monitor_metrics,
+                        "consciousness_state": asdict(consciousness_state)
+                    }
+                }
             else:
                 raise ValueError(f"Unknown command type: {command_type}")
+
+            # Broadcast update via WebSocket if result is successful
+            if result and result.get("success"):
+                await self.ws_handler.broadcast_update(
+                    channel="admin_trading",
+                    data={
+                        "type": command_type,
+                        "result": result["data"]
+                    }
+                )
+
+            return result
+
         except Exception as e:
-            logging.error(f"AI trading error: {str(e)}")
+            error_msg = f"AI trading error: {str(e)}"
+            logging.error(error_msg)
+            
+            # Store error in memory
+            await self.trading_memory.store_trade_execution({
+                "type": "error",
+                "data": {
+                    "command": command,
+                    "error": error_msg
+                },
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            # Broadcast error via WebSocket
+            await self.ws_handler.broadcast_update(
+                channel="admin_trading",
+                data={
+                    "type": "error",
+                    "error": error_msg
+                }
+            )
+            
             return {
                 "success": False,
-                "error": str(e)
+                "error": error_msg
             }
 
     async def handle_holder_trading(
@@ -924,7 +1002,10 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
         )
     return result
 
-
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    client_id = websocket.headers.get("client-id", str(uuid.uuid4()))
+    await service.ws_handler.handle_connection(websocket, client_id)
 
 # New feature endpoints
 @app.post("/memories/chain/{memory_key}")

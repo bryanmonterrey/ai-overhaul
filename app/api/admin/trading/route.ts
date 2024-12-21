@@ -1,8 +1,13 @@
 // app/api/admin/trading/route.ts
 import { NextRequest } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // Validation schemas
 const TradeSchema = z.object({
@@ -18,10 +23,33 @@ const StrategySchema = z.object({
   targetProfit: z.number()
 });
 
+async function checkAdminAuth(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return false;
+  }
+
+  const token = authHeader.split(' ')[1];
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  
+  if (error || !user) {
+    return false;
+  }
+
+  // Check if user has admin role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+
+  return profile?.is_admin === true;
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.isAdmin) {
+    const isAdmin = await checkAdminAuth(req);
+    if (!isAdmin) {
       return new Response('Unauthorized', { status: 401 });
     }
 
@@ -46,8 +74,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.isAdmin) {
+    const isAdmin = await checkAdminAuth(req);
+    if (!isAdmin) {
       return new Response('Unauthorized', { status: 401 });
     }
 
