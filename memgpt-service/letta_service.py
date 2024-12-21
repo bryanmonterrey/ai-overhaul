@@ -191,6 +191,15 @@ class MemGPTService:
                 }
             )
 
+            self.trading_chat = TradingChat(
+            self,
+            self.memory_processor,
+            self.dspy_service
+            )
+            self.trading_memory = TradingMemory(
+                self.memory_processor
+            )
+
             
             
         except Exception as e:
@@ -717,6 +726,56 @@ class MemGPTService:
         except Exception as e:
             print(f"Error summarizing memories: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    async def handle_ai_trading(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle AI trading operations"""
+        try:
+            command_type = command.get('type')
+            if command_type == 'execute_trade':
+                return await self._execute_ai_trade(command)
+            elif command_type == 'update_strategy':
+                return await self._update_ai_strategy(command)
+            elif command_type == 'get_status':
+                return await self._get_ai_trading_status()
+            else:
+                raise ValueError(f"Unknown command type: {command_type}")
+        except Exception as e:
+            logging.error(f"AI trading error: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    async def handle_holder_trading(
+        self,
+        user_address: str,
+        command: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle holder trading operations"""
+        try:
+            # Verify holder status
+            is_holder = await self._verify_token_holder(user_address)
+            if not is_holder:
+                return {
+                    "success": False,
+                    "error": "Not a token holder"
+                }
+
+            command_type = command.get('type')
+            if command_type == 'update_settings':
+                return await self._update_holder_settings(user_address, command)
+            elif command_type == 'get_portfolio':
+                return await self._get_holder_portfolio(user_address)
+            elif command_type == 'toggle_trading':
+                return await self._toggle_holder_trading(user_address, command)
+            else:
+                raise ValueError(f"Unknown command type: {command_type}")
+        except Exception as e:
+            logging.error(f"Holder trading error: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 # FastAPI setup
 app = FastAPI()
