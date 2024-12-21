@@ -123,12 +123,12 @@ export default function LoginPage() {
 
   return (
     <div className="h-full flex items-center font-ia justify-center bg-[#11111A]">
-      <div className="max-w-md w-full space-y-8 p-8 bg-[#11111A] border border-white rounded-none shadow-none">
+      <div className="max-w-md w-full space-y-8 p-8 bg-[#11111A] border border-zinc-800 rounded-md shadow-none">
         <div>
-          <h2 className="text-center text-xl font-ia text-white">
+          <h2 className="text-center text-xl font-ia text-[#DDDDDD]">
             Connect Your Wallet
           </h2>
-          <p className="mt-2 text-center font-ia text-sm text-gray-300">
+          <p className="mt-2 text-center font-ia text-sm text-[#DDDDDD]">
             To access the chat, you need to verify your $GOATSE SINGULARITY tokens
           </p>
           {error && (
@@ -143,7 +143,7 @@ export default function LoginPage() {
         </div>
 
         {isAuthenticating && (
-          <p className="text-center text-sm text-gray-400">
+          <p className="text-center text-sm text-[#DDDDDD]">
             Authenticating...
           </p>
         )}
