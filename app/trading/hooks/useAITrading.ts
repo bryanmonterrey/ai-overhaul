@@ -1,6 +1,6 @@
 // app/trading/hooks/useAITrading.ts
 import { useState, useEffect } from 'react';
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast";
 import { aiTradingService } from '../services/aiTradingService';
 
 export function useAITrading() {

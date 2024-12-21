@@ -1,8 +1,7 @@
 // app/trading/holders/page.tsx
 import { redirect } from 'next/navigation';
 import { HolderDashboard } from './components/HolderDashboard';
-import { getUser } from '@/lib/auth';
-import { verifyTokenHolder } from '@/lib/token';
+import { getUser, verifyTokenHolder } from '../../lib/auth'; 
 
 export default async function HolderTradingPage() {
   const user = await getUser();

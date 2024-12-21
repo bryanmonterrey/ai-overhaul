@@ -1,7 +1,7 @@
 // app/trading/hooks/useTrading.ts
 import { useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from "@/hooks/use-toast";
 
 export function useTrading(isAdmin: boolean = false) {
   const { toast } = useToast();

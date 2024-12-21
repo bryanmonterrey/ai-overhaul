@@ -6,9 +6,8 @@ import { getUser } from '../../lib/auth';
 export default async function AdminTradingPage() {
   const user = await getUser();
 
-  // Only allow admins
   if (!user?.isAdmin) {
-    redirect('/');
+    redirect('/');  // or wherever you want to redirect non-admins
   }
 
   return (

@@ -1,6 +1,43 @@
 // app/lib/auth.ts
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { cookies } from 'next/headers';
+
+// Add getUser function for admin authentication
+export async function getUser() {
+    const cookieStore = cookies();
+    const supabase = createClientComponentClient();
+    
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error || !user) {
+        return null;
+      }
+  
+      // Get additional user data from your users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+  
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        return null;
+      }
+  
+      return {
+        ...user,
+        isAdmin: userData?.role === 'admin',
+        ...userData
+      };
+  
+    } catch (error) {
+      console.error('Auth error:', error);
+      return null;
+    }
+  }
 
 export async function verifyTokenHolder(walletAddress: string) {
   const supabase = createClientComponentClient();

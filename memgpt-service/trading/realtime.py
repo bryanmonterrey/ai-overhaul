@@ -1,19 +1,203 @@
 # memgpt-service/trading/realtime.py
-from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Callable
+from decimal import Decimal
+import asyncio
+from datetime import datetime, timedelta
+import json
+from dataclasses import dataclass, asdict
+from .risk_helpers import RiskHelpers
+from .portfolio.risk_calculator import RiskCalculator
 
-async def broadcast_trading_update(
-    update_type: str,
-    data: Dict[str, Any],
-    channel: str
-):
-    """Broadcast trading updates to WebSocket clients"""
-    await supabase.channel(channel).send({
-        "type": "broadcast",
-        "event": "trading_update",
-        "payload": {
-            "type": update_type,
-            "data": data,
-            "timestamp": datetime.now().isoformat()
+@dataclass
+class MonitoringMetrics:
+    """Real-time monitoring metrics"""
+    timestamp: datetime
+    portfolio_value: Decimal
+    day_pnl: Decimal
+    day_pnl_percent: float
+    current_drawdown: float
+    risk_level: str
+    volatility_24h: float
+    sharpe_ratio: float
+    total_positions: int
+    active_trades: int
+    largest_position: Dict[str, Any]
+    risk_warnings: List[str]
+    performance_metrics: Dict[str, float]
+
+class RealTimeMonitor:
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.risk_calculator = RiskCalculator()
+        self.risk_helpers = RiskHelpers()
+        
+        # Initialize monitoring state
+        self.monitoring_state = {
+            "last_update": datetime.now(),
+            "subscribers": [],
+            "active_alerts": set(),
+            "metrics_history": [],
+            "risk_thresholds": config.get("risk_thresholds", {
+                "max_drawdown": 0.15,  # 15%
+                "position_concentration": 0.25,  # 25%
+                "volatility_threshold": 0.50,  # 50% annualized
+            })
         }
-    })
+
+    async def start_monitoring(self):
+        """Start the monitoring loop"""
+        while True:
+            try:
+                # Collect and analyze metrics
+                metrics = await self.collect_metrics()
+                
+                # Check for risk alerts
+                alerts = self.check_risk_alerts(metrics)
+                
+                # Store historical data
+                self.store_metrics(metrics)
+                
+                # Notify subscribers
+                await self.notify_subscribers({
+                    "type": "metrics_update",
+                    "data": asdict(metrics),
+                    "alerts": alerts
+                })
+                
+                # Update state
+                self.monitoring_state["last_update"] = datetime.now()
+                
+            except Exception as e:
+                print(f"Monitoring error: {str(e)}")
+                
+            await asyncio.sleep(5)  # Update every 5 seconds
+
+    async def collect_metrics(self) -> MonitoringMetrics:
+        """Collect real-time metrics"""
+        # Get portfolio data
+        portfolio = await self.get_portfolio_data()
+        
+        # Calculate performance metrics
+        performance = self.calculate_performance_metrics(portfolio)
+        
+        # Calculate risk metrics
+        risk_metrics = await self.calculate_risk_metrics(portfolio)
+        
+        return MonitoringMetrics(
+            timestamp=datetime.now(),
+            portfolio_value=portfolio["total_value"],
+            day_pnl=performance["day_pnl"],
+            day_pnl_percent=performance["day_pnl_percent"],
+            current_drawdown=risk_metrics["current_drawdown"],
+            risk_level=self.determine_risk_level(risk_metrics),
+            volatility_24h=risk_metrics["volatility_24h"],
+            sharpe_ratio=risk_metrics["sharpe_ratio"],
+            total_positions=len(portfolio["positions"]),
+            active_trades=len(portfolio["active_trades"]),
+            largest_position=self.get_largest_position(portfolio),
+            risk_warnings=risk_metrics["warnings"],
+            performance_metrics=performance
+        )
+
+    def check_risk_alerts(self, metrics: MonitoringMetrics) -> List[Dict[str, Any]]:
+        """Check for risk threshold breaches"""
+        alerts = []
+        thresholds = self.monitoring_state["risk_thresholds"]
+        
+        # Check drawdown
+        if metrics.current_drawdown > thresholds["max_drawdown"]:
+            alerts.append({
+                "type": "risk_alert",
+                "level": "high",
+                "message": f"Drawdown threshold exceeded: {metrics.current_drawdown:.2%}"
+            })
+            
+        # Check position concentration
+        if metrics.largest_position["percentage"] > thresholds["position_concentration"]:
+            alerts.append({
+                "type": "risk_alert",
+                "level": "medium",
+                "message": f"High position concentration in {metrics.largest_position['token']}"
+            })
+            
+        # Check volatility
+        if metrics.volatility_24h > thresholds["volatility_threshold"]:
+            alerts.append({
+                "type": "risk_alert",
+                "level": "medium",
+                "message": f"High volatility detected: {metrics.volatility_24h:.2%}"
+            })
+            
+        return alerts
+
+    def store_metrics(self, metrics: MonitoringMetrics):
+        """Store metrics for historical analysis"""
+        self.monitoring_state["metrics_history"].append(asdict(metrics))
+        
+        # Keep last 24 hours of data (assuming 5-second updates)
+        max_history = 17280  # 24 * 60 * 12
+        if len(self.monitoring_state["metrics_history"]) > max_history:
+            self.monitoring_state["metrics_history"] = self.monitoring_state["metrics_history"][-max_history:]
+
+    async def subscribe(self, callback: Callable[[Dict[str, Any]], None]) -> str:
+        """Subscribe to monitoring updates"""
+        self.monitoring_state["subscribers"].append(callback)
+        return str(len(self.monitoring_state["subscribers"]) - 1)
+
+    async def unsubscribe(self, subscriber_id: str):
+        """Unsubscribe from updates"""
+        idx = int(subscriber_id)
+        if idx < len(self.monitoring_state["subscribers"]):
+            self.monitoring_state["subscribers"].pop(idx)
+
+    async def notify_subscribers(self, update: Dict[str, Any]):
+        """Notify all subscribers of updates"""
+        # First broadcast to Supabase realtime
+        await self.broadcast_trading_update(
+            update_type=update["type"],
+            data=update["data"],
+            channel="trading_updates"
+        )
+        
+        # Then notify local subscribers
+        for subscriber in self.monitoring_state["subscribers"]:
+            try:
+                await subscriber(update)
+            except Exception as e:
+                print(f"Error notifying subscriber: {str(e)}")
+
+    async def broadcast_trading_update(
+        self,
+        update_type: str,
+        data: Dict[str, Any],
+        channel: str
+    ):
+        """Broadcast trading updates to WebSocket clients via Supabase"""
+        try:
+            # Format the update with standard fields
+            formatted_update = {
+                "type": update_type,
+                "data": data,
+                "timestamp": datetime.now().isoformat(),
+                "source": "trading_system"
+            }
+            
+            # Add additional metadata for specific update types
+            if update_type == "metrics_update":
+                formatted_update["interval"] = "5s"
+                formatted_update["version"] = "2.0"
+            elif update_type == "risk_alert":
+                formatted_update["priority"] = data.get("level", "medium")
+                formatted_update["requires_action"] = data.get("requires_action", False)
+            
+            # Broadcast via Supabase
+            await self.supabase.channel(channel).send({
+                "type": "broadcast",
+                "event": "trading_update",
+                "payload": formatted_update
+            })
+            
+        except Exception as e:
+            print(f"Error broadcasting update: {str(e)}")
+            # Continue execution even if broadcast fails
+            pass

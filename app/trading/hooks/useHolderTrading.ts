@@ -1,6 +1,6 @@
 // app/trading/hooks/useHolderTrading.ts
 import { useState, useEffect } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from "@/hooks/use-toast";
 import { holderTradingService } from '../services/holderTradingService';
 
 export function useHolderTrading(userAddress: string) {
