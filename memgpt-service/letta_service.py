@@ -19,6 +19,9 @@ from memory_base import Memory
 import uuid
 from dspy_modules.service import DSPyService
 from pathlib import Path
+from .trading.websocket.event_handler import WebSocketEventHandler
+from .trading.realtime import RealTimeMonitor
+from .trading.memory.trading_memory import TradingMemory
 
 
 
@@ -199,6 +202,26 @@ class MemGPTService:
             self.trading_memory = TradingMemory(
                 self.memory_processor
             )
+
+            # Initialize WebSocket event handler
+            self.ws_handler = WebSocketEventHandler()
+            
+            # Initialize RealTimeMonitor with consciousness integration
+            self.realtime_monitor = RealTimeMonitor({
+                "risk_thresholds": {
+                    "max_drawdown": 0.15,
+                    "position_concentration": 0.25,
+                    "volatility_threshold": 0.50
+                },
+                "update_interval": 5
+            })
+            self.realtime_monitor.set_supabase_client(self.supabase)
+            
+            # Connect trading memory to realtime monitor
+            self.trading_memory.set_realtime_monitor(self.realtime_monitor)
+            
+            # Initialize consciousness connection
+            self._init_consciousness_connection()
 
             
             
@@ -451,6 +474,41 @@ class MemGPTService:
         except Exception as e:
             print(f"Error tracking memory evolution: {str(e)}")
             return {"success": False, "error": str(e)}
+        
+    def _init_consciousness_connection(self):
+        """Initialize consciousness state connection to trading system"""
+        async def consciousness_update_handler(state: Dict[str, Any]):
+            if self.agent and self.agent.agent_state:
+                # Update emotional state based on trading performance
+                if state.get("risk_level") == "high":
+                    self.agent.agent_state.consciousness.emotionalState = "cautious"
+                elif state.get("day_pnl_percent", 0) > 5:
+                    self.agent.agent_state.consciousness.emotionalState = "confident"
+                
+                # Update attention focus
+                self.agent.agent_state.consciousness.attentionFocus = [
+                    "trading_performance",
+                    *state.get("risk_warnings", [])
+                ]
+                
+                # Update current thought
+                self.agent.agent_state.consciousness.currentThought = (
+                    f"Monitoring trading performance. "
+                    f"Risk level: {state.get('risk_level', 'unknown')}. "
+                    f"Daily P&L: {state.get('day_pnl_percent', 0):.2f}%"
+                )
+                
+                # Store in short term memory
+                self.agent.agent_state.consciousness.shortTermMemory.append({
+                    "type": "trading_update",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": state
+                })
+
+        # Register consciousness update handler with realtime monitor
+        asyncio.create_task(
+            self.realtime_monitor.subscribe(consciousness_update_handler)
+        )
         
     async def analyze_content(self, content: str) -> Dict[str, Any]:
         """Analyze content for patterns and context"""

@@ -1,16 +1,28 @@
 # memgpt-service/trading/realtime.py
+
 from typing import Dict, Any, List, Optional, Callable
 from decimal import Decimal
 import asyncio
 from datetime import datetime, timedelta
 import json
 from dataclasses import dataclass, asdict
+import logging
 from .risk_helpers import RiskHelpers
 from .portfolio.risk_calculator import RiskCalculator
 
 @dataclass
+class ConsciousnessMetrics:
+    """Metrics for the consciousness system"""
+    emotional_state: str
+    confidence_level: float
+    attention_focus: List[str]
+    decision_factors: Dict[str, float]
+    risk_tolerance: float
+    market_perception: str
+
+@dataclass
 class MonitoringMetrics:
-    """Real-time monitoring metrics"""
+    """Real-time monitoring metrics with consciousness integration"""
     timestamp: datetime
     portfolio_value: Decimal
     day_pnl: Decimal
@@ -24,12 +36,14 @@ class MonitoringMetrics:
     largest_position: Dict[str, Any]
     risk_warnings: List[str]
     performance_metrics: Dict[str, float]
+    consciousness_state: Optional[ConsciousnessMetrics] = None
 
 class RealTimeMonitor:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.risk_calculator = RiskCalculator()
         self.risk_helpers = RiskHelpers()
+        self.supabase = None  # Will be set by the trading handler
         
         # Initialize monitoring state
         self.monitoring_state = {
@@ -37,6 +51,7 @@ class RealTimeMonitor:
             "subscribers": [],
             "active_alerts": set(),
             "metrics_history": [],
+            "consciousness_history": [],
             "risk_thresholds": config.get("risk_thresholds", {
                 "max_drawdown": 0.15,  # 15%
                 "position_concentration": 0.25,  # 25%
@@ -50,6 +65,11 @@ class RealTimeMonitor:
             try:
                 # Collect and analyze metrics
                 metrics = await self.collect_metrics()
+                
+                # Update consciousness state if available
+                if hasattr(self, 'memory_processor'):
+                    consciousness = await self.update_consciousness_state(metrics)
+                    metrics.consciousness_state = consciousness
                 
                 # Check for risk alerts
                 alerts = self.check_risk_alerts(metrics)
@@ -68,36 +88,40 @@ class RealTimeMonitor:
                 self.monitoring_state["last_update"] = datetime.now()
                 
             except Exception as e:
-                print(f"Monitoring error: {str(e)}")
+                logging.error(f"Monitoring error: {str(e)}")
                 
-            await asyncio.sleep(5)  # Update every 5 seconds
+            await asyncio.sleep(self.config.get("update_interval", 5))
 
     async def collect_metrics(self) -> MonitoringMetrics:
         """Collect real-time metrics"""
-        # Get portfolio data
-        portfolio = await self.get_portfolio_data()
-        
-        # Calculate performance metrics
-        performance = self.calculate_performance_metrics(portfolio)
-        
-        # Calculate risk metrics
-        risk_metrics = await self.calculate_risk_metrics(portfolio)
-        
-        return MonitoringMetrics(
-            timestamp=datetime.now(),
-            portfolio_value=portfolio["total_value"],
-            day_pnl=performance["day_pnl"],
-            day_pnl_percent=performance["day_pnl_percent"],
-            current_drawdown=risk_metrics["current_drawdown"],
-            risk_level=self.determine_risk_level(risk_metrics),
-            volatility_24h=risk_metrics["volatility_24h"],
-            sharpe_ratio=risk_metrics["sharpe_ratio"],
-            total_positions=len(portfolio["positions"]),
-            active_trades=len(portfolio["active_trades"]),
-            largest_position=self.get_largest_position(portfolio),
-            risk_warnings=risk_metrics["warnings"],
-            performance_metrics=performance
-        )
+        try:
+            # Get portfolio data
+            portfolio = await self.get_portfolio_data()
+            
+            # Calculate performance metrics
+            performance = self.calculate_performance_metrics(portfolio)
+            
+            # Calculate risk metrics
+            risk_metrics = await self.calculate_risk_metrics(portfolio)
+            
+            return MonitoringMetrics(
+                timestamp=datetime.now(),
+                portfolio_value=portfolio["total_value"],
+                day_pnl=performance["day_pnl"],
+                day_pnl_percent=performance["day_pnl_percent"],
+                current_drawdown=risk_metrics["current_drawdown"],
+                risk_level=self.determine_risk_level(risk_metrics),
+                volatility_24h=risk_metrics["volatility_24h"],
+                sharpe_ratio=risk_metrics["sharpe_ratio"],
+                total_positions=len(portfolio["positions"]),
+                active_trades=len(portfolio["active_trades"]),
+                largest_position=self.get_largest_position(portfolio),
+                risk_warnings=risk_metrics["warnings"],
+                performance_metrics=performance
+            )
+        except Exception as e:
+            logging.error(f"Error collecting metrics: {str(e)}")
+            raise
 
     def check_risk_alerts(self, metrics: MonitoringMetrics) -> List[Dict[str, Any]]:
         """Check for risk threshold breaches"""
@@ -164,7 +188,7 @@ class RealTimeMonitor:
             try:
                 await subscriber(update)
             except Exception as e:
-                print(f"Error notifying subscriber: {str(e)}")
+                logging.error(f"Error notifying subscriber: {str(e)}")
 
     async def broadcast_trading_update(
         self,
@@ -174,6 +198,10 @@ class RealTimeMonitor:
     ):
         """Broadcast trading updates to WebSocket clients via Supabase"""
         try:
+            if not self.supabase:
+                logging.error("Supabase client not initialized")
+                return
+
             # Format the update with standard fields
             formatted_update = {
                 "type": update_type,
@@ -198,6 +226,35 @@ class RealTimeMonitor:
             })
             
         except Exception as e:
-            print(f"Error broadcasting update: {str(e)}")
+            logging.error(f"Error broadcasting update: {str(e)}")
             # Continue execution even if broadcast fails
             pass
+
+    def set_supabase_client(self, supabase_client):
+        """Set Supabase client for realtime updates"""
+        self.supabase = supabase_client
+
+    async def get_portfolio_data(self) -> Dict[str, Any]:
+        """Get current portfolio data"""
+        # Implementation needed
+        pass
+
+    def calculate_performance_metrics(self, portfolio: Dict[str, Any]) -> Dict[str, float]:
+        """Calculate performance metrics from portfolio data"""
+        # Implementation needed
+        pass
+
+    async def calculate_risk_metrics(self, portfolio: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate risk metrics from portfolio data"""
+        # Implementation needed
+        pass
+
+    def determine_risk_level(self, risk_metrics: Dict[str, Any]) -> str:
+        """Determine overall risk level"""
+        # Implementation needed
+        pass
+
+    def get_largest_position(self, portfolio: Dict[str, Any]) -> Dict[str, Any]:
+        """Get largest position details"""
+        # Implementation needed
+        pass
