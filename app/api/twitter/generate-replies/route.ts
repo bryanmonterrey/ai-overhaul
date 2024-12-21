@@ -101,17 +101,19 @@ export async function POST(request: NextRequest) {
             }
         
             const lettaClient = new LettaClient();
-            const personalitySystem = new PersonalitySystem({
-                ...DEFAULT_PERSONALITY,
-                platform: 'twitter' as Platform
-            });
-
             const supabase = createClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
             );
+            const trainingService = new TwitterTrainingService(supabase);
 
-            const trainingService = new TwitterTrainingService(supabase); 
+            const personalitySystem = new PersonalitySystem(
+                {
+                    ...DEFAULT_PERSONALITY,
+                    platform: 'twitter' as Platform
+                },
+                trainingService
+            );
 
             // Initial memory storage
             try {

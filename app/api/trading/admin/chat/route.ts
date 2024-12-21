@@ -93,7 +93,12 @@ export async function POST(req: NextRequest) {
       console.error('Async processing error:', error);
     });
 
-    return new StreamingTextResponse(stream);
+    return new StreamingTextResponse(stream, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'text/event-stream',
+      }
+    });
 
   } catch (error) {
     console.error('Route handler error:', error);

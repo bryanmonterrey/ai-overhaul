@@ -17,7 +17,7 @@ import { TwitterApiClient } from '../../lib/twitter-client';
 import { createClient } from '@supabase/supabase-js';
 import { TwitterTrainingService } from '../../lib/services/twitter-training';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/types/supabase';
+import { Database } from '../../types/supabase';
 import { cookies } from 'next/headers';
 
 const twitterInputSchema = z.object({
@@ -63,12 +63,13 @@ const personalityConfig = {
     platform: 'twitter'
 };
 
-const personalitySystem = new PersonalitySystem(personalityConfig);
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+const trainingService = new TwitterTrainingService(supabase);
+const personalitySystem = new PersonalitySystem(personalityConfig, trainingService);
 
 // Now twitterManager can use personalitySystem
 const twitterManager = new TwitterManager(

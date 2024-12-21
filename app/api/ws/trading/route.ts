@@ -1,6 +1,6 @@
 import { WebSocketServer } from 'ws';
 import type { NextApiRequest } from 'next';
-import { NextApiResponseServerIO } from '@/types/socket';
+import { NextApiResponseServerIO } from '../../../types/socket';
 
 export default function handler(req: NextApiRequest, res: NextApiResponseServerIO) {
   if (!res.socket.server.ws) {
