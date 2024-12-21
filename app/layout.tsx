@@ -3,6 +3,7 @@ import { ClientProviders } from './providers/ClientProviders';
 import ClientLayout from './ClientLayout';
 import "./globals.css";
 import { metadata } from './metadata';
+import { Toaster } from "@/components/ui/toaster"
 
 export { metadata };
 
@@ -18,6 +19,7 @@ export default function RootLayout({
         <ClientProviders>
           <ClientLayout>
             {children}
+            <Toaster />
           </ClientLayout>
         </ClientProviders>
       </body>
