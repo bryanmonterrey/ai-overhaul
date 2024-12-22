@@ -153,7 +153,7 @@ export default function LoginPage() {
           <WalletConnection />
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 mx-auto w-full flex items-center justify-center">
           <HCaptcha
             sitekey={hcaptchaSiteKey}
             onVerify={handleCaptchaVerify}
