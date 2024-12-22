@@ -25,6 +25,7 @@ from trading.memory.trading_memory import TradingMemory
 from chat.trading_chat import TradingChat
 import logging
 from dataclasses import asdict
+from fastapi.responses import StreamingResponse
 
 load_dotenv()
 
