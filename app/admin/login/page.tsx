@@ -3,13 +3,16 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClientComponentClient();
+  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || 'your-site-key';
 
   useEffect(() => {
     const testConnection = async () => {
@@ -26,13 +29,22 @@ export default function AdminLogin() {
     };
     
     testConnection();
-  }, []);
+  }, [supabase]);
   
-  
+  const handleCaptchaVerify = (token: string) => {
+    console.log('Captcha verified:', token);
+    setCaptchaToken(token);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     
+    if (!captchaToken) {
+      setError('Please complete the CAPTCHA.');
+      return;
+    }
+
     try {
       // 1. Sign in
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -111,9 +123,15 @@ export default function AdminLogin() {
               required
             />
           </div>
+          <div className="mt-4">
+            <HCaptcha
+              sitekey={hcaptchaSiteKey}
+              onVerify={handleCaptchaVerify}
+            />
+          </div>
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-[#0D0E15]  text-zinc-50 rounded-md hover:bg-white/10 border border-zinc-800"
+            className="w-full px-4 py-2 bg-[#0D0E15] text-zinc-50 rounded-md hover:bg-white/10 border border-zinc-800"
           >
             login
           </button>
