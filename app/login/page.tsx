@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { TokenChecker } from '../lib/blockchain/token-checker';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 
 export default function LoginPage() {
   const supabase = createClientComponentClient();
@@ -14,6 +15,15 @@ export default function LoginPage() {
   const { connected, publicKey } = useWallet();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+
+  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '06c08b02-0200-4da2-95f6-97ea360e4528';
+
+  // Handle successful hCaptcha verification
+  const handleCaptchaVerify = (token: string) => {
+    console.log('Captcha verified:', token);
+    setCaptchaToken(token);
+  };
 
   // Check existing session
   useEffect(() => {
@@ -123,7 +133,7 @@ export default function LoginPage() {
 
   return (
     <div className="h-full flex items-center font-ia justify-center bg-[#11111A]">
-      <div className="max-w-md w-full space-y-8 p-8 bg-[#11111A] border border-zinc-800 rounded-md shadow-none">
+      <div className="max-w-md w-full space-y-8 p-8 bg-[#0D0E15] border border-zinc-900 rounded-md shadow-none">
         <div>
           <h2 className="text-center text-xl font-ia text-[#DDDDDD]">
             Connect Your Wallet

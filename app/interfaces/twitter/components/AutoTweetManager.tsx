@@ -179,13 +179,13 @@ export default function AutoTweetManager() {
     <Card variant="system" title="AUTO_TWEET_MANAGER">
       <div className="space-y-4">
         {error && (
-          <div className="text-red-500 text-xs font-mono p-2 border border-red-500 bg-red-500/10">
+          <div className="text-red-500 text-xs  p-2 border border-red-500 bg-red-500/10">
             ERROR: {error}
           </div>
         )}
 
         <div className="flex items-center justify-between">
-          <div className="font-mono text-xs">
+          <div className=" text-xs">
             MODE: {isAutoMode ? 'AUTOMATIC' : 'MANUAL'}
           </div>
           <Switch
@@ -197,24 +197,24 @@ export default function AutoTweetManager() {
 
         <div className="flex gap-2">
           <Button
-            variant="system"
+            variant="primary"
             onClick={generateTweetBatch}
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 bg-[#00FFA2] hover:bg-[#00FFA2]/80 text-[#11111A] font-semibold"
           >
-            {isLoading ? 'GENERATING...' : 'GENERATE_BATCH'}
+            {isLoading ? 'generating...' : 'generate batch'}
           </Button>
         </div>
 
         {isLoading && (
-          <div className="space-y-2 font-mono text-xs">
-            <div>GENERATING: {generationProgress}/{totalTweets}</div>
+          <div className="space-y-2  text-xs">
+            <div>generating: {generationProgress}/{totalTweets}</div>
             {renderProgressBar()}
           </div>
         )}
 
         {!isLoading && (
-          <div className="grid grid-cols-3 gap-2 text-xs font-mono">
+          <div className="grid grid-cols-3 gap-2 text-xs ">
             <div className="border border-zinc-800/20 p-2">
               TOTAL: {queuedTweets.length}
             </div>
@@ -229,7 +229,7 @@ export default function AutoTweetManager() {
 
         <div className="space-y-2">
           {queuedTweets.map(tweet => (
-            <div key={tweet.id} className="p-2 border border-zinc-800 font-mono text-xs">
+            <div key={tweet.id} className="p-2 border border-zinc-800  text-xs">
               <div className="flex justify-between items-start mb-2">
                 <div className="opacity-70">
                   {tweet.style.toUpperCase()}_MODE | {
@@ -280,7 +280,7 @@ export default function AutoTweetManager() {
           ))}
 
           {queuedTweets.length === 0 && !isLoading && (
-            <div className="text-center font-mono text-xs opacity-50 p-4">
+            <div className="text-center  text-xs opacity-50 p-4">
               NO_TWEETS_IN_QUEUE
             </div>
           )}

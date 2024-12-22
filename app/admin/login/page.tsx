@@ -84,7 +84,7 @@ export default function AdminLogin() {
   return (
     <div className="flex h-full flex-col items-center justify-center p-2 bg-[#11111A]">
       <div className="w-full max-w-md space-y-4">
-        <h1 className="text-2xl font-bold text-center text-white">Admin Login</h1>
+        <h1 className="text-2xl font-bold text-center text-zinc-50">admin login</h1>
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-none">
             {error}
@@ -92,30 +92,30 @@ export default function AdminLogin() {
         )}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-white">Email</label>
+            <label className="block text-sm font-medium mb-1 text-zinc-50">email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2 border rounded-none bg-[#11111A] text-white border-white"
+              className="w-full p-2 border rounded-md bg-[#11111A] text-zinc-50 border-zinc-800"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-white">Password</label>
+            <label className="block text-sm font-medium mb-1 text-zinc-50">password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 border rounded-none bg-[#11111A] text-white border-white"
+              className="w-full p-2 border rounded-md bg-[#11111A] text-zinc-50 border-zinc-800"
               required
             />
           </div>
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-[#11111A] text-white rounded-none hover:bg-white/10 border border-white"
+            className="w-full px-4 py-2 bg-[#0D0E15] text-zinc-50 rounded-md hover:bg-white/10 border border-zinc-800"
           >
-            Login
+            login
           </button>
         </form>
       </div>

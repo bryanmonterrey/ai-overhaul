@@ -1094,27 +1094,31 @@ async def admin_chat_endpoint(request: Request):
         # Return as streaming response
         async def event_stream():
             try:
+                # Format the response exactly as vercel/ai expects it
                 response_data = {
-                    "role": "assistant",
-                    "content": result.get("response", "No response generated"),
                     "id": str(uuid.uuid4()),
+                    "role": "assistant",
+                    "content": result.get("response", ""),
                     "createdAt": datetime.now().isoformat()
                 }
-                print("Sending response:", response_data)  # Debug log
+                # Important: Each line must start with "data: " and end with two newlines
                 yield f"data: {json.dumps(response_data)}\n\n"
+                # Signal the end of the stream
+                yield "data: [DONE]\n\n"
             except Exception as e:
-                print("Error in event stream:", str(e))  # Debug log
-                error_response = {
-                    "role": "assistant",
-                    "content": f"Error: {str(e)}",
-                    "id": str(uuid.uuid4()),
-                    "createdAt": datetime.now().isoformat()
+                error_data = {
+                    "error": str(e)
                 }
-                yield f"data: {json.dumps(error_response)}\n\n"
+                yield f"data: {json.dumps(error_data)}\n\n"
 
         return StreamingResponse(
             event_stream(),
-            media_type="text/event-stream"
+            media_type="text/event-stream",
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Content-Type': 'text/event-stream'
+            }
         )
         
     except Exception as e:
