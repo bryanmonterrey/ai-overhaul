@@ -37,6 +37,21 @@ class TradingChat:
                 context="admin"
             )
             print("DSPy analysis result:", analysis)  # Debug log
+
+            # For system messages, we can return them directly
+            if analysis["command_type"] == "SYSTEM":
+                if analysis["parameters"].get("action") == "greet":
+                    return {
+                        "response": analysis["parameters"]["message"]
+                    }
+                elif analysis["parameters"].get("action") == "error":
+                    return {
+                        "response": f"Error: {analysis['parameters'].get('error', 'Unknown error')}"
+                    }
+                elif analysis["parameters"].get("action") == "unknown":
+                    return {
+                        "response": "I'm not sure what you mean. Can you please be more specific about what you'd like me to do?"
+                    }
             
             # Get command handler
             handler = self.command_handlers.get(analysis["command_type"])

@@ -375,6 +375,73 @@ class DSPyService:
                 'success': False,
                 'error': str(e)
             }
+        
+    async def analyze_trading_command(
+        self,
+        message: str,
+        context: str = "default"
+    ) -> Dict[str, Any]:
+        """Analyze trading chat messages to determine command type and parameters"""
+        try:
+            # Build a prompt for command analysis
+            prompt = f"""Analyze the following trading message and determine the command type and parameters:
+
+Message: {message}
+Context: {context}
+
+Command Types:
+- TRADE: For trade execution requests
+- ANALYSIS: For market analysis requests
+- SETTINGS: For system settings changes
+- PORTFOLIO: For portfolio information requests
+- SYSTEM: For system maintenance commands
+
+Respond in JSON format:
+{{
+    "command_type": "<command_type>",
+    "parameters": {{
+        // Extracted parameters based on command type
+    }}
+}}
+"""
+
+            # Get response from language model
+            result = await self.predict_with_retry(prompt)
+
+            try:
+                # Parse JSON response
+                parsed_result = json.loads(result)
+                return {
+                    "command_type": parsed_result.get("command_type", "SYSTEM"),
+                    "parameters": parsed_result.get("parameters", {})
+                }
+            except json.JSONDecodeError:
+                # If greeting or casual message, return default response
+                if any(word in message.lower() for word in ['hi', 'hello', 'hey', 'greetings']):
+                    return {
+                        "command_type": "SYSTEM",
+                        "parameters": {
+                            "action": "greet",
+                            "message": "Hello! I'm your AI trading assistant. How can I help you today?"
+                        }
+                    }
+                return {
+                    "command_type": "SYSTEM",
+                    "parameters": {
+                        "action": "unknown",
+                        "original_message": message
+                    }
+                }
+
+        except Exception as e:
+            print(f"Error analyzing trading command: {str(e)}")
+            return {
+                "command_type": "SYSTEM",
+                "parameters": {
+                    "action": "error",
+                    "error": str(e)
+                }
+            }
             
     async def optimize_response(self,
                               input_text: str,
