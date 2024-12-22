@@ -12,8 +12,9 @@ export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   try {
-    // Initialize Supabase client
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    // Initialize Supabase client with proper cookie handling
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
     // Verify admin session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
