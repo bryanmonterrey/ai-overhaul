@@ -12,7 +12,7 @@ export default function AdminLogin() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || 'your-site-key';
+  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '06c08b02-0200-4da2-95f6-97ea360e4528';
 
   useEffect(() => {
     const testConnection = async () => {
