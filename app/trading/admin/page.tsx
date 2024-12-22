@@ -1,13 +1,50 @@
 // app/trading/admin/page.tsx
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { AITradingDashboard } from './components/AITradingDashboard';
-import { getUser } from '../../lib/auth';
 
-export default async function AdminTradingPage() {
-  const user = await getUser();
+export default function AdminTradingPage() {
+  const supabase = createClientComponentClient();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!user?.isAdmin) {
-    redirect('/');  // or wherever you want to redirect non-admins
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          router.push('/admin/login');
+          return;
+        }
+
+        // Check if user is admin
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (roleData?.role !== 'admin') {
+          router.push('/');
+          return;
+        }
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        router.push('/admin/login');
+      }
+    };
+
+    checkAuth();
+  }, [supabase, router]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
   }
 
   return (

@@ -130,8 +130,8 @@ export function AIStrategyControl({ strategies, onUpdate }: AIStrategyControlPro
                   min={5}
                   max={20}
                   step={1}
-                  onValueChange={([value]) =>
-                    handleUpdate({ ...settings, maxDrawdown: value })
+                  onValueChange={(value) =>
+                    handleUpdate({ ...settings, maxDrawdown: (value as number[])[0] })
                   }
                 >
                   <Slider.Control>
@@ -148,15 +148,22 @@ export function AIStrategyControl({ strategies, onUpdate }: AIStrategyControlPro
 
               <div className="space-y-2">
                 <label>Target Profit (%)</label>
-                <Slider
+                <Slider.Root
                   value={[settings.targetProfit]}
                   min={10}
                   max={50}
                   step={5}
-                  onValueChange={([value]) =>
-                    handleUpdate({ ...settings, targetProfit: value })
+                  onValueChange={(value) =>
+                    handleUpdate({ ...settings, targetProfit: (value as number[])[0] })
                   }
-                />
+                >
+                  <Slider.Control className="flex w-full items-center py-3">
+                    <Slider.Track className="h-1 w-full rounded bg-gray-200 shadow-[inset_0_0_0_1px] shadow-gray-200">
+                      <Slider.Indicator className="rounded bg-gray-700" />
+                      <Slider.Thumb className="size-4 rounded-full bg-white outline outline-1 outline-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-800" />
+                    </Slider.Track>
+                  </Slider.Control>
+                </Slider.Root>
                 <span className="text-sm text-muted-foreground">
                   {settings.targetProfit}%
                 </span>
@@ -207,21 +214,28 @@ export function AIStrategyControl({ strategies, onUpdate }: AIStrategyControlPro
             {settings.jito.enabled && (
               <div className="space-y-2">
                 <label>Priority Fee (SOL)</label>
-                <Slider
+                <Slider.Root
                   value={[settings.jito.priorityFee * 1000]}
                   min={1}
                   max={5}
                   step={0.1}
-                  onValueChange={([value]) =>
+                  onValueChange={(value) =>
                     handleUpdate({
                       ...settings,
                       jito: {
                         ...settings.jito,
-                        priorityFee: value / 1000
+                        priorityFee: (value as number[])[0] / 1000
                       }
                     })
                   }
-                />
+                >
+                  <Slider.Control className="flex w-full items-center py-3">
+                    <Slider.Track className="h-1 w-full rounded bg-gray-200 shadow-[inset_0_0_0_1px] shadow-gray-200">
+                      <Slider.Indicator className="rounded bg-gray-700" />
+                      <Slider.Thumb className="size-4 rounded-full bg-white outline outline-1 outline-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-800" />
+                    </Slider.Track>
+                  </Slider.Control>
+                </Slider.Root>
                 <span className="text-sm text-muted-foreground">
                   {settings.jito.priorityFee} SOL
                 </span>

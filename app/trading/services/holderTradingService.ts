@@ -1,4 +1,6 @@
 // app/trading/services/holderTradingService.ts
+import { createClient } from '@supabase/supabase-js';
+
 class HolderTradingService {
     private supabase;
     private baseUrl = '/api/trading/holders';
@@ -116,6 +118,6 @@ class HolderTradingService {
   
       return response.json();
     }
-  }
+}
   
-  export const holderTradingService = new HolderTradingService();
+export const holderTradingService = new HolderTradingService();
