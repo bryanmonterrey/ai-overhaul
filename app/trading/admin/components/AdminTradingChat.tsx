@@ -1,12 +1,14 @@
 // app/trading/admin/components/AdminTradingChat.tsx
 'use client';
 
-import { useState } from 'react';
-import { useChat } from 'ai/react';
-import { ScrollArea } from '@base-ui-components/react/scroll-area';
-import { Button } from '../../../components/common/Button';
-import { Input } from '../../../components/common/Input';
-import { Card } from '../../../components/common/Card';
+import { useRef, useEffect } from 'react';
+import { useChat, Message } from 'ai/react'; // Import Message type from ai/react
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useToast } from "@/hooks/use-toast";
 
 interface TradeExecutionData {
   type: 'trade_execution';
@@ -23,10 +25,27 @@ interface PortfolioUpdateData {
 
 type MessageData = TradeExecutionData | PortfolioUpdateData;
 
-export const AdminTradingChat = () => {
-  const { messages, input, handleInputChange, handleSubmit } = useChat({
+// Helper function to type check the message data
+function isTradeExecution(data: any): data is TradeExecutionData {
+  return data?.type === 'trade_execution';
+}
+
+function isPortfolioUpdate(data: any): data is PortfolioUpdateData {
+  return data?.type === 'portfolio_update';
+}
+
+export function AdminTradingChat() {
+  const { toast } = useToast();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/trading/admin/chat',
   });
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const handleTradeExecution = async (tradeData: TradeExecutionData) => {
     try {
@@ -42,25 +61,28 @@ export const AdminTradingChat = () => {
         throw new Error('Failed to execute trade');
       }
 
-      // Handle successful trade execution
-      // You might want to show a toast or update UI
+      toast({
+        title: "Trade Executed",
+        description: `Successfully executed ${tradeData.side} trade for ${tradeData.amount} ${tradeData.token}`,
+      });
     } catch (error) {
       console.error('Error executing trade:', error);
-      // Handle error - show toast or error message
+      toast({
+        title: "Trade Failed",
+        description: "Failed to execute trade. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <Card className="flex flex-col h-[600px]">
-      <div className="p-4 border-b">
-        <h2 className="text-xl font-semibold">AI Trading Assistant</h2>
-        <p className="text-sm text-muted-foreground">
-          Control and monitor AI trading through conversation
-        </p>
-      </div>
-
-      <ScrollArea.Root className="flex-1 p-4">
-        <ScrollArea.Viewport className="h-full overscroll-contain rounded-md outline outline-1 -outline-offset-1 outline-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-800">
+    <Card className="w-full h-[600px] flex flex-col">
+      <CardHeader>
+        <CardTitle>AI Trading Assistant</CardTitle>
+      </CardHeader>
+      
+      <CardContent className="flex-1 flex flex-col">
+        <ScrollArea ref={scrollRef} className="flex-1 pr-4">
           <div className="space-y-4">
             {messages.map((message) => (
               <div
@@ -69,65 +91,79 @@ export const AdminTradingChat = () => {
                   message.role === 'user' ? 'justify-end' : 'justify-start'
                 }`}
               >
-                <div
-                  className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  {message.role === 'assistant' && message.data && (
-                    <div className="mt-2 pt-2 border-t">
-                      {/* Render trading data/actions */}
-                      {(message.data as MessageData).type === 'trade_execution' && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-semibold">Trade Details:</p>
-                          <div className="text-xs">
-                            <p>Token: {(message.data as TradeExecutionData).token}</p>
-                            <p>Side: {(message.data as TradeExecutionData).side}</p>
-                            <p>Amount: {(message.data as TradeExecutionData).amount} SOL</p>
+                <div className={`flex gap-3 max-w-[80%] ${
+                  message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                }`}>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={message.role === 'user' ? '/user-avatar.png' : '/ai-avatar.png'}
+                      alt={message.role}
+                    />
+                    <AvatarFallback>
+                      {message.role === 'user' ? 'U' : 'AI'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div
+                    className={`rounded-lg p-3 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <p className="text-sm">{message.content}</p>
+                    {message.role === 'assistant' && message.data && (
+                      <div className="mt-2 pt-2 border-t border-border">
+                        {isTradeExecution(message.data) && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold">Trade Details:</p>
+                            <div className="text-xs">
+                              <p>Token: {message.data.token}</p>
+                              <p>Side: {message.data.side}</p>
+                              <p>Amount: {message.data.amount} SOL</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => isTradeExecution(message.data) && handleTradeExecution(message.data)}
+                              className="mt-2"
+                            >
+                              Confirm Trade
+                            </Button>
                           </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleTradeExecution(message.data as TradeExecutionData)}
-                          >
-                            Confirm Trade
-                          </Button>
-                        </div>
-                      )}
-                      {(message.data as MessageData).type === 'portfolio_update' && (
-                        <div className="space-y-2">
-                          <p className="text-xs font-semibold">Portfolio Update:</p>
-                          <div className="text-xs">
-                            <p>Total Value: {(message.data as PortfolioUpdateData).totalValue} SOL</p>
-                            <p>Daily P&L: {(message.data as PortfolioUpdateData).dailyPnL} SOL</p>
+                        )}
+                        {isPortfolioUpdate(message.data) && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold">Portfolio Update:</p>
+                            <div className="text-xs">
+                              <p>Total Value: {message.data.totalValue} SOL</p>
+                              <p>Daily P&L: {message.data.dailyPnL} SOL</p>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    )}
+                    <span className="text-xs opacity-50 mt-1 block">
+                      {new Date().toLocaleTimeString()}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        </ScrollArea.Viewport>
-        <ScrollArea.Scrollbar className="m-2 flex w-1 justify-center rounded bg-gray-200 opacity-0 transition-opacity delay-300 data-[hovering]:opacity-100 data-[hovering]:delay-0 data-[hovering]:duration-75 data-[scrolling]:opacity-100 data-[scrolling]:delay-0 data-[scrolling]:duration-75">
-          <ScrollArea.Thumb className="w-full rounded bg-gray-500" />
-        </ScrollArea.Scrollbar>
-      </ScrollArea.Root>
-
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex gap-4">
+        </ScrollArea>
+        
+        <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
           <Input
             value={input}
             onChange={handleInputChange}
             placeholder="Ask about trades, performance, or give commands..."
+            disabled={isLoading}
             className="flex-1"
           />
-          <Button type="submit">Send</Button>
-        </div>
-      </form>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? 'Sending...' : 'Send'}
+          </Button>
+        </form>
+      </CardContent>
     </Card>
   );
-};
+}
