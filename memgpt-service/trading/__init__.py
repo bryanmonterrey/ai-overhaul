@@ -3,9 +3,10 @@ Trading module initialization.
 Implements sophisticated Solana trading system with multi-strategy approach.
 """
 from typing import Dict, Any
-from .agents import AnalystAgent, TraderAgent, RiskManager
-from .strategies import MomentumStrategy, MeanReversionStrategy, SentimentStrategy
-from .portfolio import PortfolioManager, RiskCalculator
+from .agents.analyst_agent import AnalystAgent
+from .agents.trader_agent import TraderAgent
+from .agents.risk_manager import RiskManager
+from .portfolio.risk_calculator import RiskCalculator
 
 class TradingSystem:
     def __init__(self, config: Dict[str, Any]):

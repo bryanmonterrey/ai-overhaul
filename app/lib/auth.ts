@@ -26,10 +26,22 @@ export async function getUser() {
         console.error('Error fetching user data:', userError);
         return null;
       }
+
+      // Get role data from user_roles table
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (roleError) {
+        console.error('Error fetching role data:', roleError);
+        return null;
+      }
   
       return {
         ...user,
-        isAdmin: userData?.role === 'admin',
+        isAdmin: roleData?.role === 'admin', // Updated to use role from user_roles
         ...userData
       };
   
@@ -37,7 +49,7 @@ export async function getUser() {
       console.error('Auth error:', error);
       return null;
     }
-  }
+}
 
 export async function verifyTokenHolder(walletAddress: string) {
   const supabase = createClientComponentClient();

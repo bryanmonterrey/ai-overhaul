@@ -26,12 +26,13 @@ export async function middleware(req: NextRequest) {
 
   // Protected admin routes
   if (pathname.startsWith('/admin') || 
-      pathname.startsWith('/api/admin') ||
-      pathname.startsWith('/twitter') || 
-      pathname.startsWith('/telegram')) {
-    if (!session) {
-      return NextResponse.redirect(new URL('/admin/login', req.url));
-    }
+    pathname.startsWith('/api/admin') ||
+    pathname.startsWith('/twitter') || 
+    pathname.startsWith('/telegram') ||
+    pathname.startsWith('/trading/admin')) {  // Add this line
+  if (!session) {
+    return NextResponse.redirect(new URL('/admin/login', req.url));
+  }
 
     // Check if user is admin
     const { data: roleData } = await supabase
@@ -46,11 +47,12 @@ export async function middleware(req: NextRequest) {
   }
 
   // Protected chat routes
-  if (pathname.startsWith('/chat') || 
-      pathname.startsWith('/conversation') || 
-      pathname.startsWith('/conversations')) {
+    if (pathname.startsWith('/chat') || 
+    pathname.startsWith('/conversation') || 
+    pathname.startsWith('/conversations') ||
+    pathname.startsWith('/trading/holders')) {  // Add this line
     if (!session) {
-      return NextResponse.redirect(new URL('/login', req.url));
+    return NextResponse.redirect(new URL('/login', req.url));
     }
 
     try {
@@ -133,6 +135,10 @@ export const config = {
     '/api/chat/:path*',
     '/twitter/:path*',
     '/telegram/:path*',
+    '/trading/admin/:path*',
+    '/trading/holders/:path*',
+    '/api/trading/admin/:path*',
+    '/api/trading/holders/:path*',
     '/((?!insufficient-tokens|login|api/auth).*)',
     '/api/memory/:path*',
   ],

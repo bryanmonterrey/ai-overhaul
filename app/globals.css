@@ -8,9 +8,11 @@
 
 @font-face {
   font-family: "ia";
-  src: url("/iAWriter.otf"); 
+  src: url("/fonts/SFPRODISPLAYREGULAR.OTF"); 
   font-weight: 400;
 }
+
+
 
 @font-face {
   font-family: "ia-italic";

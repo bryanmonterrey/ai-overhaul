@@ -2,7 +2,7 @@
 Risk calculator for portfolio management.
 Handles risk metrics, exposure calculations, and position sizing.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import numpy as np

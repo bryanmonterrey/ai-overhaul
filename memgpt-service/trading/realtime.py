@@ -41,7 +41,13 @@ class MonitoringMetrics:
 class RealTimeMonitor:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.risk_calculator = RiskCalculator()
+        self.risk_calculator = RiskCalculator(config.get("risk_calculator", {
+            "max_position_size": 100,
+            "max_portfolio_var": 0.05,
+            "max_concentration": 0.2,
+            "var_confidence": 0.95,
+            "var_window": 30
+        }))
         self.risk_helpers = RiskHelpers()
         self.supabase = None  # Will be set by the trading handler
         

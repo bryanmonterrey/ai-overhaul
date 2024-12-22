@@ -10,3 +10,7 @@ pydantic
 python-frontmatter
 faiss-cpu
 networkx
+solana
+solana-sdk
+solders
+base58

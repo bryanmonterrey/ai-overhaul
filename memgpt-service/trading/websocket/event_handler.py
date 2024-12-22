@@ -1,9 +1,9 @@
 # memgpt-service/trading/websocket/event_handler.py
 
-from typing import Dict, Any, Optional, Set
+from typing import Dict, Any, Optional, Set, List
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from dataclasses import dataclass, asdict
 
@@ -25,8 +25,9 @@ class WebSocketEventHandler:
             'admin': set(),
             'holder': set()
         }
-        
-        # Start cleanup task
+
+    async def start(self):
+        """Start the WebSocket handler and its cleanup task"""
         asyncio.create_task(self._cleanup_inactive_clients())
 
     async def register_client(

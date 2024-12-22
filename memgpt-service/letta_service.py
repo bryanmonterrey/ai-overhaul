@@ -19,9 +19,10 @@ from memory_base import Memory
 import uuid
 from dspy_modules.service import DSPyService
 from pathlib import Path
-from .trading.websocket.event_handler import WebSocketEventHandler
-from .trading.realtime import RealTimeMonitor
-from .trading.memory.trading_memory import TradingMemory
+from trading.websocket.event_handler import WebSocketEventHandler
+from trading.realtime import RealTimeMonitor
+from trading.memory.trading_memory import TradingMemory
+from chat.trading_chat import TradingChat
 import logging
 from dataclasses import asdict
 
@@ -213,7 +214,14 @@ class MemGPTService:
                     "position_concentration": 0.25,
                     "volatility_threshold": 0.50
                 },
-                "update_interval": 5
+                "update_interval": 5,
+                "risk_calculator": {
+                    "max_position_size": 100,  # In SOL
+                    "max_portfolio_var": 0.05,  # 5% VaR
+                    "max_concentration": 0.2,   # 20% max in single position
+                    "var_confidence": 0.95,     # 95% confidence for VaR
+                    "var_window": 30            # 30-day window for VaR
+                }
             })
             self.realtime_monitor.set_supabase_client(self.supabase)
             
@@ -915,8 +923,11 @@ class MemGPTService:
 
 # FastAPI setup
 app = FastAPI()
-service = MemGPTService()
-app.state.memgpt_service = service 
+
+@app.on_event("startup")
+async def startup_event():
+    app.state.memgpt_service = MemGPTService()
+    await app.state.memgpt_service.ws_handler.start()
 
 app.add_middleware(
     CORSMiddleware,
@@ -1087,7 +1098,7 @@ if __name__ == "__main__":
             config = uvicorn.Config(
                 app,
                 host="0.0.0.0",
-                port=3001,
+                port=3002,
                 log_level="info"
             )
             server = uvicorn.Server(config)

@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from decimal import Decimal
 from dataclasses import dataclass
-from ...memory_base import Memory
+from memory_base import Memory
 from ..risk_helpers import RiskHelpers
 
 @dataclass
@@ -26,6 +26,7 @@ class TradingMemory:
         self.state_history: List[TradingState] = []
         self.active_alerts: List[Dict[str, Any]] = []
         self.strategy_history: List[Dict[str, Any]] = []
+        self.realtime_monitor = None
         
     async def store_trade_execution(self, trade_result: Dict[str, Any]) -> str:
         """Store trade execution in LettA memory"""
@@ -192,3 +193,7 @@ class TradingMemory:
         """Get current consciousness state"""
         # Implementation will depend on your consciousness system
         pass
+
+    def set_realtime_monitor(self, monitor):
+        """Set the realtime monitor instance"""
+        self.realtime_monitor = monitor
