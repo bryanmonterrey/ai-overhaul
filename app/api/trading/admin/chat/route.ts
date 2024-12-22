@@ -14,23 +14,48 @@ export async function POST(req: NextRequest) {
   try {
     // Initialize Supabase client with proper cookie handling
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies: () => cookieStore 
+    });
 
-    // Verify admin session
+    // Verify admin session with debug logging
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('Session check:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      email: session?.user?.email,
+      error: sessionError
+    });
+
     if (sessionError || !session) {
-      return new Response('Unauthorized', { status: 401 });
+      console.error('Session error or no session:', sessionError);
+      return new Response('Unauthorized: No valid session', { status: 401 });
     }
 
-    // Verify admin status
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', session.user.id)
+    // Check if user is admin using user_roles table (matching middleware)
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', session.user.id)
       .single();
 
-    if (!profile?.is_admin) {
-      return new Response('Unauthorized', { status: 401 });
+    console.log('Role check:', {
+      roleData,
+      roleError,
+      userId: session.user.id
+    });
+
+    if (roleError) {
+      console.error('Role check error:', roleError);
+      return new Response('Unauthorized: Role check failed', { status: 401 });
+    }
+
+    if (roleData?.role !== 'admin') {
+      console.log('User not admin:', {
+        userId: session.user.id,
+        role: roleData?.role
+      });
+      return new Response('Unauthorized: Not an admin', { status: 401 });
     }
 
     const { messages }: { messages: Message[] } = await req.json();
@@ -76,7 +101,7 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    // Send message to LettA
+    // Send message to LettA with role context
     ws.onopen = () => {
       ws.send(JSON.stringify({
         type: 'trading_chat',
@@ -85,7 +110,8 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         context: {
           isAdmin: true,
-          sessionId: session.user.id
+          sessionId: session.user.id,
+          userRole: roleData.role // Include role in context
         }
       }));
     };
@@ -101,7 +127,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Route handler error:', error);
     return new Response(
-      JSON.stringify({ error: 'Error processing request' }), 
+      JSON.stringify({ 
+        error: 'Error processing request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }), 
       { 
         status: 500,
         headers: { 'Content-Type': 'application/json' }

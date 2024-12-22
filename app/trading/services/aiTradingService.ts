@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 class AITradingService {
   private supabase;
-  private baseUrl = '/api/admin/trading';
+  private baseUrl = '/api/admin/trading/chat';
 
   constructor() {
     this.supabase = createClient(
