@@ -1075,19 +1075,87 @@ async def cluster_memories(config: ClusterConfig):
 
 @app.post("/trading/admin/chat")
 async def admin_chat_endpoint(request: Request):
-    data = await request.json()
-    return StreamingResponse(
-        app.state.memgpt_service.trading_chat.process_messages(data),
-        media_type="text/event-stream"
-    )
+    try:
+        data = await request.json()
+        print("Received request data:", data)  # Debug log
+        
+        # Get the last message content
+        messages = data.get('messages', [])
+        if not messages:
+            raise HTTPException(status_code=400, detail="No messages provided")
+            
+        last_message = messages[-1].get('content', '')
+        print("Processing message:", last_message)  # Debug log
+        
+        # Process through trading chat
+        result = await app.state.memgpt_service.trading_chat.process_admin_message(last_message)
+        print("Generated result:", result)  # Debug log
+        
+        # Return as streaming response
+        async def event_stream():
+            try:
+                response_data = {
+                    "role": "assistant",
+                    "content": result.get("response", "No response generated"),
+                    "id": str(uuid.uuid4()),
+                    "createdAt": datetime.now().isoformat()
+                }
+                print("Sending response:", response_data)  # Debug log
+                yield f"data: {json.dumps(response_data)}\n\n"
+            except Exception as e:
+                print("Error in event stream:", str(e))  # Debug log
+                error_response = {
+                    "role": "assistant",
+                    "content": f"Error: {str(e)}",
+                    "id": str(uuid.uuid4()),
+                    "createdAt": datetime.now().isoformat()
+                }
+                yield f"data: {json.dumps(error_response)}\n\n"
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream"
+        )
+        
+    except Exception as e:
+        print("Endpoint error:", str(e))  # Debug log
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/trading/holders/chat")
 async def holder_chat_endpoint(request: Request):
-    data = await request.json()
-    return StreamingResponse(
-        app.state.memgpt_service.trading_chat.process_holder_messages(data),
-        media_type="text/event-stream"
-    )
+    try:
+        data = await request.json()
+        
+        messages = data.get('messages', [])
+        if not messages:
+            raise HTTPException(status_code=400, detail="No messages provided")
+            
+        user_address = data.get('userAddress')
+        if not user_address:
+            raise HTTPException(status_code=400, detail="No user address provided")
+            
+        last_message = messages[-1].get('content', '')
+        
+        # Process through trading chat
+        result = await app.state.memgpt_service.trading_chat.process_holder_message(
+            message=last_message,
+            user_address=user_address
+        )
+        
+        # Return as streaming response
+        async def event_stream():
+            try:
+                yield f"data: {json.dumps(result)}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/memories/evolution/{concept}")
 async def track_memory_evolution(concept: str):

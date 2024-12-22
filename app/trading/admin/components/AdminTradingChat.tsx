@@ -42,20 +42,32 @@ export function AdminTradingChat() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/trading/admin/chat',
     onResponse: (response) => {
-      // Handle streaming response if needed
-      console.log('Streaming response:', response);
-    },
-    onFinish: (message) => {
-      // Handle completion if needed
-      console.log('Chat completed:', message);
-    },
-  });
+        // Debug logs
+        console.log('Received response:', response);
+      },
+      onFinish: (message) => {
+        // Debug logs
+        console.log('Chat completed:', message);
+      },
+      onError: (error) => {
+        console.error('Chat error:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to send message",
+          variant: "destructive",
+        });
+      },
+    });
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    useEffect(() => {
+        console.log('Current messages:', messages);
+      }, [messages]);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages]);
 
   // Subscribe to trading updates
   useEffect(() => {

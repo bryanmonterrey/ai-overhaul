@@ -14,7 +14,7 @@ class TradingChat:
     def __init__(self, letta_service, memory_processor, dspy_service):
         self.letta = letta_service
         self.memory = memory_processor
-        self.dspy = dspy_service
+        self.dspy_service = dspy_service 
         self.command_handlers = self._init_command_handlers()
         
     def _init_command_handlers(self) -> Dict[str, callable]:
@@ -28,26 +28,34 @@ class TradingChat:
         
     async def process_admin_message(self, message: str) -> Dict[str, Any]:
         """Process admin chat messages"""
+        print("Starting process_admin_message with:", message)  # Debug log
         try:
+            print("Calling dspy_service.analyze_trading_command")  # Debug log
             # Use DSPy to analyze intent and extract command
             analysis = await self.dspy_service.analyze_trading_command(
                 message,
                 context="admin"
             )
+            print("DSPy analysis result:", analysis)  # Debug log
             
             # Get command handler
             handler = self.command_handlers.get(analysis["command_type"])
+            print("Found handler:", handler)  # Debug log
+            
             if not handler:
+                print("No handler found for command type")  # Debug log
                 return {
                     "response": "I don't understand that command.",
                     "error": "Invalid command type"
                 }
                 
             # Execute command with admin privileges
+            print("Executing handler with parameters:", analysis["parameters"])  # Debug log
             result = await handler(
                 analysis["parameters"],
                 is_admin=True
             )
+            print("Handler result:", result)  # Debug log
             
             # Store interaction in memory
             await self.memory.store_interaction(
@@ -59,10 +67,19 @@ class TradingChat:
                     "timestamp": datetime.now().isoformat()
                 }
             )
+            print("Memory stored, returning result")  # Debug log
             
+            # Make sure we have a response field
+            if isinstance(result, dict) and "response" not in result:
+                result = {
+                    "response": str(result),
+                    "data": result
+                }
+                
             return result
             
         except Exception as e:
+            print("Error in process_admin_message:", str(e))  # Debug log
             return {
                 "response": f"Error processing command: {str(e)}",
                 "error": str(e)
