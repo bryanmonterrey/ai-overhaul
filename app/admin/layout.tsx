@@ -18,13 +18,13 @@ export default function AdminLayout({
 
   return (
     <div className="h-full bg-[#11111A]">
-      <header className="border-b border-white">
+      <header className="border-b border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14">
-            <div className="text-white font-bold">Admin Dashboard</div>
+          <div className="flex justify-between items-center h-8">
+            <div className="text-zinc-50 font-bold">Admin Dashboard</div>
             <button
               onClick={handleSignOut}
-              className="px-4 py-2 bg-[#11111A] text-white rounded-none hover:bg-white/10 border border-white"
+              className="px-4 py-1 bg-[#11111A] text-zinc-50 rounded-md hover:bg-white/10 border border-zinc-800"
             >
               Sign Out
             </button>
