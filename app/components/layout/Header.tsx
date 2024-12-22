@@ -11,8 +11,8 @@ import { Magnetic } from '../common/MagButton';
 
 const CustomWalletButton = () => {
   return (
-    <WalletMultiButton className="!bg-[#11111A] !border !border-[#DDDDDD] !rounded-none !font-ia !text-sm !px-3 !py-1">
-      SELECT&nbsp;WALLET
+    <WalletMultiButton className="!bg-[#0D0E15] !border !border-zinc-900 !rounded-md !font-ia !text-sm !px-3 !py-1">
+      select&nbsp;wallet
     </WalletMultiButton>
   );
 };
@@ -34,7 +34,7 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A] border-b border-zinc-800">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A]">
       <div className=" px-4 justify-between">
         <div className="flex justify-between items-center h-14">
           <div className="flex items-center space-x-8">
@@ -48,8 +48,8 @@ export default function Header() {
               <Link href="/chat" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
               <button 
               type='button'
-              className='inline-flex items-center rounded-md border border-zinc-800
-         bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-800
+              className='inline-flex items-center rounded-md border border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 chat
               </button>
@@ -60,8 +60,8 @@ export default function Header() {
               <Link href="/conversations" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
               <button 
               type='button'
-              className='inline-flex items-center rounded-md border border-zinc-800
-         bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-800
+              className='inline-flex items-center rounded-md border border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 conversations
               </button>
@@ -71,8 +71,8 @@ export default function Header() {
               <Link href="/twitter" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
               <button 
               type='button'
-              className='inline-flex items-center rounded-md border border-zinc-800
-         bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-800
+              className='inline-flex items-center rounded-md border border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 twitter
               </button>
@@ -82,8 +82,8 @@ export default function Header() {
               <Link href="/telegram" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
               <button 
               type='button'
-              className='inline-flex items-center rounded-md border border-zinc-800
-         bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-800
+              className='inline-flex items-center rounded-md border border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 telegram
               </button>
@@ -93,8 +93,8 @@ export default function Header() {
               <Link href="/admin" className="font-ia text-[#DDDDDD] hover:text-[#DDDDDD]">
               <button 
               type='button'
-              className='inline-flex items-center rounded-md border border-zinc-800
-         bg-transparent px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-800
+              className='inline-flex items-center rounded-md border border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 admin
               </button>
@@ -109,9 +109,9 @@ export default function Header() {
             {/* Menu button - shown only on small screens */}
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="sm:hidden text-xs px-5 py-2 border border-[#DDDDDD] text-white"
+              className="sm:hidden text-xs px-5 py-2 border bg-[#0D0E15] rounded-md border-zinc-900 text-zinc-50"
             >
-              MENU
+              menu
             </button>
             
             {connected && publicKey ? (
@@ -123,9 +123,9 @@ export default function Header() {
                 </Card>
                 <button
                   onClick={handleSignOut}
-                  className="font-ia bg-[#11111A] text-[#DDDDDD] border border-[#DDDDDD] py-2 px-3 hover:text-red-500 text-xs"
+                  className="font-ia bg-[#0D0E15] text-zinc-50 border rounded-md border-zinc-900 py-2 px-3 hover:text-red-500 text-xs"
                 >
-                  DISCONNECT
+                  disconnect
                 </button>
               </div>
             ) : (
