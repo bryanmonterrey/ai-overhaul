@@ -953,7 +953,7 @@ async def analyze_content(request: AnalyzeRequest):
             raise HTTPException(status_code=400, detail="Content is required")
 
         # Process the content
-        result = await service.process_memory_content(
+        result = await app.state.memgpt_service.process_memory_content(
             content=request.content,
             context=request.context
         )
@@ -976,14 +976,14 @@ async def query_content(request: QueryRequest):
 
 
         if request.type == 'analysis':
-            result = await service.process_memory_content(
+            result = await app.state.memgpt_service.process_memory_content(
                 content=request.query,
                 context=request.context
             )
             return {"success": True, "data": result}
         else:
             # Properly await the memory query
-            result = await service.query_memories(
+            result = await app.state.memgpt_service.query_memories(
                 memory_type=request.type,
                 query={"content": request.query, "context": request.context}
             )
@@ -998,14 +998,14 @@ async def query_content(request: QueryRequest):
 # Existing endpoints
 @app.post("/store", response_model=MemoryResponse)
 async def store_memory(memory: BaseMemory):
-    result = await service.store_memory(memory)
+    result = await app.state.memgpt_service.store_memory(memory)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
 
 @app.get("/memories/{key}", response_model=MemoryResponse)  # This one should be added
 async def get_memory(key: str, type: Optional[MemoryType] = None):
-    result = await service.get_memory(key)
+    result = await app.state.memgpt_service.get_memory(key)
     if not result["success"]:
         raise HTTPException(
             status_code=404 if "not found" in str(result["error"]).lower() else 500, 
@@ -1016,7 +1016,7 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     client_id = websocket.headers.get("client-id", str(uuid.uuid4()))
-    await service.ws_handler.handle_connection(websocket, client_id)
+    await app.state.memgpt_service.ws_handler.handle_connection(websocket, client_id)
 
 # New feature endpoints
 @app.post("/memories/chain/{memory_key}")
@@ -1032,7 +1032,7 @@ async def chain_memories(memory_key: str, config: ChainConfig):
                 raise HTTPException(status_code=400, detail="Memory key is required")
             key = memory_key  # Allow non-UUID keys for metadata lookup
             
-        result = await service.get_memory(key)
+        result = await app.state.memgpt_service.get_memory(key)
         if not result["success"]:
             return {
                 "success": True,
@@ -1043,7 +1043,7 @@ async def chain_memories(memory_key: str, config: ChainConfig):
             }
             
         # If we found the memory, proceed with chaining
-        chain_result = await service.chain_memories(key, config)
+        chain_result = await app.state.memgpt_service.chain_memories(key, config)
         if not chain_result["success"]:
             return {
                 "success": True,
@@ -1067,21 +1067,21 @@ async def chain_memories(memory_key: str, config: ChainConfig):
     
 @app.post("/memories/cluster")
 async def cluster_memories(config: ClusterConfig):
-    result = await service.cluster_memories(config)
+    result = await app.state.memgpt_service.cluster_memories(config)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
 
 @app.get("/memories/evolution/{concept}")
 async def track_memory_evolution(concept: str):
-    result = await service.track_memory_evolution(concept)
+    result = await app.state.memgpt_service.track_memory_evolution(concept)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
 
 @app.get("/summary")
 async def get_memory_summary(timeframe: str = 'recent', limit: int = 5):
-    result = await service.summarize_memories(timeframe, limit)
+    result = await app.state.memgpt_service.summarize_memories(timeframe, limit)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
@@ -1098,7 +1098,7 @@ if __name__ == "__main__":
             config = uvicorn.Config(
                 app,
                 host="0.0.0.0",
-                port=3002,
+                port=3001,
                 log_level="info"
             )
             server = uvicorn.Server(config)
