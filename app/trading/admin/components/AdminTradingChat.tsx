@@ -40,7 +40,7 @@ export function AdminTradingChat() {
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: '/api/trading/admin/chat',
+    api: '/api/letta/chat',
     onResponse: (response) => {
       // Handle streaming response if needed
       console.log('Streaming response:', response);

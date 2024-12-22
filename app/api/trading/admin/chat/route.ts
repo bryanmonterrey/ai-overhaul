@@ -4,9 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/supabase/functions/supabase.types';
 import { Message } from 'ai';
-import WebSocket from 'ws';
 
-// Use environment variable for API URL with local fallback
 const API_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001';
 
 export const runtime = 'edge';
@@ -66,20 +64,13 @@ export async function POST(req: NextRequest) {
       return new Response('No messages provided', { status: 400 });
     }
 
-    // Log WebSocket connection attempt
-    const wsUrl = `${API_URL.replace('http', 'ws')}/ws`;
-    console.log('Attempting WebSocket connection to:', wsUrl);
-
-    // Create WebSocket connection to LettA
-    const ws = new WebSocket(wsUrl);
-    
-    // Create streaming response
-    const stream = new TransformStream();
-    const writer = stream.writable.getWriter();
-
-    ws.onopen = () => {
-      console.log('WebSocket connection opened');
-      const payload = {
+    // Instead of WebSocket, make HTTP request to Python backend
+    const pythonResponse = await fetch(`${API_URL}/trading/admin/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         type: 'trading_chat',
         messages,
         role: 'admin',
@@ -89,48 +80,43 @@ export async function POST(req: NextRequest) {
           sessionId: session.user.id,
           userRole: roleData.role
         }
-      };
-      console.log('Sending payload:', payload);
-      ws.send(JSON.stringify(payload));
-    };
+      })
+    });
 
-    ws.onmessage = async (event) => {
+    if (!pythonResponse.ok) {
+      throw new Error(`Python API error: ${pythonResponse.statusText}`);
+    }
+
+    // Create streaming response
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+
+    // Process the Python response
+    const reader = pythonResponse.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body from Python API');
+    }
+
+    // Read and forward the streaming response
+    (async () => {
       try {
-        const data = JSON.parse(event.data);
-        console.log('Received WebSocket message:', data);
-        await writer.write(
-          new TextEncoder().encode(
-            `data: ${JSON.stringify({ text: data.text })}\n\n`
-          )
-        );
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            await writer.close();
+            break;
+          }
+          // Format the response as SSE
+          await writer.write(new TextEncoder().encode(
+            `data: ${JSON.stringify({ text: new TextDecoder().decode(value) })}\n\n`
+          ));
+        }
       } catch (error) {
-        console.error('Error processing message:', error);
-      }
-    };
-
-    ws.onclose = async (event) => {
-      console.log('WebSocket connection closed:', {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean
-      });
-      try {
+        console.error('Streaming error:', error);
         await writer.close();
-      } catch (error) {
-        console.error('Error closing writer:', error);
       }
-    };
+    })();
 
-    ws.onerror = async (error) => {
-      console.error('WebSocket connection error:', error);
-      try {
-        await writer.close();
-      } catch (err) {
-        console.error('Error closing writer:', err);
-      }
-    };
-
-    console.log('Setting up stream response');
     return new Response(stream.readable, {
       headers: {
         'Content-Type': 'text/event-stream',

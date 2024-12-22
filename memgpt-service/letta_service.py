@@ -1,7 +1,7 @@
 # memgpt-service/letta_service.py
 import os
 import json
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, validator
 from enum import Enum
@@ -1071,6 +1071,22 @@ async def cluster_memories(config: ClusterConfig):
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
+
+@app.post("/trading/admin/chat")
+async def admin_chat_endpoint(request: Request):
+    data = await request.json()
+    return StreamingResponse(
+        app.state.memgpt_service.trading_chat.process_messages(data),
+        media_type="text/event-stream"
+    )
+
+@app.post("/trading/holders/chat")
+async def holder_chat_endpoint(request: Request):
+    data = await request.json()
+    return StreamingResponse(
+        app.state.memgpt_service.trading_chat.process_holder_messages(data),
+        media_type="text/event-stream"
+    )
 
 @app.get("/memories/evolution/{concept}")
 async def track_memory_evolution(concept: str):
