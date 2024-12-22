@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || 'your-site-key';
+  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '7f5ac86c-52a2-4aaa-bf1c-e1a8309e0106';
 
   // Handle successful hCaptcha verification
   const handleCaptchaVerify = (token: string) => {
