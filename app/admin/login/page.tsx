@@ -113,7 +113,7 @@ export default function AdminLogin() {
           </div>
           <button
             type="submit"
-            className="w-full px-4 py-2 bg-[#0D0E15] text-zinc-50 rounded-md hover:bg-white/10 border border-zinc-800"
+            className="w-full px-4 py-2 bg-[#0D0E15]  text-zinc-50 rounded-md hover:bg-white/10 border border-zinc-800"
           >
             login
           </button>
