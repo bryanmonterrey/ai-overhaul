@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { AITradingDashboard } from './components/AITradingDashboard';
+import { AdminTradingChat } from './components/AdminTradingChat';
 
 export default function AdminTradingPage() {
   const supabase = createClientComponentClient();
@@ -49,6 +50,9 @@ export default function AdminTradingPage() {
 
   return (
     <div className="container mx-auto p-6">
+        <div className="lg:col-span-2 mb-14">
+          <AdminTradingChat />
+        </div>
       <h1 className="text-2xl font-bold mb-6">AI Trading Management</h1>
       <AITradingDashboard />
     </div>

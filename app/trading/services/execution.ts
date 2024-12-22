@@ -1,7 +1,8 @@
 // app/trading/services/execution.ts
-import { Connection, PublicKey, TransactionInstruction } from '@solana/web3.js';
-import { JupiterProvider, TOKEN_LIST_URL } from '@jup-ag/core';
-import { getBundleInstructions } from '@jito-foundation/mev-bot';
+import { Connection, PublicKey, TransactionInstruction, Transaction } from '@solana/web3.js';
+import { Jupiter, RouteInfo, TOKEN_LIST_URL } from '@jup-ag/core';
+import { Wallet } from '@coral-xyz/anchor';
+import JSBI from 'jsbi';
 
 interface TradeParams {
   inputMint: string;
@@ -14,59 +15,128 @@ interface TradeParams {
 
 class TradeExecutionService {
   private connection: Connection;
-  private jupiter: JupiterProvider;
+  private jupiter!: Jupiter; // Add ! to fix definite assignment
+  private blockEngineUrl: string;
 
   constructor() {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
-    this.jupiter = new JupiterProvider({
+    this.blockEngineUrl = 'https://frankfurt.jito.wtf/';
+    this.initializeJupiter();
+  }
+
+  private async initializeJupiter() {
+    this.jupiter = await Jupiter.load({
       connection: this.connection,
-      cluster: 'mainnet-beta',
-      tokenListUrl: TOKEN_LIST_URL,
+      cluster: 'mainnet-beta'
+      // user property is omitted completely
     });
   }
 
-  async executeTradeWithMEV(params: TradeParams) {
+  private async submitToBlockEngine(signedTransaction: Transaction) {
     try {
+      const response = await fetch(`${this.blockEngineUrl}/bundle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactions: [signedTransaction.serialize()],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit to block engine');
+      }
+
+      const result = await response.json();
+      return result.bundleId;
+    } catch (error) {
+      console.error('Block engine submission error:', error);
+      throw error;
+    }
+  }
+
+  async executeTradeWithMEV(params: TradeParams, wallet: Wallet) {
+    try {
+      // Convert amount to JSBI
+      const amountBigInt = JSBI.BigInt(params.amount.toString());
+
       // Get Jupiter quote
-      const quote = await this.jupiter.computeBestRoute({
+      const route = await this.jupiter.computeRoutes({
         inputMint: new PublicKey(params.inputMint),
         outputMint: new PublicKey(params.outputMint),
-        amount: params.amount,
+        amount: amountBigInt,
         slippageBps: params.slippage * 100,
         forceFetch: true,
       });
 
-      if (!quote) {
+      if (!route.routesInfos?.length) {
         throw new Error('No route found');
       }
 
-      // Get transaction instructions from Jupiter
-      const { transactions } = await quote.execute();
+      // Get best route
+      const bestRoute = route.routesInfos[0];
+
+      // Execute the trade
+      const { swapTransaction } = await this.jupiter.exchange({
+        routeInfo: bestRoute,
+        userPublicKey: wallet.publicKey, // Pass the wallet's public key here
+      });
+
+      let signatures: string[] = [];
 
       // If MEV protection is enabled
       if (params.useMev) {
-        // Get Jito bundle instructions
-        const bundleInstructions = await getBundleInstructions({
-          connection: this.connection,
-          instructions: transactions.map(tx => tx.instructions).flat(),
-          priorityFee: params.priorityFee || 0.0025, // Default to 0.0025 SOL if not specified
-        });
+        const priorityFee = params.priorityFee || 0.0025;
+        
+        try {
+          // Create priority fee instruction
+          const priorityFeeInstruction = new TransactionInstruction({
+            keys: [],
+            programId: new PublicKey('ComputeBudget111111111111111111111111111111'),
+            data: Buffer.from([
+              0x02, // Instruction index for SetComputeUnitPrice
+              ...new Uint8Array(new Float64Array([priorityFee * 1e9]).buffer)
+            ])
+          });
 
-        // Add Jito instructions to transaction
-        transactions.forEach(tx => {
-          tx.instructions.push(...bundleInstructions);
-        });
+          // Add priority fee instruction to transaction
+          if (swapTransaction instanceof Transaction) {
+            swapTransaction.instructions.unshift(priorityFeeInstruction);
+            swapTransaction.sign(wallet.payer);
+
+            // Submit to block engine
+            const bundleId = await this.submitToBlockEngine(swapTransaction);
+            console.log('Bundle submitted:', bundleId);
+
+            // Wait for confirmation
+            const signature = swapTransaction.signatures[0]?.signature;
+            if (signature) {
+              await this.connection.confirmTransaction({
+                signature: signature.toString(),
+                blockhash: swapTransaction.recentBlockhash!,
+                lastValidBlockHeight: await this.connection.getBlockHeight()
+              });
+              signatures.push(signature.toString());
+            }
+          }
+
+        } catch (error) {
+          console.error('MEV-protected transaction failed:', error);
+          // Fallback to regular transaction
+          const signature = await this.connection.sendTransaction(swapTransaction as Transaction, [wallet.payer]);
+          signatures.push(signature);
+        }
+      } else {
+        // Execute regular transaction without MEV protection
+        const signature = await this.connection.sendTransaction(swapTransaction as Transaction, [wallet.payer]);
+        signatures.push(signature);
       }
-
-      // Execute transaction(s)
-      const signatures = await Promise.all(
-        transactions.map(tx => this.connection.sendTransaction(tx))
-      );
 
       return {
         success: true,
         signatures,
-        route: quote.routePlan,
+        route: bestRoute,
       };
 
     } catch (error) {
@@ -75,20 +145,38 @@ class TradeExecutionService {
     }
   }
 
-  async getRouteQuote(params: TradeParams) {
+  async getRouteQuote(params: TradeParams): Promise<{
+    price: number;
+    priceImpact: number;
+    route: RouteInfo;
+    minOutputAmount: number;
+  }> {
     try {
-      const quote = await this.jupiter.computeBestRoute({
+      const amountBigInt = JSBI.BigInt(params.amount.toString());
+
+      const routes = await this.jupiter.computeRoutes({
         inputMint: new PublicKey(params.inputMint),
         outputMint: new PublicKey(params.outputMint),
-        amount: params.amount,
+        amount: amountBigInt,
         slippageBps: params.slippage * 100,
       });
 
+      if (!routes.routesInfos?.length) {
+        throw new Error('No routes found');
+      }
+
+      const bestRoute = routes.routesInfos[0];
+
+      // Convert JSBI values to numbers for the response
+      const outAmount = Number(bestRoute.outAmount.toString());
+      const inAmount = Number(bestRoute.inAmount.toString());
+      const otherAmountThreshold = Number(bestRoute.otherAmountThreshold.toString());
+
       return {
-        price: quote.outAmount / quote.inAmount,
-        priceImpact: quote.priceImpactPct,
-        route: quote.routePlan,
-        minOutputAmount: quote.outAmountWithSlippage,
+        price: outAmount / inAmount,
+        priceImpact: bestRoute.priceImpactPct,
+        route: bestRoute,
+        minOutputAmount: otherAmountThreshold,
       };
 
     } catch (error) {

@@ -2,19 +2,21 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { useChat, Message } from 'ai/react'; // Import Message type from ai/react
+import { useChat, Message } from 'ai/react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from "@/hooks/use-toast";
+import { aiTradingService } from '../../services/aiTradingService';
 
 interface TradeExecutionData {
   type: 'trade_execution';
   token: string;
   side: 'buy' | 'sell';
   amount: number;
+  price?: number;
 }
 
 interface PortfolioUpdateData {
@@ -39,6 +41,14 @@ export function AdminTradingChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/trading/admin/chat',
+    onResponse: (response) => {
+      // Handle streaming response if needed
+      console.log('Streaming response:', response);
+    },
+    onFinish: (message) => {
+      // Handle completion if needed
+      console.log('Chat completed:', message);
+    },
   });
 
   useEffect(() => {
@@ -47,19 +57,28 @@ export function AdminTradingChat() {
     }
   }, [messages]);
 
+  // Subscribe to trading updates
+  useEffect(() => {
+    const subscription = aiTradingService.subscribeToUpdates((update) => {
+      if (update.type === 'trade_execution' || update.type === 'portfolio_update') {
+        console.log('Received trading update:', update);
+        // Handle real-time updates if needed
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const handleTradeExecution = async (tradeData: TradeExecutionData) => {
     try {
-      const response = await fetch('/api/trading/admin/execute', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(tradeData),
+      await aiTradingService.executeManualTrade({
+        token: tradeData.token,
+        side: tradeData.side,
+        amount: tradeData.amount,
+        price: tradeData.price
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to execute trade');
-      }
 
       toast({
         title: "Trade Executed",
@@ -120,6 +139,9 @@ export function AdminTradingChat() {
                               <p>Token: {message.data.token}</p>
                               <p>Side: {message.data.side}</p>
                               <p>Amount: {message.data.amount} SOL</p>
+                              {message.data.price && (
+                                <p>Price: {message.data.price} USDC</p>
+                              )}
                             </div>
                             <Button
                               size="sm"
