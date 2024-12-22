@@ -51,67 +51,74 @@ export default function LoginPage() {
     checkSession();
   }, [supabase, router]);
 
-  useEffect(() => {
-    const handleWalletLogin = async () => {
-      if (!connected || !publicKey || isAuthenticating || !captchaToken) return;
+  const handleWalletLogin = async () => {
+    if (!connected || !publicKey || isAuthenticating || !captchaToken) return;
 
-      try {
-        setIsAuthenticating(true);
-        setError(null);
-        console.log('Starting wallet authentication for:', publicKey.toString());
+    try {
+      setIsAuthenticating(true);
+      setError(null);
 
-        const tokenChecker = new TokenChecker();
-        const { isEligible, value } = await tokenChecker.checkEligibility(publicKey.toString());
+      // Step 1: Verify CAPTCHA server-side
+      const captchaResponse = await fetch('/api/verify-turnstile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: captchaToken }),
+      });
 
-        if (!isEligible) {
-          setError('Insufficient GOATSE tokens');
-          return;
-        }
+      const captchaResult = await captchaResponse.json();
 
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: `${publicKey.toString()}@wallet.local`,
-          password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
-          options: {
-            data: {
-              wallet_address: publicKey.toString(),
-              token_value: value,
-              captcha_token: captchaToken,
-            },
-          },
-        });
-
-        if (signUpError) {
-          console.log('Sign up attempt result:', signUpError.message);
-
-          if (signUpError.message.includes('User already registered')) {
-            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email: `${publicKey.toString()}@wallet.local`,
-              password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
-            });
-
-            if (signInError) {
-              setError('Authentication failed');
-              return;
-            }
-
-            if (signInData.session) {
-              router.push('/chat');
-            }
-          } else {
-            setError('Authentication failed');
-          }
-        } else if (signUpData.session) {
-          router.push('/chat');
-        }
-      } catch (error) {
-        setError('Authentication failed');
-      } finally {
-        setIsAuthenticating(false);
+      if (!captchaResult.success) {
+        throw new Error('CAPTCHA verification failed.');
       }
-    };
 
-    handleWalletLogin();
-  }, [connected, publicKey, supabase, router, isAuthenticating, captchaToken]);
+      // Step 2: Check token eligibility
+      const tokenChecker = new TokenChecker();
+      const { isEligible, value } = await tokenChecker.checkEligibility(publicKey.toString());
+
+      if (!isEligible) {
+        setError('Insufficient GOATSE tokens');
+        return;
+      }
+
+      // Step 3: Sign up or sign in
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: `${publicKey.toString()}@wallet.local`,
+        password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
+        options: {
+          data: {
+            wallet_address: publicKey.toString(),
+            token_value: value,
+          },
+        },
+      });
+
+      if (signUpError) {
+        if (signUpError.message.includes('User already registered')) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: `${publicKey.toString()}@wallet.local`,
+            password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
+          });
+
+          if (signInError) {
+            throw new Error('Authentication failed.');
+          }
+
+          if (signInData.session) {
+            router.push('/chat');
+          }
+        } else {
+          throw new Error('Authentication failed.');
+        }
+      } else if (signUpData.session) {
+        router.push('/chat');
+      }
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      setError(error.message || 'An unknown error occurred');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
   if (loading) {
     return (

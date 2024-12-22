@@ -45,7 +45,20 @@ export default function AdminLogin() {
     }
 
     try {
-      // 1. Sign in
+      // Step 1: Verify CAPTCHA server-side
+      const captchaResponse = await fetch('/api/verify-turnstile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: captchaToken }),
+      });
+
+      const captchaResult = await captchaResponse.json();
+
+      if (!captchaResult.success) {
+        throw new Error('CAPTCHA verification failed.');
+      }
+
+      // Step 2: Sign in using Supabase
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -59,31 +72,24 @@ export default function AdminLogin() {
         throw new Error('No user data returned');
       }
 
-      // 2. Get user role
+      // Step 3: Check user role in Supabase database
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', signInData.user.id)
         .single();
 
-      console.log('Role check response:', { roleData, roleError });
-
       if (roleError) {
         await supabase.auth.signOut();
         throw new Error(`Role check failed: ${roleError.message}`);
       }
 
-      if (!roleData) {
-        await supabase.auth.signOut();
-        throw new Error('No role found for user');
-      }
-
-      if (roleData.role !== 'admin') {
+      if (!roleData || roleData.role !== 'admin') {
         await supabase.auth.signOut();
         throw new Error('Not authorized as admin');
       }
 
-      // 3. Success
+      // Step 4: Redirect to admin page
       router.push('/admin');
     } catch (error: any) {
       console.error('Login error:', error);
