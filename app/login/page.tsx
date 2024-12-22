@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { TokenChecker } from '../lib/blockchain/token-checker';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 export default function LoginPage() {
   const supabase = createClientComponentClient();
@@ -17,21 +17,18 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '7f5ac86c-52a2-4aaa-bf1c-e1a8309e0106';
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || 'your-site-key';
 
-  // Handle successful hCaptcha verification
   const handleCaptchaVerify = (token: string) => {
     console.log('Captcha verified:', token);
     setCaptchaToken(token);
   };
 
-  // Check existing session
   useEffect(() => {
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          // Verify tokens even for existing sessions
           const tokenChecker = new TokenChecker();
           const { isEligible } = await tokenChecker.checkEligibility(session.user.user_metadata.wallet_address);
 
@@ -50,10 +47,10 @@ export default function LoginPage() {
         setLoading(false);
       }
     };
+
     checkSession();
   }, [supabase, router]);
 
-  // Handle wallet authentication
   useEffect(() => {
     const handleWalletLogin = async () => {
       if (!connected || !publicKey || isAuthenticating || !captchaToken) return;
@@ -63,7 +60,6 @@ export default function LoginPage() {
         setError(null);
         console.log('Starting wallet authentication for:', publicKey.toString());
 
-        // Check token eligibility first
         const tokenChecker = new TokenChecker();
         const { isEligible, value } = await tokenChecker.checkEligibility(publicKey.toString());
 
@@ -72,7 +68,6 @@ export default function LoginPage() {
           return;
         }
 
-        // Proceed with auth only if tokens are sufficient and captcha is verified
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: `${publicKey.toString()}@wallet.local`,
           password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
@@ -80,41 +75,35 @@ export default function LoginPage() {
             data: {
               wallet_address: publicKey.toString(),
               token_value: value,
-              captcha_token: captchaToken, // Send captcha token
-            }
-          }
+              captcha_token: captchaToken,
+            },
+          },
         });
 
         if (signUpError) {
           console.log('Sign up attempt result:', signUpError.message);
 
           if (signUpError.message.includes('User already registered')) {
-            console.log('User exists, attempting sign in');
             const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
               email: `${publicKey.toString()}@wallet.local`,
-              password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret'
+              password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
             });
 
             if (signInError) {
-              console.error('Sign in error:', signInError);
               setError('Authentication failed');
               return;
             }
 
             if (signInData.session) {
-              console.log('Successfully signed in');
               router.push('/chat');
             }
           } else {
-            console.error('Unexpected error during signup:', signUpError);
             setError('Authentication failed');
           }
         } else if (signUpData.session) {
-          console.log('Successfully signed up and authenticated');
           router.push('/chat');
         }
       } catch (error) {
-        console.error('Authentication error:', error);
         setError('Authentication failed');
       } finally {
         setIsAuthenticating(false);
@@ -154,9 +143,9 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-4 mx-auto w-full flex items-center justify-center">
-          <HCaptcha
-            sitekey={hcaptchaSiteKey}
-            onVerify={handleCaptchaVerify}
+          <Turnstile
+            siteKey={turnstileSiteKey}
+            onSuccess={handleCaptchaVerify}
           />
         </div>
 

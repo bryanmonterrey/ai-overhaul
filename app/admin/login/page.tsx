@@ -3,7 +3,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -12,7 +12,7 @@ export default function AdminLogin() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClientComponentClient();
-  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '06c08b02-0200-4da2-95f6-97ea360e4528';
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || 'your-site-key';
 
   useEffect(() => {
     const testConnection = async () => {
@@ -21,16 +21,15 @@ export default function AdminLogin() {
           .from('user_roles')
           .select('count(*)')
           .single();
-        
         console.log('Connection test:', { data, error });
       } catch (err) {
         console.error('Connection test failed:', err);
       }
     };
-    
+
     testConnection();
   }, [supabase]);
-  
+
   const handleCaptchaVerify = (token: string) => {
     console.log('Captcha verified:', token);
     setCaptchaToken(token);
@@ -39,7 +38,7 @@ export default function AdminLogin() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
+
     if (!captchaToken) {
       setError('Please complete the CAPTCHA.');
       return;
@@ -51,42 +50,41 @@ export default function AdminLogin() {
         email,
         password,
       });
-  
+
       if (signInError) {
         throw new Error(`Sign in failed: ${signInError.message}`);
       }
-  
+
       if (!signInData.user) {
         throw new Error('No user data returned');
       }
-  
-      // 2. Get user role - with explicit error logging
+
+      // 2. Get user role
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', signInData.user.id)
         .single();
-  
+
       console.log('Role check response:', { roleData, roleError });
-  
+
       if (roleError) {
         await supabase.auth.signOut();
         throw new Error(`Role check failed: ${roleError.message}`);
       }
-  
+
       if (!roleData) {
         await supabase.auth.signOut();
         throw new Error('No role found for user');
       }
-  
+
       if (roleData.role !== 'admin') {
         await supabase.auth.signOut();
         throw new Error('Not authorized as admin');
       }
-  
+
       // 3. Success
       router.push('/admin');
-  
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'An unknown error occurred');
@@ -124,9 +122,9 @@ export default function AdminLogin() {
             />
           </div>
           <div className="mt-4">
-            <HCaptcha
-              sitekey={hcaptchaSiteKey}
-              onVerify={handleCaptchaVerify}
+            <Turnstile
+              siteKey={turnstileSiteKey}
+              onSuccess={handleCaptchaVerify}
             />
           </div>
           <button
