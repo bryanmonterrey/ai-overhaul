@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/supabase/functions/supabase.types';
 import { Message } from 'ai';
+import WebSocket from 'ws';
 
 // Use environment variable for API URL with local fallback
 const API_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001';
@@ -59,21 +60,44 @@ export async function POST(req: NextRequest) {
     }
 
     const { messages }: { messages: Message[] } = await req.json();
+    console.log('Processing messages:', messages);
 
     if (!messages?.length) {
       return new Response('No messages provided', { status: 400 });
     }
 
+    // Log WebSocket connection attempt
+    const wsUrl = `${API_URL.replace('http', 'ws')}/ws`;
+    console.log('Attempting WebSocket connection to:', wsUrl);
+
     // Create WebSocket connection to LettA
-    const ws = new WebSocket(`${API_URL.replace('http', 'ws')}/ws`);
+    const ws = new WebSocket(wsUrl);
     
     // Create streaming response
     const stream = new TransformStream();
     const writer = stream.writable.getWriter();
 
+    ws.onopen = () => {
+      console.log('WebSocket connection opened');
+      const payload = {
+        type: 'trading_chat',
+        messages,
+        role: 'admin',
+        userId: session.user.id,
+        context: {
+          isAdmin: true,
+          sessionId: session.user.id,
+          userRole: roleData.role
+        }
+      };
+      console.log('Sending payload:', payload);
+      ws.send(JSON.stringify(payload));
+    };
+
     ws.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('Received WebSocket message:', data);
         await writer.write(
           new TextEncoder().encode(
             `data: ${JSON.stringify({ text: data.text })}\n\n`
@@ -84,7 +108,12 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    ws.onclose = async () => {
+    ws.onclose = async (event) => {
+      console.log('WebSocket connection closed:', {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean
+      });
       try {
         await writer.close();
       } catch (error) {
@@ -93,7 +122,7 @@ export async function POST(req: NextRequest) {
     };
 
     ws.onerror = async (error) => {
-      console.error('WebSocket error:', error);
+      console.error('WebSocket connection error:', error);
       try {
         await writer.close();
       } catch (err) {
@@ -101,21 +130,7 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    // Send message to LettA with role context
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        type: 'trading_chat',
-        messages,
-        role: 'admin',
-        userId: session.user.id,
-        context: {
-          isAdmin: true,
-          sessionId: session.user.id,
-          userRole: roleData.role // Include role in context
-        }
-      }));
-    };
-
+    console.log('Setting up stream response');
     return new Response(stream.readable, {
       headers: {
         'Content-Type': 'text/event-stream',

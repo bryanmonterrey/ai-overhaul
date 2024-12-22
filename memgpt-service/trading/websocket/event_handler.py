@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timedelta
 import logging
 from dataclasses import dataclass, asdict
+from fastapi import WebSocket, WebSocketDisconnect
 
 @dataclass
 class WSClient:
@@ -18,6 +19,7 @@ class WSClient:
 class WebSocketEventHandler:
     def __init__(self):
         self.clients: Dict[str, WSClient] = {}
+        self.websockets: Dict[str, WebSocket] = {} 
         self.channels: Dict[str, Set[str]] = {
             'monitoring': set(),
             'trades': set(),
@@ -186,11 +188,64 @@ class WebSocketEventHandler:
                 if client_id in self.clients:
                     await self._send_to_client(client_id, message)
 
+    async def handle_connection(self, websocket: WebSocket, client_id: str):
+        """Handle new WebSocket connection"""
+        try:
+            await websocket.accept()
+            self.websockets[client_id] = websocket
+            
+            # Register client
+            await self.register_client(client_id)
+            
+            try:
+                while True:
+                    # Receive message
+                    data = await websocket.receive_json()
+                    
+                    # Update heartbeat
+                    await self.update_heartbeat(client_id)
+                    
+                    # Process message based on type
+                    message_type = data.get('type')
+                    
+                    if message_type == 'trading_chat':
+                        # Process trading chat message
+                        response = {
+                            'type': 'trading_chat_response',
+                            'text': data.get('messages', [{}])[-1].get('content', ''),
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        await websocket.send_json(response)
+                    
+                    elif message_type == 'subscribe':
+                        # Handle channel subscription
+                        channels = data.get('channels', [])
+                        await self.subscribe(client_id, channels)
+                    
+                    elif message_type == 'unsubscribe':
+                        # Handle channel unsubscription
+                        channels = data.get('channels', [])
+                        await self.unsubscribe(client_id, channels)
+
+            except WebSocketDisconnect:
+                # Clean up on disconnect
+                await self.unregister_client(client_id)
+                self.websockets.pop(client_id, None)
+                
+        except Exception as e:
+            logging.error(f"WebSocket connection error: {str(e)}")
+            if client_id in self.websockets:
+                await self.unregister_client(client_id)
+                self.websockets.pop(client_id, None)
+
     async def _send_to_client(self, client_id: str, message: Dict[str, Any]):
         """Send message to specific client"""
         try:
-            # The actual sending mechanism will depend on your WebSocket implementation
-            # This is a placeholder for the actual WebSocket send
-            pass
+            if client_id in self.websockets:
+                websocket = self.websockets[client_id]
+                await websocket.send_json(message)
         except Exception as e:
             logging.error(f"Error sending to client {client_id}: {str(e)}")
+            # Clean up if client is no longer connected
+            await self.unregister_client(client_id)
+            self.websockets.pop(client_id, None)
