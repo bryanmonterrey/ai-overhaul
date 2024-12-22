@@ -17,7 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '06c08b02-0200-4da2-95f6-97ea360e4528';
+  const hcaptchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || 'your-site-key';
 
   // Handle successful hCaptcha verification
   const handleCaptchaVerify = (token: string) => {
@@ -34,7 +34,7 @@ export default function LoginPage() {
           // Verify tokens even for existing sessions
           const tokenChecker = new TokenChecker();
           const { isEligible } = await tokenChecker.checkEligibility(session.user.user_metadata.wallet_address);
-          
+
           if (isEligible) {
             console.log('Session valid and tokens verified, redirecting to chat');
             router.push('/chat');
@@ -56,7 +56,7 @@ export default function LoginPage() {
   // Handle wallet authentication
   useEffect(() => {
     const handleWalletLogin = async () => {
-      if (!connected || !publicKey || isAuthenticating) return;
+      if (!connected || !publicKey || isAuthenticating || !captchaToken) return;
 
       try {
         setIsAuthenticating(true);
@@ -72,21 +72,22 @@ export default function LoginPage() {
           return;
         }
 
-        // Proceed with auth only if tokens are sufficient
+        // Proceed with auth only if tokens are sufficient and captcha is verified
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: `${publicKey.toString()}@wallet.local`,
           password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
           options: {
             data: {
               wallet_address: publicKey.toString(),
-              token_value: value
+              token_value: value,
+              captcha_token: captchaToken, // Send captcha token
             }
           }
         });
 
         if (signUpError) {
           console.log('Sign up attempt result:', signUpError.message);
-          
+
           if (signUpError.message.includes('User already registered')) {
             console.log('User exists, attempting sign in');
             const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -121,7 +122,7 @@ export default function LoginPage() {
     };
 
     handleWalletLogin();
-  }, [connected, publicKey, supabase, router, isAuthenticating]);
+  }, [connected, publicKey, supabase, router, isAuthenticating, captchaToken]);
 
   if (loading) {
     return (
@@ -150,6 +151,13 @@ export default function LoginPage() {
 
         <div className="mt-8">
           <WalletConnection />
+        </div>
+
+        <div className="mt-4">
+          <HCaptcha
+            sitekey={hcaptchaSiteKey}
+            onVerify={handleCaptchaVerify}
+          />
         </div>
 
         {isAuthenticating && (
