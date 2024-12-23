@@ -3,7 +3,7 @@ import { createClient } from '../supabase/client';
 
 export class WalletAuthManager {
   private supabase;
-  private retryDelay = 1000;
+  private retryDelay = 100000;
   private maxRetries = 3;
 
   constructor() {
