@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { TokenChecker } from '../lib/blockchain/token-checker';
-import { Turnstile } from '@marsidev/react-turnstile';
 
 export default function LoginPage() {
   const supabase = createClientComponentClient();
@@ -15,23 +14,17 @@ export default function LoginPage() {
   const { connected, publicKey } = useWallet();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || 'your-site-key';
-
-  const handleCaptchaVerify = (token: string) => {
-    console.log('Captcha verified:', token);
-    setCaptchaToken(token);
-  };
-
+  // Check existing session
   useEffect(() => {
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
+          // Verify tokens even for existing sessions
           const tokenChecker = new TokenChecker();
           const { isEligible } = await tokenChecker.checkEligibility(session.user.user_metadata.wallet_address);
-
+          
           if (isEligible) {
             console.log('Session valid and tokens verified, redirecting to chat');
             router.push('/chat');
@@ -47,78 +40,78 @@ export default function LoginPage() {
         setLoading(false);
       }
     };
-
     checkSession();
   }, [supabase, router]);
 
-  const handleWalletLogin = async () => {
-    if (!connected || !publicKey || isAuthenticating || !captchaToken) return;
+  // Handle wallet authentication
+  useEffect(() => {
+    const handleWalletLogin = async () => {
+      if (!connected || !publicKey || isAuthenticating) return;
 
-    try {
-      setIsAuthenticating(true);
-      setError(null);
+      try {
+        setIsAuthenticating(true);
+        setError(null);
+        console.log('Starting wallet authentication for:', publicKey.toString());
 
-      // Step 1: Verify CAPTCHA server-side
-      const captchaResponse = await fetch('/api/verify-turnstile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: captchaToken }),
-      });
+        // Check token eligibility first
+        const tokenChecker = new TokenChecker();
+        const { isEligible, value } = await tokenChecker.checkEligibility(publicKey.toString());
 
-      const captchaResult = await captchaResponse.json();
-
-      if (!captchaResult.success) {
-        throw new Error('CAPTCHA verification failed.');
-      }
-
-      // Step 2: Check token eligibility
-      const tokenChecker = new TokenChecker();
-      const { isEligible, value } = await tokenChecker.checkEligibility(publicKey.toString());
-
-      if (!isEligible) {
-        setError('Insufficient GOATSE tokens');
-        return;
-      }
-
-      // Step 3: Sign up or sign in
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: `${publicKey.toString()}@wallet.local`,
-        password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
-        options: {
-          data: {
-            wallet_address: publicKey.toString(),
-            token_value: value,
-          },
-        },
-      });
-
-      if (signUpError) {
-        if (signUpError.message.includes('User already registered')) {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: `${publicKey.toString()}@wallet.local`,
-            password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
-          });
-
-          if (signInError) {
-            throw new Error('Authentication failed.');
-          }
-
-          if (signInData.session) {
-            router.push('/chat');
-          }
-        } else {
-          throw new Error('Authentication failed.');
+        if (!isEligible) {
+          setError('Insufficient GOATSE tokens');
+          return;
         }
-      } else if (signUpData.session) {
-        router.push('/chat');
+
+        // Proceed with auth only if tokens are sufficient
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: `${publicKey.toString()}@wallet.local`,
+          password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret',
+          options: {
+            data: {
+              wallet_address: publicKey.toString(),
+              token_value: value
+            }
+          }
+        });
+
+        if (signUpError) {
+          console.log('Sign up attempt result:', signUpError.message);
+          
+          if (signUpError.message.includes('User already registered')) {
+            console.log('User exists, attempting sign in');
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+              email: `${publicKey.toString()}@wallet.local`,
+              password: process.env.NEXT_PUBLIC_WALLET_AUTH_SECRET || 'default-secret'
+            });
+
+            if (signInError) {
+              console.error('Sign in error:', signInError);
+              setError('Authentication failed');
+              return;
+            }
+
+            if (signInData.session) {
+              console.log('Successfully signed in');
+              router.push('/chat');
+            }
+          } else {
+            console.error('Unexpected error during signup:', signUpError);
+            setError('Authentication failed');
+          }
+        } else if (signUpData.session) {
+          console.log('Successfully signed up and authenticated');
+          router.push('/chat');
+        }
+      } catch (error) {
+        console.error('Authentication error:', error);
+        setError('Authentication failed');
+      } finally {
+        setIsAuthenticating(false);
       }
-    } catch (error: any) {
-      console.error('Authentication error:', error);
-      setError(error.message || 'An unknown error occurred');
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
+    };
+
+    handleWalletLogin();
+  }, [connected, publicKey, supabase, router, isAuthenticating]);
 
   if (loading) {
     return (
@@ -147,13 +140,6 @@ export default function LoginPage() {
 
         <div className="mt-8">
           <WalletConnection />
-        </div>
-
-        <div className="mt-4 mx-auto w-full flex items-center justify-center">
-          <Turnstile
-            siteKey={turnstileSiteKey}
-            onSuccess={handleCaptchaVerify}
-          />
         </div>
 
         {isAuthenticating && (
