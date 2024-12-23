@@ -1,6 +1,7 @@
 # memgpt-service/letta_service.py
 import os
 import json
+import time
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, validator
@@ -1077,39 +1078,57 @@ async def cluster_memories(config: ClusterConfig):
 async def admin_chat_endpoint(request: Request):
     try:
         data = await request.json()
-        print("Received request data:", data)  # Debug log
+        print("Received request data:", data)
         
-        # Get the last message content
         messages = data.get('messages', [])
         if not messages:
             raise HTTPException(status_code=400, detail="No messages provided")
             
         last_message = messages[-1].get('content', '')
-        print("Processing message:", last_message)  # Debug log
+        print("Processing message:", last_message)
         
-        # Process through trading chat
         result = await app.state.memgpt_service.trading_chat.process_admin_message(last_message)
-        print("Generated result:", result)  # Debug log
-        
-        # Return as streaming response
+        print("Generated result:", result)
+
         async def event_stream():
             try:
-                # Format the response exactly as vercel/ai expects it
-                response_data = {
+                # Send the main message
+                message = {
                     "id": str(uuid.uuid4()),
                     "role": "assistant",
                     "content": result.get("response", ""),
                     "createdAt": datetime.now().isoformat()
                 }
-                # Important: Each line must start with "data: " and end with two newlines
-                yield f"data: {json.dumps(response_data)}\n\n"
-                # Signal the end of the stream
-                yield "data: [DONE]\n\n"
-            except Exception as e:
-                error_data = {
-                    "error": str(e)
+                yield f"data: {json.dumps(message)}\n\n"
+
+                # If there's additional data, send it as another message
+                if result.get("data"):
+                    data_message = {
+                        "id": str(uuid.uuid4()),
+                        "role": "assistant",
+                        "content": "",
+                        "data": result["data"],
+                        "createdAt": datetime.now().isoformat()
+                    }
+                    yield f"data: {json.dumps(data_message)}\n\n"
+
+                # Send the DONE message - This needs to be a complete message too
+                done_message = {
+                    "id": str(uuid.uuid4()),
+                    "role": "done",
+                    "content": "",
+                    "createdAt": datetime.now().isoformat()
                 }
-                yield f"data: {json.dumps(error_data)}\n\n"
+                yield f"data: {json.dumps(done_message)}\n\n"
+
+            except Exception as e:
+                error_message = {
+                    "id": str(uuid.uuid4()),
+                    "role": "error",
+                    "content": f"Error: {str(e)}",
+                    "createdAt": datetime.now().isoformat()
+                }
+                yield f"data: {json.dumps(error_message)}\n\n"
 
         return StreamingResponse(
             event_stream(),
@@ -1117,12 +1136,12 @@ async def admin_chat_endpoint(request: Request):
             headers={
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
-                'Content-Type': 'text/event-stream'
+                'Content-Type': 'text/event-stream',
             }
         )
         
     except Exception as e:
-        print("Endpoint error:", str(e))  # Debug log
+        print("Endpoint error:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/trading/holders/chat")

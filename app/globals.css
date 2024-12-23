@@ -46,7 +46,7 @@
 
 @font-face {
   font-family: "bookish";
-  src: url("/font/BookishTrial-Book.otf"); 
+  src: url("/fonts/BookishTrial-Book.otf"); 
   font-weight: 400;
 }
 
@@ -60,7 +60,7 @@
 
 @font-face {
   font-family: "inria";
-  src: url("/font/InriaSerif-Regular.otf"); 
+  src: url("/fonts/InriaSerif-Regular.otf"); 
   font-weight: 400;
 }
 

@@ -39,42 +39,70 @@ function isPortfolioUpdate(data: any): data is PortfolioUpdateData {
 export function AdminTradingChat() {
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: '/api/trading/admin/chat',
     onResponse: (response) => {
-        // Debug logs
-        console.log('Received response:', response);
-      },
-      onFinish: (message) => {
-        // Debug logs
-        console.log('Chat completed:', message);
-      },
-      onError: (error) => {
-        console.error('Chat error:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to send message",
-          variant: "destructive",
-        });
-      },
-    });
+      // Log raw response and headers
+      console.log('Raw response:', response);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      // Verify the response is a proper stream
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error('Response has no body');
+      }
+    },
+    onFinish: (message) => {
+      console.log('Chat completed with message:', message);
+      scrollToBottom();
+    },
+    onError: (error) => {
+      console.error('Chat error:', error);
+      toast({
+        title: "Chat Error",
+        description: error.message || "Failed to process message",
+        variant: "destructive",
+      });
+    }
+  });
 
-    useEffect(() => {
-        console.log('Current messages:', messages);
-      }, [messages]);
+  // Scroll helper function
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  };
 
-    useEffect(() => {
-        if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [messages]);
+  // Effect for scrolling
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Effect for monitoring messages
+  useEffect(() => {
+    console.log('Messages updated:', messages);
+  }, [messages]);
+
+  // Effect for error handling
+  useEffect(() => {
+    if (error) {
+      console.error('Chat error state:', error);
+      toast({
+        title: "Error",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   // Subscribe to trading updates
   useEffect(() => {
     const subscription = aiTradingService.subscribeToUpdates((update) => {
       if (update.type === 'trade_execution' || update.type === 'portfolio_update') {
         console.log('Received trading update:', update);
-        // Handle real-time updates if needed
       }
     });
 
@@ -101,6 +129,20 @@ export function AdminTradingChat() {
       toast({
         title: "Trade Failed",
         description: "Failed to execute trade. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    try {
+      await handleSubmit(e);
+    } catch (error) {
+      console.error('Form submission error:', error);
+      toast({
+        title: "Message Error",
+        description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
     }
@@ -141,7 +183,8 @@ export function AdminTradingChat() {
                         : 'bg-muted'
                     }`}
                   >
-                    <p className="text-sm">{message.content}</p>
+                    {/* Make sure we handle message content safely */}
+                    <p className="text-sm">{typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}</p>
                     {message.role === 'assistant' && message.data && (
                       <div className="mt-2 pt-2 border-t border-border">
                         {isTradeExecution(message.data) && (
@@ -185,7 +228,7 @@ export function AdminTradingChat() {
           </div>
         </ScrollArea>
         
-        <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
+        <form onSubmit={handleFormSubmit} className="mt-4 flex gap-2">
           <Input
             value={input}
             onChange={handleInputChange}

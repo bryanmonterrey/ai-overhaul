@@ -9,6 +9,15 @@ const API_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001
 
 export const runtime = 'edge';
 
+function createStreamMessage(content: string) {
+  return {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content,
+    createdAt: new Date().toISOString()
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Initialize Supabase client with proper cookie handling
@@ -17,62 +26,39 @@ export async function POST(req: NextRequest) {
       cookies: () => cookieStore 
     });
 
-    // Verify admin session with debug logging
+    // Verify admin session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log('Session check:', {
-      hasSession: !!session,
-      userId: session?.user?.id,
-      email: session?.user?.email,
-      error: sessionError
-    });
+    console.log('Session check:', { hasSession: !!session, userId: session?.user?.id });
 
     if (sessionError || !session) {
       console.error('Session error or no session:', sessionError);
       return new Response('Unauthorized: No valid session', { status: 401 });
     }
 
-    // Check if user is admin using user_roles table (matching middleware)
+    // Check if user is admin
     const { data: roleData, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', session.user.id)
       .single();
 
-    console.log('Role check:', {
-      roleData,
-      roleError,
-      userId: session.user.id
-    });
-
-    if (roleError) {
-      console.error('Role check error:', roleError);
-      return new Response('Unauthorized: Role check failed', { status: 401 });
-    }
-
-    if (roleData?.role !== 'admin') {
-      console.log('User not admin:', {
-        userId: session.user.id,
-        role: roleData?.role
-      });
+    if (roleError || roleData?.role !== 'admin') {
+      console.error('Role error or not admin:', roleError || roleData?.role);
       return new Response('Unauthorized: Not an admin', { status: 401 });
     }
 
     const { messages }: { messages: Message[] } = await req.json();
-    console.log('Processing messages:', messages);
-
+    
     if (!messages?.length) {
       return new Response('No messages provided', { status: 400 });
     }
 
-    // Instead of WebSocket, make HTTP request to Python backend
     const pythonResponse = await fetch(`${API_URL}/trading/admin/chat`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'trading_chat',
         messages,
+        type: 'trading_chat',
         role: 'admin',
         userId: session.user.id,
         context: {
@@ -87,32 +73,88 @@ export async function POST(req: NextRequest) {
       throw new Error(`Python API error: ${pythonResponse.statusText}`);
     }
 
-    // Create streaming response
     const stream = new TransformStream();
     const writer = stream.writable.getWriter();
-
-    // Process the Python response
     const reader = pythonResponse.body?.getReader();
+
     if (!reader) {
       throw new Error('No response body from Python API');
     }
 
-    // Read and forward the streaming response
+    // Handle the streaming response
     (async () => {
       try {
+        const decoder = new TextDecoder();
+        let buffer = '';
+
         while (true) {
           const { done, value } = await reader.read();
+          
           if (done) {
+            if (buffer.trim()) {
+              try {
+                const data = JSON.parse(buffer);
+                if (data.response) {
+                  const message = createStreamMessage(data.response);
+                  await writer.write(
+                    new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+                  );
+                }
+              } catch (e) {
+                console.error('Error processing final buffer:', e);
+              }
+            }
+            
+            await writer.write(
+              new TextEncoder().encode('data: [DONE]\n\n')
+            );
             await writer.close();
             break;
           }
-          // Format the response as SSE
-          await writer.write(new TextEncoder().encode(
-            `data: ${JSON.stringify({ text: new TextDecoder().decode(value) })}\n\n`
-          ));
+
+          buffer += decoder.decode(value, { stream: true });
+
+          try {
+            const data = JSON.parse(buffer);
+            if (data.response) {
+              const message = createStreamMessage(data.response);
+              await writer.write(
+                new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+              );
+              buffer = ''; // Clear buffer after successful processing
+            }
+          } catch (e) {
+            // If the JSON is incomplete, try to process line by line
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line);
+                if (data.response) {
+                  const message = createStreamMessage(data.response);
+                  await writer.write(
+                    new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+                  );
+                }
+              } catch {
+                // Skip invalid lines
+                continue;
+              }
+            }
+          }
         }
       } catch (error) {
         console.error('Streaming error:', error);
+        const message = createStreamMessage(
+          `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+        await writer.write(
+          new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+        );
+        await writer.write(
+          new TextEncoder().encode('data: [DONE]\n\n')
+        );
         await writer.close();
       }
     })();
@@ -132,10 +174,7 @@ export async function POST(req: NextRequest) {
         error: 'Error processing request',
         details: error instanceof Error ? error.message : 'Unknown error'
       }), 
-      { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
