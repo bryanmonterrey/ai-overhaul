@@ -13,7 +13,17 @@ const config: Config = {
   			ia: [
   				'ia',
   				'monospace'
-  			]
+  			],
+			sportesia: ['sportesia', 'monospace'],
+  			verminy: ['vermin1', 'monospace'],
+  			verminyv: ['verminV', 'monospace'],
+			goatse: ['goatse', 'monospace'],
+			courier: ['courier', 'monospace'],
+			inter: ['inter', 'monospace'],
+			english: ['english', 'monospace'],
+			bookish: ['bookish', 'monospace'],
+			lumen: ['lumen', 'monospace'],
+			inria: ['inria', 'monospace'],
   		},
   		colors: {
   			background: 'var(--background)',

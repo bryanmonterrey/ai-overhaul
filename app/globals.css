@@ -15,6 +15,56 @@
 
 
 @font-face {
+  font-family: "english";
+  src: url("/fonts/OldEnglishFive.otf"); 
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "inter";
+  src: url("/fonts/SFPRODISPLAYREGULAR.OTF"); 
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "inter";
+  src: url("/fonts/InterDisplay-Medium.otf"); 
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "inter";
+  src: url("/fonts/InterDisplay-SemiBold.otf"); 
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: "inter";
+  src: url("/fonts/InterDisplay-Bold.otf"); 
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "bookish";
+  src: url("/font/BookishTrial-Book.otf"); 
+  font-weight: 400;
+}
+
+
+@font-face {
+  font-family: "lumen";
+  src: url("/fonts/lumen-script-bold.otf"); 
+  font-weight: 700;
+}
+
+
+@font-face {
+  font-family: "inria";
+  src: url("/font/InriaSerif-Regular.otf"); 
+  font-weight: 400;
+}
+
+@font-face {
   font-family: "ia-italic";
   src: url("/iAWriterItalic.otf"); 
   font-weight: 400;
