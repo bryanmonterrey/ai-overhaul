@@ -9,6 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001
 
 export const runtime = 'edge';
 
+// Keep the existing stream message type
 function createStreamMessage(content: string) {
   return {
     id: crypto.randomUUID(),
@@ -20,7 +21,7 @@ function createStreamMessage(content: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Initialize Supabase client with proper cookie handling
+    // Keep all your existing auth code ...
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ 
       cookies: () => cookieStore 
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
       throw new Error(`Python API error: ${pythonResponse.statusText}`);
     }
 
+    // Create streaming response
     const stream = new TransformStream();
     const writer = stream.writable.getWriter();
     const reader = pythonResponse.body?.getReader();
@@ -91,20 +93,18 @@ export async function POST(req: NextRequest) {
           const { done, value } = await reader.read();
           
           if (done) {
+            // Handle any remaining buffer
             if (buffer.trim()) {
-              try {
-                const data = JSON.parse(buffer);
-                if (data.response) {
-                  const message = createStreamMessage(data.response);
+              const lines = buffer.split('\n');
+              for (const line of lines) {
+                if (line.trim().startsWith('data: ')) {
+                  const jsonStr = line.trim().slice(6);
                   await writer.write(
-                    new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+                    new TextEncoder().encode(jsonStr + '\n\n')
                   );
                 }
-              } catch (e) {
-                console.error('Error processing final buffer:', e);
               }
             }
-            
             await writer.write(
               new TextEncoder().encode('data: [DONE]\n\n')
             );
@@ -113,35 +113,17 @@ export async function POST(req: NextRequest) {
           }
 
           buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-          try {
-            const data = JSON.parse(buffer);
-            if (data.response) {
-              const message = createStreamMessage(data.response);
-              await writer.write(
-                new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
-              );
-              buffer = ''; // Clear buffer after successful processing
-            }
-          } catch (e) {
-            // If the JSON is incomplete, try to process line by line
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
 
-            for (const line of lines) {
-              try {
-                const data = JSON.parse(line);
-                if (data.response) {
-                  const message = createStreamMessage(data.response);
-                  await writer.write(
-                    new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
-                  );
-                }
-              } catch {
-                // Skip invalid lines
-                continue;
-              }
-            }
+            // Pass through the SSE messages directly
+            await writer.write(
+              new TextEncoder().encode(trimmedLine + '\n\n')
+            );
           }
         }
       } catch (error) {

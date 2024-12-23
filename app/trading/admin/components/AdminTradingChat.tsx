@@ -1,15 +1,14 @@
-// app/trading/admin/components/AdminTradingChat.tsx
 'use client';
 
 import { useRef, useEffect } from 'react';
 import { useChat, Message } from 'ai/react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from "@/hooks/use-toast";
 import { aiTradingService } from '../../services/aiTradingService';
+import InputMorphMessage from '@/components/InputMorphMessage';
 
 interface TradeExecutionData {
   type: 'trade_execution';
@@ -42,27 +41,22 @@ export function AdminTradingChat() {
   
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: '/api/trading/admin/chat',
+    streamProtocol: 'text', // Add this line
+    id: 'admin-trading-chat', // Add this for stability
     onResponse: (response) => {
-      // Log raw response and headers
       console.log('Raw response:', response);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-      
-      // Verify the response is a proper stream
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      if (!response.body) {
-        throw new Error('Response has no body');
-      }
     },
     onFinish: (message) => {
-      console.log('Chat completed with message:', message);
+      console.log('Chat completed:', message);
       scrollToBottom();
     },
     onError: (error) => {
       console.error('Chat error:', error);
       toast({
-        title: "Chat Error",
+        title: "Error",
         description: error.message || "Failed to process message",
         variant: "destructive",
       });
@@ -154,7 +148,7 @@ export function AdminTradingChat() {
         <CardTitle>AI Trading Assistant</CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col">
+      <CardContent className="flex-1 flex flex-col overflow-y-auto">
         <ScrollArea ref={scrollRef} className="flex-1 pr-4">
           <div className="space-y-4">
             {messages.map((message) => (
@@ -227,19 +221,12 @@ export function AdminTradingChat() {
             ))}
           </div>
         </ScrollArea>
-        
-        <form onSubmit={handleFormSubmit} className="mt-4 flex gap-2">
-          <Input
-            value={input}
-            onChange={handleInputChange}
-            placeholder="Ask about trades, performance, or give commands..."
-            disabled={isLoading}
-            className="flex-1"
-          />
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Sending...' : 'Send'}
-          </Button>
-        </form>
+        <InputMorphMessage
+          input={input}
+          isLoading={isLoading}
+          onInputChange={handleInputChange}
+          onFormSubmit={handleFormSubmit}
+        />
       </CardContent>
     </Card>
   );
