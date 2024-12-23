@@ -15,6 +15,7 @@ export default function AdminLogin() {
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || 'your-site-key';
 
   useEffect(() => {
+    // Test connection to the database (for debugging purposes)
     const testConnection = async () => {
       try {
         const { data, error } = await supabase
@@ -55,8 +56,11 @@ export default function AdminLogin() {
       const captchaResult = await captchaResponse.json();
 
       if (!captchaResult.success) {
+        console.error('CAPTCHA verification failed:', captchaResult.errors);
         throw new Error('CAPTCHA verification failed.');
       }
+
+      console.log('CAPTCHA verification passed!');
 
       // Step 2: Sign in using Supabase
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -65,12 +69,15 @@ export default function AdminLogin() {
       });
 
       if (signInError) {
+        console.error('Sign-In Error:', signInError);
         throw new Error(`Sign in failed: ${signInError.message}`);
       }
 
       if (!signInData.user) {
-        throw new Error('No user data returned');
+        throw new Error('No user data returned from Supabase.');
       }
+
+      console.log('Sign-In Successful:', signInData);
 
       // Step 3: Check user role in Supabase database
       const { data: roleData, error: roleError } = await supabase
@@ -80,27 +87,31 @@ export default function AdminLogin() {
         .single();
 
       if (roleError) {
+        console.error('Role Check Error:', roleError);
         await supabase.auth.signOut();
         throw new Error(`Role check failed: ${roleError.message}`);
       }
 
       if (!roleData || roleData.role !== 'admin') {
+        console.error('Unauthorized Role:', roleData);
         await supabase.auth.signOut();
-        throw new Error('Not authorized as admin');
+        throw new Error('Not authorized as admin.');
       }
 
-      // Step 4: Redirect to admin page
+      console.log('Admin Role Verified:', roleData);
+
+      // Step 4: Redirect to admin dashboard
       router.push('/admin');
     } catch (error: any) {
       console.error('Login error:', error);
-      setError(error.message || 'An unknown error occurred');
+      setError(error.message || 'An unknown error occurred.');
     }
   };
 
   return (
     <div className="flex h-full flex-col items-center justify-center p-2 bg-[#11111A]">
       <div className="w-full max-w-md space-y-4">
-        <h1 className="text-2xl font-bold text-center text-zinc-50">admin login</h1>
+        <h1 className="text-2xl font-bold text-center text-zinc-50">Admin Login</h1>
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-none">
             {error}
@@ -108,7 +119,7 @@ export default function AdminLogin() {
         )}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-zinc-50">email</label>
+            <label className="block text-sm font-medium mb-1 text-zinc-50">Email</label>
             <input
               type="email"
               value={email}
@@ -118,7 +129,7 @@ export default function AdminLogin() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-zinc-50">password</label>
+            <label className="block text-sm font-medium mb-1 text-zinc-50">Password</label>
             <input
               type="password"
               value={password}
@@ -137,7 +148,7 @@ export default function AdminLogin() {
             type="submit"
             className="w-full px-4 py-2 bg-[#0D0E15] text-zinc-50 rounded-md hover:bg-white/10 border border-zinc-800"
           >
-            login
+            Login
           </button>
         </form>
       </div>
