@@ -76,7 +76,7 @@ export class TwitterManager {
             throw new TwitterDataError('Tweet exceeds Twitter Premium character limit');
         }
 
-        if (!this.twitterClient?.tweet) {
+        if (!this.twitterClient?.v2.tweet) {
             throw new TwitterError('Twitter client not initialized', 'INITIALIZATION_ERROR', 500);
         }
 
