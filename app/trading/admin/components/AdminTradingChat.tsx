@@ -130,15 +130,19 @@ export function AdminTradingChat() {
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    try {
-      await handleSubmit(e);
-    } catch (error) {
-      console.error('Form submission error:', error);
-      toast({
-        title: "Message Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
+  
+    if (input.trim()) {
+      try {
+        // Use handleSubmit from useChat to process the input
+        await handleSubmit(e);
+      } catch (error) {
+        console.error('Form submission error:', error);
+        toast({
+          title: "Message Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -148,85 +152,23 @@ export function AdminTradingChat() {
         <CardTitle>AI Trading Assistant</CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col overflow-y-auto">
-        <ScrollArea ref={scrollRef} className="flex-1 pr-4">
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                <div className={`flex gap-3 max-w-[80%] ${
-                  message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                }`}>
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage
-                      src={message.role === 'user' ? '/user-avatar.png' : '/ai-avatar.png'}
-                      alt={message.role}
-                    />
-                    <AvatarFallback>
-                      {message.role === 'user' ? 'U' : 'AI'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div
-                    className={`rounded-lg p-3 ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    {/* Make sure we handle message content safely */}
-                    <p className="text-sm">{typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}</p>
-                    {message.role === 'assistant' && message.data && (
-                      <div className="mt-2 pt-2 border-t border-border">
-                        {isTradeExecution(message.data) && (
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold">Trade Details:</p>
-                            <div className="text-xs">
-                              <p>Token: {message.data.token}</p>
-                              <p>Side: {message.data.side}</p>
-                              <p>Amount: {message.data.amount} SOL</p>
-                              {message.data.price && (
-                                <p>Price: {message.data.price} USDC</p>
-                              )}
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => isTradeExecution(message.data) && handleTradeExecution(message.data)}
-                              className="mt-2"
-                            >
-                              Confirm Trade
-                            </Button>
-                          </div>
-                        )}
-                        {isPortfolioUpdate(message.data) && (
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold">Portfolio Update:</p>
-                            <div className="text-xs">
-                              <p>Total Value: {message.data.totalValue} SOL</p>
-                              <p>Daily P&L: {message.data.dailyPnL} SOL</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <span className="text-xs opacity-50 mt-1 block">
-                      {new Date().toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-        <InputMorphMessage
-          input={input}
-          isLoading={isLoading}
-          onInputChange={handleInputChange}
-          onFormSubmit={handleFormSubmit}
+      <CardContent className="flex-1 flex flex-col justify-between overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+      <InputMorphMessage
+        input={input}
+        isLoading={isLoading}
+        onInputChange={handleInputChange}
+        onFormSubmit={handleFormSubmit}
+        messages={messages
+            .filter((msg) => msg.role === 'user' || msg.role === 'assistant') // Filter relevant roles
+            .map((msg, index) => ({
+            id: index, // Use index if a number is required
+            text: msg.content, // Map content to text
+            role: msg.role as 'user' | 'assistant',
+            }))}
+        
         />
+        </div>
       </CardContent>
     </Card>
   );

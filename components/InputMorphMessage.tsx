@@ -1,12 +1,22 @@
 import { PlusIcon } from '@radix-ui/react-icons';
 import { AnimatePresence, motion } from 'framer-motion';
-import React, { useState } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 
 interface InputMorphMessageProps {
   input: string;
   isLoading: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  messages?: {
+    id: number;
+    text: string;
+    role: 'user' | 'assistant';
+    data?: any;
+  }[]; // Updated types
+  handleTradeExecution?: (data: any) => void; // For executing trades
+  handlePortfolioUpdate?: (data: any) => void; // For portfolio updates
 }
 
 const transitionDebug = {
@@ -19,40 +29,119 @@ export default function InputMorphMessage({
   isLoading,
   onInputChange,
   onFormSubmit,
+  messages = [],
+  handleTradeExecution,
 }: InputMorphMessageProps) {
-  const [messages, setMessages] = useState<{ id: number; text: string }[]>([]);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
+    // Function to scroll to the bottom
+    const scrollToBottom = () => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    };
+  
+    // Scroll to bottom when messages change
+    useEffect(() => {
+      scrollToBottom();
+    }, [messages]);
+    
   return (
-    <div className="flex h-auto flex-col items-end justify-end pb-4">
+    <div className="flex h-full flex-col items-end justify-end pb-4">
+    <div 
+    ref={scrollRef}
+    className="flex-1 overflow-y-scroll h-auto items-end justify-end">
       <AnimatePresence mode="wait">
         {messages.map((message) => (
           <motion.div
             key={message.id}
+            layoutId={`message-${message.id}`}
             layout="position"
-            className="z-10 mt-2 max-w-[250px] break-words rounded-2xl bg-gray-200 dark:bg-black"
-            layoutId={`container-[${messages.length - 1}]`}
+            className={`flex ${
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            } w-full`}
             transition={transitionDebug}
           >
-            <div className="px-3 py-2 text-[15px] leading-[15px] text-gray-900 dark:text-gray-100">
-              {message.text}
+            <div
+              className={`flex gap-3 max-w-[80%] ${
+                message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+              }`}
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarImage
+                  src={message.role === 'user' ? '/user-avatar.png' : '/ai-avatar.png'}
+                  alt={message.role}
+                />
+                <AvatarFallback>{message.role === 'user' ? 'U' : 'AI'}</AvatarFallback>
+              </Avatar>
+              <div
+                className={`rounded-lg p-3 ${
+                  message.role === 'user'
+                    ? 'bg-gray-200 text-gray-900 dark:bg-black dark:text-gray-100'
+                    : 'bg-blue-200 text-gray-900 dark:bg-blue-800 dark:text-gray-100'
+                }`}
+              >
+                <p className="text-sm">{message.text}</p>
+                {message.role === 'assistant' && message.data && (
+                  <div className="mt-2 pt-2 border-t border-border">
+                    {/* Trade Execution Details */}
+                    {message.data.type === 'trade_execution' && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold">Trade Details:</p>
+                        <div className="text-xs">
+                          <p>Token: {message.data.token}</p>
+                          <p>Side: {message.data.side}</p>
+                          <p>Amount: {message.data.amount} SOL</p>
+                          {message.data.price && <p>Price: {message.data.price} USDC</p>}
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            handleTradeExecution && handleTradeExecution(message.data)
+                          }
+                          className="mt-2"
+                        >
+                          Confirm Trade
+                        </Button>
+                      </div>
+                    )}
+                    {/* Portfolio Update Details */}
+                    {message.data.type === 'portfolio_update' && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold">Portfolio Update:</p>
+                        <div className="text-xs">
+                          <p>Total Value: {message.data.totalValue} SOL</p>
+                          <p>Daily P&L: {message.data.dailyPnL} SOL</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <span className="text-xs opacity-50 mt-1 block">
+                  {new Date().toLocaleTimeString()}
+                </span>
+              </div>
             </div>
           </motion.div>
         ))}
       </AnimatePresence>
+      </div>
+      <div className="relative w-full">
       <form onSubmit={onFormSubmit} className="mt-4 flex w-full">
+      
         <input
-          type="text"
-          value={input}
-          onChange={onInputChange}
-          className="relative h-9 w-[250px] flex-grow rounded-full border border-gray-200 bg-white px-3 text-[15px] outline-none placeholder:text-gray-400 focus-visible:ring-0 focus-visible:ring-blue-500/20 focus-visible:ring-offset-1
-            dark:border-black/60 dark:bg-black dark:text-gray-50 dark:placeholder-gray-500 dark:focus-visible:ring-blue-500/20 dark:focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-700"
-          placeholder="Type your message"
-          disabled={isLoading}
+            type="text"
+            value={input}
+            onChange={onInputChange}
+            className="relative h-9 w-[calc(100%-2rem)] flex-grow rounded-full border border-zinc-900 bg-[#1D1D2C] px-3 text-[15px] outline-none placeholder:text-gray-400 focus-visible:ring-0 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-zinc-900 focus-visible:ring-offset-1
+            dark:border-black/60 dark:bg-black dark:text-gray-50 dark:placeholder-gray-500 dark:focus-visible:ring-zinc-900/20 dark:focus-visible:ring-offset-1 dark:focus-visible:ring-offset-zinc-900"
+            placeholder="Type your message"
+            disabled={isLoading}
         />
         <motion.div
-          key={messages.length}
+          key={input.length} // Trigger re-render for new input value
           layout="position"
-          className="pointer-events-none absolute z-10 flex h-9 w-[250px] items-center overflow-hidden break-words rounded-full bg-gray-200 [word-break:break-word] dark:bg-black"
+          className="pointer-events-none absolute z-10 flex h-9 w-[calc(100%-2rem)] items-center overflow-hidden break-words rounded-full bg-gray-200 [word-break:break-word] dark:bg-black"
           layoutId={`container-[${messages.length}]`}
           transition={transitionDebug}
           initial={{ opacity: 0.6, zIndex: -1 }}
@@ -63,14 +152,16 @@ export default function InputMorphMessage({
             {input}
           </div>
         </motion.div>
+  
         <button
-          type="submit"
-          className="ml-2 flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 dark:bg-black"
-          disabled={isLoading}
+            type="submit"
+            className="ml-2 flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 dark:bg-black"
+            disabled={isLoading}
         >
-          <PlusIcon className="h-5 w-5 text-gray-600 dark:text-gray-50" />
+            <PlusIcon className="h-5 w-5 text-gray-600 dark:text-gray-50" />
         </button>
-      </form>
+        </form>
+        </div>
     </div>
   );
 }
