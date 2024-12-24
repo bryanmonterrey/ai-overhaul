@@ -329,7 +329,7 @@ useEffect(() => {
           </Alert>
         )}
         
-        <div id="chat-messages" className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div id="chat-messages" className="flex-1 overflow-y-auto bg-navyy rounded-t-xl border-t border-l border-r border-zinc-900 p-4 space-y-4">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -372,8 +372,8 @@ useEffect(() => {
           ))}
         </div>
 
-        <div className="border-t border-zinc-800 p-4 pb-8 md:pb-4 bg-[#11111A]">
-          <div className="text-xs text-[#DDDDDD] mb-2">
+        <div className="border-b border-r border-l bg-navyy border-zinc-900 rounded-b-xl p-4 pb-8 md:pb-4">
+          <div className="text-xs text-zinc-50 mb-2">
             TOKEN_COUNT: {tokenCount}
           </div>
           <div className="flex space-x-2">
@@ -382,7 +382,7 @@ useEffect(() => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
-              className="flex-1 bg-[#11111A] text-base text-[#DDDDDD] border border-zinc-800 rounded-md px-4 py-2 font-ia disabled:opacity-50"
+              className="flex-1 bg-purp text-base text-zinc-50 border border-zinc-900 rounded-full px-4 py-2 font-ia disabled:opacity-50"
               placeholder={isLoading ? 'processing...' : 'enter command...'}
               disabled={isLoading}
             />
@@ -398,7 +398,7 @@ useEffect(() => {
       </div>
 
       {isAnalyticsVisible && (
-  <div className="w-80 border-l border-zinc-800 p-4 space-y-4">
+  <div className="w-80  p-4 space-y-4">
     <button
       onClick={() => setShowAnalytics(!showAnalytics)}
       className="w-full text-[#DDDDDD] border bg-navyy border-zinc-900 rounded-md p-2 font-ia text-sm"
