@@ -129,14 +129,13 @@ export interface ConsciousnessState {
 }
 
 export interface PersonalityConfig {
-  platform: 'twitter' | string;
+  platform?: 'twitter' | string;
   baseTemperature: number;
   creativityBias: number;
   emotionalVolatility: number;
   memoryRetention: number;
   responsePatterns: Record<EmotionalState, string[]>;
 }
-
 
 
 export interface MemoryPattern {

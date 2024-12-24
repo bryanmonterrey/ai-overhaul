@@ -26,6 +26,7 @@ export interface StyleConfiguration {
 }
 
 export interface PersonalityConfig {
+    platform: 'twitter' | 'chat';
     baseTemperature: number;
     creativityBias: number;
     emotionalVolatility: number;

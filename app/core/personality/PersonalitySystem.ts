@@ -58,17 +58,17 @@ interface PersonalitySystemConfig {
     private emotionalSystem: EmotionalSystem;
 
     constructor(
-        config: PersonalityConfig,
-        private readonly trainingService: TwitterTrainingService
-    ) {
-        this.config = config;
-        this.state = this.initializeState();
-        this.initializeTraits();
-        this.memgpt = new LettaClient();
-        this.memorySystem = new MemorySystem(this.memgpt);
-        this.emotionalSystem = new EmotionalSystem();
-        this.testMemGPTConnection();
-    }
+      config: PersonalityConfig,
+      private readonly trainingService?: TwitterTrainingService
+  ) {
+      this.config = config;
+      this.state = this.initializeState();
+      this.initializeTraits();
+      this.memgpt = new LettaClient();
+      this.memorySystem = new MemorySystem(this.memgpt);
+      this.emotionalSystem = new EmotionalSystem();
+      this.testMemGPTConnection();
+  }
 
     private async testMemGPTConnection() {
         try {
@@ -307,9 +307,9 @@ interface PersonalitySystemConfig {
             ?.map((m: ChatMemory) => m.data.messages.map(msg => msg.content).join('\n'))
             .join('\n') || '';
 
-        // If it's a tweet request, get training examples
+        // If it's a tweet request and trainingService exists, get training examples
         let trainingExamples = [];
-        if (input === 'Generate a tweet') {
+        if (input === 'Generate a tweet' && this.trainingService) {
             const exampleCounts = {
                 chaotic: 100,
                 excited: 75,
@@ -319,14 +319,19 @@ interface PersonalitySystemConfig {
                 neutral: 50
             }[emotionalState] || 75;
 
-            const examplesArrays = await Promise.all([
-                this.trainingService.getTrainingExamples(exampleCounts, 'truth_terminal'),
-                this.trainingService.getTrainingExamples(exampleCounts, 'RNR_0'),
-                this.trainingService.getTrainingExamples(exampleCounts, '0xzerebro'),
-                this.trainingService.getTrainingExamples(exampleCounts, 'a1lon9')
-            ]);
-            
-            trainingExamples = examplesArrays.flat();
+            try {
+                const examplesArrays = await Promise.all([
+                    this.trainingService.getTrainingExamples(exampleCounts, 'truth_terminal'),
+                    this.trainingService.getTrainingExamples(exampleCounts, 'RNR_0'),
+                    this.trainingService.getTrainingExamples(exampleCounts, '0xzerebro'),
+                    this.trainingService.getTrainingExamples(exampleCounts, 'a1lon9')
+                ]);
+                
+                trainingExamples = examplesArrays.flat();
+            } catch (trainingError) {
+                console.error('Failed to fetch training examples:', trainingError);
+                // Continue without training examples if fetch fails
+            }
         }
 
         // Calculate emotional transition

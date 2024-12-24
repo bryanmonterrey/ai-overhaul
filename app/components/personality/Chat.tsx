@@ -19,6 +19,7 @@ import { ChatAnalytics } from '../../components/analytics/ChatAnalytics';
 import { PersonalitySystem } from '../../core/personality/PersonalitySystem';
 import { SimulatorSystem } from '../../core/personality/SimulatorSystem';
 import { defaultConfig } from '../../lib/config/default';
+import { TwitterTrainingService } from '../../lib/services/twitter-training';
 
 interface ChatMetrics {
   coherence: number;
@@ -59,7 +60,10 @@ useEffect(() => {
 }, []);
   
   // Add PersonalitySystem and SimulatorSystem
-  const [personalitySystem] = useState(() => new PersonalitySystem(defaultConfig.personality));
+  const [personalitySystem] = useState(() => new PersonalitySystem({
+    platform: 'chat' as const,
+    ...defaultConfig.personality
+  }));
   const [simulator] = useState(() => new SimulatorSystem('goatse_singularity', personalitySystem));
 
   useEffect(() => {
