@@ -41,7 +41,7 @@ export const EmotionalStateDisplay = ({
           <div className="mb-1">system_stability:</div>
           <div className="w-full bg-[#11111A] h-2">
             <div 
-              className="bg-green-500 h-full transition-all duration-500"
+              className="bg-green-500 h-full rounded-full transition-all duration-500"
               style={{ width: `${(1 - intensity) * 100}%` }}
             />
           </div>

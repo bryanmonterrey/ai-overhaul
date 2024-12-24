@@ -141,7 +141,7 @@ useEffect(() => {
   }, [supabase, router]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <div>loading...</div>;
   }
 
   const handleStateUpdate = (newState: Partial<PersonalityState>) => {
@@ -156,7 +156,7 @@ useEffect(() => {
       <div className="flex flex-col">
         <Card variant="system" className="mb-4">
           <div className="text-xs space-y-1">
-            <div>protocol: DIRECT_INTERFACE</div>
+            <div>protocol: DIRECT INTERFACE</div>
             <div>connection_status: ACTIVE</div>
             <div>system: ONLINE</div>
           </div>

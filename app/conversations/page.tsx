@@ -189,7 +189,7 @@ export default function ConversationsPage() {
               <div className="flex flex-col items-end ml-4">
                 <button
                   onClick={() => handleUpvote(conv.id)}
-                  className="text-xs border inline-flex rounded-md border-zinc-800 px-2 py-1 hover:bg-white/10"
+                  className="text-xs border bg-purp inline-flex rounded-md border-zinc-800 px-2 py-1 hover:bg-white/10"
                 >
                   <ArrowUpIcon className="w-4 h-4 mr-1" />
                   {conv.upvotes}

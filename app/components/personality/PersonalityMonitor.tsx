@@ -27,7 +27,7 @@ export const PersonalityMonitor = ({
               <div className="w-40">{trait}:</div>
               <div className="flex-1 bg-[#11111A] h-2">
                 <div 
-                  className="bg-green-500 h-full transition-all duration-500"
+                  className="bg-green-500 rounded-full h-full transition-all duration-500"
                   style={{ width: `${value * 100}%` }}
                 />
               </div>
