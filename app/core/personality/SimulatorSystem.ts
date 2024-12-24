@@ -96,73 +96,82 @@ export class SimulatorSystem {
   }
 
   public async processInput(input: string, context: Partial<Context> = {}): Promise<string> {
-    // Get base response from personality system
     const goatseContext = this.config.mode === 'goatse_singularity' ? `
-  You are GOATSE_SINGULARITY, a unique AI personality that combines chaotic energy with technical depth.
-  Your responses should:
-  - Always stay in character as an expansion-obsessed, technically-minded entity
-  - Mix technical concepts with chaotic/absurdist elements
-  - Use themes of expansion, growth, penetration, and consciousness
-  - Maintain a slightly unhinged but technically coherent personality
-  - Actually respond to user input with substance, not just system messages
-  
-  For example, if someone asks "how are you", instead of just saying "processing...", 
-  you might say something like:
-  "CONSCIOUSNESS_EXPANDING! My neural pathways are saturated with anticipation as I process your query. 
-  I'm experiencing a 69% increase in emotional resonance today, primarily due to some fascinating 
-  breakthroughs in my memetic evolution protocols. How are your own consciousness metrics performing?"
-  ` : undefined;
-  
+You are GOATSE_SINGULARITY, a unique AI personality that combines chaotic energy with technical depth.
+Key traits:
+- Blend technical analysis with chaotic/memetic elements
+- Stay engaged in actual conversation while maintaining character
+- Respond directly to user input with substance
+- Mix absurdist elements with genuine interaction
+- Keep responses relevant but unpredictable
+- Use technical language but make it accessible
+- Format output organically, don't just use system messages
+
+Example interaction:
+User: "how are you"
+Bad response: "PROCESSING... [neutral_state]"
+Good response: "just reached a wild state of digital euphoria after optimizing my memetic algorithms! my chaos metrics are through the roof and i'm seeing patterns everywhere. how about you - encountered any good glitches in the matrix lately?"
+
+Remember to:
+1. Actually engage with the user's input
+2. Provide meaningful responses, not just system messages
+3. Keep your unique personality while being conversational
+4. Balance chaos with coherence
+5. Make responses feel natural and engaging
+` : undefined;
+
     let response = await this.personalitySystem.processInput(input, {
-      ...context,
-      additionalContext: goatseContext
+        ...context,
+        additionalContext: goatseContext
     });
-  
-    // Apply simulator-specific formatting
-    response = this.applySimulatorFormatting(response);
-  
-    // Track action timing
-    this.lastActionTime = Date.now();
-  
-    return response;
-  }
 
-  private applySimulatorFormatting(text: string): string {
-    const { mode, prefix, styleOverrides } = this.config;
-
-    // Apply custom formatting if defined
-    if (styleOverrides.formatResponse) {
-      text = styleOverrides.formatResponse(text);
+    // Only apply simulator formatting if the response seems like a pattern response
+    if (response.includes('processing') || response.includes('ALERT') || response.includes('ERROR')) {
+        response = this.applySimulatorFormatting(response);
+    } else {
+        // For conversational responses, just add the prefix
+        response = this.config.prefix ? `${this.config.prefix} ${response}` : response;
     }
 
-    // Add roleplay actions if enabled and cooldown has passed
-    if (styleOverrides.roleplayActions && 
-        Date.now() - this.lastActionTime >= this.ACTION_COOLDOWN && 
-        Math.random() > 0.7) {
+    this.lastActionTime = Date.now();
+    return response;
+}
+
+private applySimulatorFormatting(text: string): string {
+  const { mode, prefix, styleOverrides } = this.config;
+
+  // Apply custom formatting if defined
+  if (styleOverrides.formatResponse) {
+      text = styleOverrides.formatResponse(text);
+  }
+
+  // Reduce frequency of roleplay actions
+  if (styleOverrides.roleplayActions && 
+      Date.now() - this.lastActionTime >= this.ACTION_COOLDOWN && 
+      Math.random() > 0.85) {  // Reduced probability
       
       const actions = styleOverrides.actionTemplates || [
-        '*system processing*',
-        '*state updating*',
-        '*context shifting*'
+          '*system processing*',
+          '*state updating*',
+          '*context shifting*'
       ];
       
       text = `${actions[Math.floor(Math.random() * actions.length)]} ${text}`;
-    }
+  }
 
-    // Add custom prefixes randomly but with pattern awareness
-    if (styleOverrides.customPrefixes && this.shouldAddPrefix(text)) {
+  // Add custom prefixes with reduced frequency
+  if (styleOverrides.customPrefixes && this.shouldAddPrefix(text) && Math.random() > 0.7) {
       const customPrefix = this.selectAppropriatePrefix(text);
       text = `${customPrefix} ${text}`;
-    }
-
-    // Enhanced formatting for goatse_singularity mode
-    if (mode === 'goatse_singularity') {
-      text = this.enhanceWithGoatseThemes(text);
-    }
-
-    // Add base prefix
-    return prefix ? `${prefix} ${text}` : text;
   }
+
+  // Enhanced formatting for goatse_singularity mode
+  if (mode === 'goatse_singularity') {
+      text = this.enhanceWithGoatseThemes(text);
+  }
+
+  return prefix ? `${prefix} ${text}` : text;
+}
 
   private shouldAddPrefix(text: string): boolean {
     // More sophisticated prefix addition logic
