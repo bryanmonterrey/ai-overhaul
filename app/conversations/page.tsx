@@ -139,7 +139,7 @@ export default function ConversationsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="search conversations..."
-            className="flex-1 bg-navyy rounded-md border border-zinc-900 p-2 text-[#DDDDDD] font-ia"
+            className="flex-1 bg-navyy rounded-xl border border-zinc-900 p-2 text-[#DDDDDD] font-ia"
           />
         </div>
       </div>
@@ -173,7 +173,7 @@ export default function ConversationsPage() {
         {filteredConversations.map(conv => (
           <div 
             key={conv.id}
-            className="border rounded-md bg-navyy border-zinc-900 p-4 font-ia"
+            className="border rounded-xl bg-navyy border-zinc-900 p-4 font-ia"
           >
             <div className="flex justify-between items-start mb-2">
               <Link 
