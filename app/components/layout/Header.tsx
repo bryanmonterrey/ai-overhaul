@@ -50,7 +50,7 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 chat
               </button>
@@ -62,7 +62,7 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 conversations
               </button>
@@ -73,7 +73,7 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 twitter
               </button>
@@ -84,7 +84,7 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 telegram
               </button>
@@ -95,7 +95,7 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
                 admin
               </button>
