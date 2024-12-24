@@ -5,6 +5,8 @@ import { notFound, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { ConversationData } from '@/app/core/types/conversation';
+import { ArrowLeftIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ChatMessage {
     id: string;
@@ -194,10 +196,13 @@ interface ChatMessage {
             href="/conversations"
             className="text-[#DDDDDD] hover:text-white font-ia"
           >
-            ← Back to conversations
+            <Button>
+            <ArrowLeftIcon className="w-4 h-4" />
+            back to conversations
+            </Button>
           </Link>
           <h1 className="text-base mt-4 font-ia">
-            Conversation {conversation.id.slice(0, 8)}
+            conversation {conversation.id.slice(0, 8)}
           </h1>
           <p className="text-sm font-ia opacity-75">
             {new Date(conversation.timestamp).toLocaleString()}
@@ -211,10 +216,10 @@ interface ChatMessage {
               key={msg.id} 
               className={`p-3 border ${
                 msg.sender === 'user'
-                  ? 'border-zinc-800/30 ml-auto'
+                  ? 'border-zinc-900 bg-navyy ml-auto rounded-xl'
                   : msg.error
-                  ? 'border-red-500/20'
-                  : 'border-zinc-800/30'
+                  ? 'border-red-500/20 rounded-xl'
+                  : 'border-zinc-800/30 bg-navyy rounded-xl'
               } max-w-[80%] font-ia`}
             >
               <div className="text-xs mb-2 opacity-75">
@@ -253,9 +258,9 @@ interface ChatMessage {
         <div className="mt-8 mb-8 flex items-center space-x-4 font-ia">
           <button
             onClick={handleUpvote}
-            className="bg-[#11111A] text-[#DDDDDD] px-4 py-2 border border-zinc-800 hover:bg-[#DDDDDD]/10"
+            className="text-[#DDDDDD] px-4 py-2 rounded-md bg-navyy border border-zinc-900 hover:bg-[#DDDDDD]/10"
           >
-            ↑ {conversation.upvotes} Upvotes
+            ↑ {conversation.upvotes} upvotes
           </button>
         </div>
       </div>

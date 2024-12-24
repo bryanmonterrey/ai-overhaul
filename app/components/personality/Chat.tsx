@@ -350,7 +350,7 @@ useEffect(() => {
                   }`}
                 </div>
               )}
-              <div className={message.sender === 'ai' ? 'font-mono text-green-500' : ''}>
+              <div className={message.sender === 'ai' ? 'font-ia text-green-500' : ''}>
                 {message.content}
               </div>
               {message.aiResponse && !message.error && (
@@ -363,7 +363,7 @@ useEffect(() => {
               {message.error && message.retryable && (
                 <button
                   onClick={() => retryMessage(message.id)}
-                  className="mt-2 text-xs text-[#DDDDDD] hover:text-[#DDDDDD] font-mono"
+                  className="mt-2 text-xs text-[#DDDDDD] hover:text-[#DDDDDD] font-ia"
                 >
                   [RETRY_MESSAGE]
                 </button>
@@ -382,14 +382,14 @@ useEffect(() => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
-              className="flex-1 bg-[#11111A] text-base text-[#DDDDDD] border border-zinc-800 rounded-md px-4 py-2 font-mono disabled:opacity-50"
+              className="flex-1 bg-[#11111A] text-base text-[#DDDDDD] border border-zinc-800 rounded-md px-4 py-2 font-ia disabled:opacity-50"
               placeholder={isLoading ? 'processing...' : 'enter command...'}
               disabled={isLoading}
             />
             <button
               onClick={() => sendMessage()}
               disabled={isLoading || !inputText.trim()}
-              className="bg-[#11111A] text-[#DDDDDD] text-base px-4 py-2 rounded-md font-mono border border-zinc-800 disabled:opacity-50 hover:bg-[#11111A] transition-colors"
+              className="bg-[#11111A] text-[#DDDDDD] text-base px-4 py-2 rounded-md font-ia border border-zinc-800 disabled:opacity-50 hover:bg-[#11111A] transition-colors"
             >
               {isLoading ? 'processing...' : 'execute'}
             </button>
@@ -401,7 +401,7 @@ useEffect(() => {
   <div className="w-80 border-l border-zinc-800 p-4 space-y-4">
     <button
       onClick={() => setShowAnalytics(!showAnalytics)}
-      className="w-full text-[#DDDDDD] border border-zinc-800 rounded-md p-2 font-mono text-sm"
+      className="w-full text-[#DDDDDD] border bg-navyy border-zinc-900 rounded-md p-2 font-ia text-sm"
     >
       {showAnalytics ? 'hide analytics' : 'show analytics'}
     </button>

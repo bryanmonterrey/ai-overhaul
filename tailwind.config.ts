@@ -26,6 +26,7 @@ const config: Config = {
 			inria: ['inria', 'monospace'],
   		},
   		colors: {
+			navyy: '#0D0E15',
   			background: 'var(--background)',
   			foreground: 'var(--foreground)'
   		},

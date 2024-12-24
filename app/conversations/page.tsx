@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { ConversationPreview } from '@/app/core/types/conversation';
+import { ArrowUpIcon } from 'lucide-react';
 
 export default function ConversationsPage() {
   const supabase = createClientComponentClient();
@@ -123,7 +124,7 @@ export default function ConversationsPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#11111A] text-[#DDDDDD] p-4 flex items-center justify-center">
-        <div className="text-xl font-mono">Loading conversations...</div>
+        <div className="text-xl font-ia">loading conversations...</div>
       </div>
     );
   }
@@ -137,8 +138,8 @@ export default function ConversationsPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search conversations..."
-            className="flex-1 bg-[#11111A] border border-zinc-800 p-2 text-[#DDDDDD] font-ia"
+            placeholder="search conversations..."
+            className="flex-1 bg-navyy rounded-md border border-zinc-900 p-2 text-[#DDDDDD] font-ia"
           />
         </div>
       </div>
@@ -147,23 +148,23 @@ export default function ConversationsPage() {
       <div className="max-w-3xl mx-auto mb-8 flex gap-4 justify-center">
         <button 
           onClick={() => setSortBy('recent')}
-          className={`font-mono px-4 py-2 border ${
+          className={`font-ia px-4 rounded-md py-2 border ${
             sortBy === 'recent' 
-              ? 'bg-[#11111A] text-[#DDDDDD] border-zinc-800' 
-              : 'border-zinc-800 text-[#DDDDDD]'
+              ? ' text-[#DDDDDD] bg-navyy border-zinc-800' 
+              : 'border-zinc-900 bg-navyy/50 text-[#DDDDDD]'
           }`}
         >
-          SORT_BY_RECENT
+          sort by recent
         </button>
         <button 
           onClick={() => setSortBy('upvoted')}
-          className={`font-mono px-4 py-2 border ${
+          className={`font-ia px-4 rounded-md py-2 border ${
             sortBy === 'upvoted' 
-              ? 'bg-[#11111A] text-[#DDDDDD] border-zinc-800' 
-              : 'border-zinc-800 text-[#DDDDDD]'
+              ? 'text-[#DDDDDD] bg-navyy border-zinc-800' 
+              : 'border-zinc-900 bg-navyy/50 text-[#DDDDDD]'
           }`}
         >
-          SORT_BY_UPVOTES
+          sort by upvotes
         </button>
       </div>
 
@@ -172,7 +173,7 @@ export default function ConversationsPage() {
         {filteredConversations.map(conv => (
           <div 
             key={conv.id}
-            className="border border-zinc-800 p-4 font-ia"
+            className="border rounded-md bg-navyy border-zinc-900 p-4 font-ia"
           >
             <div className="flex justify-between items-start mb-2">
               <Link 
@@ -188,9 +189,10 @@ export default function ConversationsPage() {
               <div className="flex flex-col items-end ml-4">
                 <button
                   onClick={() => handleUpvote(conv.id)}
-                  className="text-xs border border-zinc-800 px-2 py-1 hover:bg-white/10"
+                  className="text-xs border inline-flex rounded-md border-zinc-800 px-2 py-1 hover:bg-white/10"
                 >
-                  ↑ {conv.upvotes}
+                  <ArrowUpIcon className="w-4 h-4 mr-1" />
+                  {conv.upvotes}
                 </button>
                 <span className="text-xs mt-2 opacity-75">
                   msgs: {conv.messageCount}
