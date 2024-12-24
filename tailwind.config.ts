@@ -26,6 +26,7 @@ const config: Config = {
 			inria: ['inria', 'monospace'],
   		},
   		colors: {
+			greenish: '#00FFA2',
 			purp: '#1D1D2C',
 			navyy: '#0D0E15',
   			background: 'var(--background)',

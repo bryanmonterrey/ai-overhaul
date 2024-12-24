@@ -123,7 +123,7 @@ export default function LoginPage() {
 
   return (
     <div className="h-full flex items-center font-ia justify-center bg-[#11111A]">
-      <div className="max-w-md w-full space-y-8 p-8 bg-[#0D0E15] border border-zinc-900 rounded-md shadow-none">
+      <div className="max-w-md w-full space-y-8 p-8 bg-[#0D0E15] border border-zinc-900 rounded-xl shadow-none">
         <div>
           <h2 className="text-center text-xl font-ia text-[#DDDDDD]">
             Connect Your Wallet

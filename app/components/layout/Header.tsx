@@ -50,8 +50,8 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
-         dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600'>
                 chat
               </button>
               </Link>
@@ -62,8 +62,8 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
-         dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-[#DDDDDD] hover:text-greenish transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600'>
                 conversations
               </button>
               </Link>
@@ -73,8 +73,8 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
-         dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600'>
                 twitter
               </button>
               </Link>
@@ -84,8 +84,8 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
-         dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600'>
                 telegram
               </button>
               </Link>
@@ -95,8 +95,8 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm font-semibold text-zinc-50 transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
-         dark:bg-transparent dark:text-zinc-50 dark:hover:bg-zinc-600'>
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600'>
                 admin
               </button>
               </Link>
@@ -110,7 +110,7 @@ export default function Header() {
             {/* Menu button - shown only on small screens */}
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="sm:hidden text-xs px-5 py-2 border bg-[#0D0E15] rounded-md border-zinc-900 text-zinc-50"
+              className="sm:hidden text-xs px-5 py-2 border bg-[#0D0E15] rounded-md border-zinc-900 text-[#DDDDDD] hover:text-greenish"
             >
               menu
             </button>
@@ -124,7 +124,7 @@ export default function Header() {
                 </Card>
                 <button
                   onClick={handleSignOut}
-                  className="font-ia bg-[#0D0E15] text-zinc-50 border rounded-md border-zinc-900 py-2 px-3 hover:text-red-500 text-xs"
+                  className="font-ia bg-[#0D0E15] text-[#DDDDDD] border rounded-md border-zinc-900 py-2 px-3 hover:text-red-500 text-xs"
                 >
                   disconnect
                 </button>
