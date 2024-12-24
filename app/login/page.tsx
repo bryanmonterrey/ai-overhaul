@@ -126,10 +126,10 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8 p-8 bg-[#0D0E15] border border-zinc-900 rounded-xl shadow-none">
         <div>
           <h2 className="text-center text-xl font-ia text-[#DDDDDD]">
-            Connect Your Wallet
+            connect your wallet
           </h2>
           <p className="mt-2 text-center font-ia text-sm text-[#DDDDDD]">
-            To access the chat, you need to verify your $GOATSE SINGULARITY tokens
+            to access the chat, you need to verify your $goatse singularity tokens
           </p>
           {error && (
             <p className="mt-2 text-center font-ia text-sm text-red-500">
@@ -144,7 +144,7 @@ export default function LoginPage() {
 
         {isAuthenticating && (
           <p className="text-center text-sm text-[#DDDDDD]">
-            Authenticating...
+            authenticating...
           </p>
         )}
       </div>
