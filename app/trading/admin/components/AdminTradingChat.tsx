@@ -145,33 +145,37 @@ export function AdminTradingChat() {
     }
   };
 
-  // Format messages for InputMorphMessage, filtering out [DONE] and data: prefixes
   const formattedMessages = messages
-    .filter(msg => {
-      return (msg.role === 'user' || msg.role === 'assistant') &&
-             typeof msg.content === 'string';
-    })
-    .map((msg, index) => {
-      let text = msg.content;
-      
-      // If the content starts with 'data: ', try to extract just the message
-      if (text.startsWith('data: ')) {
-        try {
-          const parsed = JSON.parse(text.slice(6));
-          text = parsed.content;
-        } catch {
-          // If parsing fails, remove the 'data: ' prefix
-          text = text.slice(6);
-        }
+  .filter(msg => {
+    // Filter out empty messages and [DONE] messages
+    if (!msg.content) return false;
+    if (msg.content === '[DONE]') return false;
+    return true;
+  })
+  .map((msg, index) => {
+    let text = msg.content;
+    
+    // Handle messages that start with 'data: '
+    if (text.startsWith('data: ')) {
+      try {
+        // Parse the JSON part after 'data: '
+        const jsonPart = text.split('\n')[0].slice(6); // Take first line and remove 'data: '
+        const parsed = JSON.parse(jsonPart);
+        text = parsed.content; // Extract just the content
+      } catch {
+        // If parsing fails, just use the original text
+        text = msg.content;
       }
+    }
 
-      return {
-        id: index,
-        text: text,
-        role: msg.role,
-        data: msg.data
-      };
-    });
+    // Return formatted message
+    return {
+      id: index,
+      text: text,
+      role: msg.role,
+      data: msg.data
+    };
+  });
 
   return (
     <Card className="w-full h-[600px] flex flex-col">

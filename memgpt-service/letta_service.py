@@ -1092,19 +1092,21 @@ async def admin_chat_endpoint(request: Request):
 
         async def event_stream():
             try:
-                # Send just the content
+                # Send minimal required structure for InputMorphMessage
                 if result.get("response"):
-                    # The message field we want is 'content'
                     message = {
                         "role": "assistant",
                         "content": result["response"]
                     }
                     yield f"data: {json.dumps(message)}\n\n"
-                    
                 yield "data: [DONE]\n\n"
 
             except Exception as e:
-                yield f"data: Error: {str(e)}\n\n"
+                error_message = {
+                    "role": "assistant",
+                    "content": f"Error: {str(e)}"
+                }
+                yield f"data: {json.dumps(error_message)}\n\n"
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
