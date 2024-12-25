@@ -2,7 +2,8 @@
 
 export class PersonalityValidator {
     private static readonly MAX_TWEET_LENGTH = 280;
-    private static readonly MIN_TWEET_LENGTH = 50;
+    private static readonly MIN_TWEET_LENGTH = 10;
+    private static readonly MAX_CHAT_LENGTH = 4000;
     private static readonly MAX_RESPONSE_LENGTH = 1000;
     
     private static readonly FORBIDDEN_PATTERNS = [
@@ -22,6 +23,7 @@ export class PersonalityValidator {
         return !this.FORBIDDEN_PATTERNS.some(pattern => pattern.test(response));
     }
 
+    // Replace the existing validateResponse method with this new one
     public static validateResponse(response: string, isTweet: boolean = false): string {
         if (!response || response.trim().length === 0) {
             return 'Error generating response [error_state]';
@@ -30,9 +32,9 @@ export class PersonalityValidator {
         // Clean the response
         let cleanedResponse = response
             .replace(/#/g, '')
-            .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '') // Remove surrogate pairs
-            .replace(/[\u2600-\u27BF]/g, '') // Remove emoji blocks
-            .replace(/[\uE000-\uF8FF]/g, '') // Remove private use area
+            .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+            .replace(/[\u2600-\u27BF]/g, '')
+            .replace(/[\uE000-\uF8FF]/g, '')
             .trim();
 
         if (isTweet) {
@@ -40,11 +42,13 @@ export class PersonalityValidator {
                 cleanedResponse = cleanedResponse.slice(0, this.MAX_TWEET_LENGTH);
             }
             if (!this.validateTweetResponse(cleanedResponse)) {
-                // Attempt to fix common issues
                 cleanedResponse = this.fixTweetResponse(cleanedResponse);
             }
-        } else if (cleanedResponse.length > this.MAX_RESPONSE_LENGTH) {
-            cleanedResponse = cleanedResponse.slice(0, this.MAX_RESPONSE_LENGTH);
+        } else {
+            // Use MAX_CHAT_LENGTH for chat responses
+            if (cleanedResponse.length > this.MAX_CHAT_LENGTH) {
+                cleanedResponse = cleanedResponse.slice(0, this.MAX_CHAT_LENGTH);
+            }
         }
 
         return cleanedResponse;
