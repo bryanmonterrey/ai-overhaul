@@ -147,7 +147,6 @@ export function AdminTradingChat() {
 
   const formattedMessages = messages
   .filter(msg => {
-    // Filter out empty messages and [DONE] messages
     if (!msg.content) return false;
     if (msg.content === '[DONE]') return false;
     return true;
@@ -155,24 +154,20 @@ export function AdminTradingChat() {
   .map((msg, index) => {
     let text = msg.content;
     
-    // Handle messages that start with 'data: '
     if (text.startsWith('data: ')) {
       try {
-        // Parse the JSON part after 'data: '
-        const jsonPart = text.split('\n')[0].slice(6); // Take first line and remove 'data: '
+        const jsonPart = text.split('\n')[0].slice(6);
         const parsed = JSON.parse(jsonPart);
-        text = parsed.content; // Extract just the content
+        text = parsed.content;
       } catch {
-        // If parsing fails, just use the original text
         text = msg.content;
       }
     }
 
-    // Return formatted message
     return {
       id: index,
       text: text,
-      role: msg.role,
+      role: msg.role === 'system' || msg.role === 'data' ? 'assistant' : msg.role,
       data: msg.data
     };
   });

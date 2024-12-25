@@ -48,7 +48,7 @@ export default function InputMorphMessage({
     <div className="flex h-full flex-col items-end justify-end pb-4">
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-scroll h-auto items-end justify-end">
+        className="flex-1 overflow-y-scroll h-auto w-full items-end justify-end">
         <AnimatePresence mode="wait">
           {messages.map((message, index) => (
             <div 
@@ -67,10 +67,10 @@ export default function InputMorphMessage({
                   layout="position"
                   layoutId={`container-[${index}]`}
                   transition={transitionDebug}
-                  className={`rounded-lg p-3 z-10 break-words ${
+                  className={` p-3 z-10 break-words ${
                     message.role === 'user'
-                      ? 'bg-gray-200 text-gray-900 dark:bg-black dark:text-gray-100'
-                      : 'bg-blue-200 text-gray-900 dark:bg-blue-800 dark:text-gray-100'
+                      ? 'bg-gray-200 rounded-b-3xl rounded-tl-3xl rounded-tr-lg text-gray-900 dark:bg-black dark:text-gray-100'
+                      : 'bg-blue-200 rounded-b-3xl rounded-tl-lg rounded-tr-3xl text-gray-900 dark:bg-blue-800 dark:text-gray-100'
                   }`}
                 >
                   <p className="text-sm">{message.text}</p>
