@@ -147,31 +147,31 @@ export function AdminTradingChat() {
 
   // Format messages for InputMorphMessage, filtering out [DONE] and data: prefixes
   const formattedMessages = messages
-  .filter(msg => {
-    // Filter out [DONE] messages and empty messages
-    if (!msg.content || msg.content === '[DONE]') return false;
-    return true;
-  })
-  .map((msg, index) => {
-    let content = msg.content;
-    // If content is a JSON string starting with "data: ", parse it
-    if (typeof content === 'string' && content.startsWith('data: ')) {
-      try {
-        const jsonContent = JSON.parse(content.slice(6));
-        content = jsonContent.content;
-      } catch {
-        // If parsing fails, just use the content as is
-        content = content.slice(6);
+    .filter(msg => {
+      return (msg.role === 'user' || msg.role === 'assistant') &&
+             typeof msg.content === 'string';
+    })
+    .map((msg, index) => {
+      let text = msg.content;
+      
+      // If the content starts with 'data: ', try to extract just the message
+      if (text.startsWith('data: ')) {
+        try {
+          const parsed = JSON.parse(text.slice(6));
+          text = parsed.content;
+        } catch {
+          // If parsing fails, remove the 'data: ' prefix
+          text = text.slice(6);
+        }
       }
-    }
 
-    return {
-      id: index,
-      text: content,
-      role: msg.role as 'user' | 'assistant',
-      data: msg.data
-    };
-  });
+      return {
+        id: index,
+        text: text,
+        role: msg.role,
+        data: msg.data
+      };
+    });
 
   return (
     <Card className="w-full h-[600px] flex flex-col">
