@@ -12,7 +12,29 @@
   font-weight: 400;
 }
 
+@font-face {
+  font-family: "geist";
+  src: url("/fonts/Geist-Regular.otf"); 
+  font-weight: 400;
+}
 
+@font-face {
+  font-family: "geist";
+  src: url("/fonts/Geist-Bold.otf"); 
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "geist";
+  src: url("/fonts/Geist-Medium.otf"); 
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "geist";
+  src: url("/fonts/Geist-SemiBold.otf"); 
+  font-weight: 600;
+}
 
 @font-face {
   font-family: "english";
@@ -71,7 +93,7 @@
 }
 
 body {
-  font-family: ia;
+  font-family: geist;
 }
 
 /* Wallet Adapter Styles */

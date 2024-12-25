@@ -11,7 +11,7 @@ const config: Config = {
   	extend: {
   		fontFamily: {
   			ia: [
-  				'ia',
+  				'geist',
   				'monospace'
   			],
 			sportesia: ['sportesia', 'monospace'],
@@ -24,6 +24,7 @@ const config: Config = {
 			bookish: ['bookish', 'monospace'],
 			lumen: ['lumen', 'monospace'],
 			inria: ['inria', 'monospace'],
+			geist: ['geist', 'monospace'],
   		},
   		colors: {
 			darkish: '#11111A',

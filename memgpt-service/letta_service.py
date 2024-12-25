@@ -1092,31 +1092,19 @@ async def admin_chat_endpoint(request: Request):
 
         async def event_stream():
             try:
-                # First send the message content
+                # Send just the content
                 if result.get("response"):
+                    # The message field we want is 'content'
                     message = {
-                        "id": str(uuid.uuid4()),
                         "role": "assistant",
-                        "content": result["response"],
-                        "createdAt": datetime.now().isoformat()
+                        "content": result["response"]
                     }
-                    message_json = json.dumps(message)
-                    print(f"Sending message: {message_json}")  # Debug log
-                    yield f"data: {message_json}\n\n"
-
-                # Then send the DONE signal
-                print("Sending DONE signal")  # Debug log
+                    yield f"data: {json.dumps(message)}\n\n"
+                    
                 yield "data: [DONE]\n\n"
 
             except Exception as e:
-                print(f"Error in event_stream: {str(e)}")  # Debug log
-                error_message = {
-                    "id": str(uuid.uuid4()),
-                    "role": "assistant",
-                    "content": f"Error: {str(e)}",
-                    "createdAt": datetime.now().isoformat()
-                }
-                yield f"data: {json.dumps(error_message)}\n\n"
+                yield f"data: Error: {str(e)}\n\n"
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
