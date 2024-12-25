@@ -1092,43 +1092,26 @@ async def admin_chat_endpoint(request: Request):
 
         async def event_stream():
             try:
-                # Send the main message
-                message = {
-                    "id": str(uuid.uuid4()),
-                    "role": "assistant",
-                    "content": result.get("response", ""),
-                    "createdAt": datetime.now().isoformat()
-                }
-                yield f"data: {json.dumps(message)}\n\n"
-
-                # If there's additional data, send it as another message
-                if result.get("data"):
-                    data_message = {
+                # Send just the response without wrapping it
+                if result.get("response"):
+                    message = {
                         "id": str(uuid.uuid4()),
                         "role": "assistant",
-                        "content": "",
-                        "data": result["data"],
-                        "createdAt": datetime.now().isoformat()
+                        "content": result["response"],
+                        "data": result.get("data") if result.get("data") else None
                     }
-                    yield f"data: {json.dumps(data_message)}\n\n"
+                    yield f"data: {json.dumps(message)}\n\n"
 
-                # Send the DONE message - This needs to be a complete message too
-                done_message = {
-                    "id": str(uuid.uuid4()),
-                    "role": "done",
-                    "content": "",
-                    "createdAt": datetime.now().isoformat()
-                }
-                yield f"data: {json.dumps(done_message)}\n\n"
+                yield "data: [DONE]\n\n"
 
             except Exception as e:
                 error_message = {
                     "id": str(uuid.uuid4()),
-                    "role": "error",
-                    "content": f"Error: {str(e)}",
-                    "createdAt": datetime.now().isoformat()
+                    "role": "assistant",
+                    "content": f"Error: {str(e)}"
                 }
                 yield f"data: {json.dumps(error_message)}\n\n"
+                yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             event_stream(),
@@ -1143,7 +1126,7 @@ async def admin_chat_endpoint(request: Request):
     except Exception as e:
         print("Endpoint error:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 @app.post("/trading/holders/chat")
 async def holder_chat_endpoint(request: Request):
     try:

@@ -41,8 +41,8 @@ export function AdminTradingChat() {
   
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: '/api/trading/admin/chat',
-    streamProtocol: 'text', // Add this line
-    id: 'admin-trading-chat', // Add this for stability
+    streamProtocol: 'text',
+    id: 'admin-trading-chat',
     onResponse: (response) => {
       console.log('Raw response:', response);
       if (!response.ok) {
@@ -133,7 +133,6 @@ export function AdminTradingChat() {
   
     if (input.trim()) {
       try {
-        // Use handleSubmit from useChat to process the input
         await handleSubmit(e);
       } catch (error) {
         console.error('Form submission error:', error);
@@ -146,6 +145,31 @@ export function AdminTradingChat() {
     }
   };
 
+  // Format messages for InputMorphMessage, filtering out [DONE] and data: prefixes
+  const formattedMessages = messages
+    .filter(msg => {
+      // Filter out system messages and raw data strings
+      if (!msg.content || typeof msg.content !== 'string') return false;
+      if (msg.content === '[DONE]') return false;
+      if (msg.content.startsWith('data: ')) {
+        try {
+          // Try to parse if it's a JSON string
+          const parsed = JSON.parse(msg.content.slice(6));
+          msg.content = parsed.content || parsed.response || '';
+        } catch {
+          // If it's not JSON, just remove the 'data: ' prefix
+          msg.content = msg.content.slice(6);
+        }
+      }
+      return true;
+    })
+    .map((msg, index) => ({
+      id: index,
+      text: msg.content,
+      role: msg.role as 'user' | 'assistant',
+      data: msg.data as MessageData | undefined
+    }));
+
   return (
     <Card className="w-full h-[600px] flex flex-col">
       <CardHeader>
@@ -153,21 +177,15 @@ export function AdminTradingChat() {
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col justify-between overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
-      <InputMorphMessage
-        input={input}
-        isLoading={isLoading}
-        onInputChange={handleInputChange}
-        onFormSubmit={handleFormSubmit}
-        messages={messages
-            .filter((msg) => msg.role === 'user' || msg.role === 'assistant') // Filter relevant roles
-            .map((msg, index) => ({
-            id: index, // Use index if a number is required
-            text: msg.content, // Map content to text
-            role: msg.role as 'user' | 'assistant',
-            }))}
-        
-        />
+        <div className="flex-1 overflow-y-auto">
+          <InputMorphMessage
+            input={input}
+            isLoading={isLoading}
+            onInputChange={handleInputChange}
+            onFormSubmit={handleFormSubmit}
+            messages={formattedMessages}
+            handleTradeExecution={handleTradeExecution}
+          />
         </div>
       </CardContent>
     </Card>
