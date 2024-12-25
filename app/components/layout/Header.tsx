@@ -35,7 +35,7 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#11111A]">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-darkish via-darkish/90 to-transparent">
       <div className=" px-4 justify-between">
         <div className="flex justify-between items-center h-14">
           <div className="flex items-center space-x-8">
