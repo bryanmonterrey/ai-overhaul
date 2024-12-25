@@ -142,15 +142,15 @@ export default function InputMorphMessage({
             <div className="px-3 py-2 text-[15px] leading-[15px] text-gray-900 dark:text-gray-50">
               {input}
             </div>
-          </motion.div>
+        </motion.div>
 
-          <button
+          <Button
             type="submit"
             className="ml-2 flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 dark:bg-black"
             disabled={isLoading}
           >
             <PlusIcon className="h-5 w-5 text-gray-600 dark:text-gray-50" />
-          </button>
+          </Button>
         </form>
       </div>
     </div>

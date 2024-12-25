@@ -85,61 +85,86 @@ export async function POST(req: NextRequest) {
 
     // Handle the streaming response
     (async () => {
-      try {
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            // Handle any remaining buffer
-            if (buffer.trim()) {
-              const lines = buffer.split('\n');
-              for (const line of lines) {
-                if (line.trim().startsWith('data: ')) {
-                  const jsonStr = line.trim().slice(6);
-                  await writer.write(
-                    new TextEncoder().encode(jsonStr + '\n\n')
-                  );
+        try {
+          const decoder = new TextDecoder();
+          let buffer = '';
+      
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+              // Handle any remaining buffer
+              if (buffer.trim()) {
+                try {
+                  const data = JSON.parse(buffer);
+                  if (data.response) {
+                    const message = createStreamMessage(data.response);
+                    await writer.write(
+                      new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+                    );
+                  }
+                } catch (e) {
+                  console.error('Error processing final buffer:', e);
                 }
               }
+              await writer.write(
+                new TextEncoder().encode('data: [DONE]\n\n')
+              );
+              await writer.close();
+              break;
             }
-            await writer.write(
-              new TextEncoder().encode('data: [DONE]\n\n')
-            );
-            await writer.close();
-            break;
+      
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+      
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+      
+              try {
+                // Remove the 'data: ' prefix and parse the JSON
+                const jsonString = trimmedLine.slice(6);
+                const data = JSON.parse(jsonString);
+      
+                if (data === '[DONE]') {
+                  await writer.write(
+                    new TextEncoder().encode('data: [DONE]\n\n')
+                  );
+                  continue;
+                }
+      
+                // Extract and format the message content
+                const message = {
+                  id: data.id || crypto.randomUUID(),
+                  role: data.role || 'assistant',
+                  content: data.content || data.response || '',
+                  createdAt: data.createdAt || new Date().toISOString()
+                };
+      
+                await writer.write(
+                  new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+                );
+              } catch (e) {
+                console.error('Error processing line:', trimmedLine, e);
+                continue;
+              }
+            }
           }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
-
-            // Pass through the SSE messages directly
-            await writer.write(
-              new TextEncoder().encode(trimmedLine + '\n\n')
-            );
-          }
+        } catch (error) {
+          console.error('Streaming error:', error);
+          const message = createStreamMessage(
+            `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+          await writer.write(
+            new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
+          );
+          await writer.write(
+            new TextEncoder().encode('data: [DONE]\n\n')
+          );
+          await writer.close();
         }
-      } catch (error) {
-        console.error('Streaming error:', error);
-        const message = createStreamMessage(
-          `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-        await writer.write(
-          new TextEncoder().encode(`data: ${JSON.stringify(message)}\n\n`)
-        );
-        await writer.write(
-          new TextEncoder().encode('data: [DONE]\n\n')
-        );
-        await writer.close();
-      }
-    })();
+      })();
 
     return new Response(stream.readable, {
       headers: {
