@@ -147,28 +147,31 @@ export function AdminTradingChat() {
 
   // Format messages for InputMorphMessage, filtering out [DONE] and data: prefixes
   const formattedMessages = messages
-    .filter(msg => {
-      // Filter out system messages and raw data strings
-      if (!msg.content || typeof msg.content !== 'string') return false;
-      if (msg.content === '[DONE]') return false;
-      if (msg.content.startsWith('data: ')) {
-        try {
-          // Try to parse if it's a JSON string
-          const parsed = JSON.parse(msg.content.slice(6));
-          msg.content = parsed.content || parsed.response || '';
-        } catch {
-          // If it's not JSON, just remove the 'data: ' prefix
-          msg.content = msg.content.slice(6);
-        }
+  .filter(msg => {
+    // Filter out [DONE] messages and empty messages
+    if (!msg.content || msg.content === '[DONE]') return false;
+    return true;
+  })
+  .map((msg, index) => {
+    let content = msg.content;
+    // If content is a JSON string starting with "data: ", parse it
+    if (typeof content === 'string' && content.startsWith('data: ')) {
+      try {
+        const jsonContent = JSON.parse(content.slice(6));
+        content = jsonContent.content;
+      } catch {
+        // If parsing fails, just use the content as is
+        content = content.slice(6);
       }
-      return true;
-    })
-    .map((msg, index) => ({
+    }
+
+    return {
       id: index,
-      text: msg.content,
+      text: content,
       role: msg.role as 'user' | 'assistant',
-      data: msg.data as MessageData | undefined
-    }));
+      data: msg.data
+    };
+  });
 
   return (
     <Card className="w-full h-[600px] flex flex-col">

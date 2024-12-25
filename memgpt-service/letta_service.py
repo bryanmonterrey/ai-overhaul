@@ -1092,25 +1092,14 @@ async def admin_chat_endpoint(request: Request):
 
         async def event_stream():
             try:
-                # Send just the response without wrapping it
+                # Send content directly
                 if result.get("response"):
-                    message = {
-                        "id": str(uuid.uuid4()),
-                        "role": "assistant",
-                        "content": result["response"],
-                        "data": result.get("data") if result.get("data") else None
-                    }
-                    yield f"data: {json.dumps(message)}\n\n"
+                    yield f"data: {result['response']}\n\n"
 
                 yield "data: [DONE]\n\n"
 
             except Exception as e:
-                error_message = {
-                    "id": str(uuid.uuid4()),
-                    "role": "assistant",
-                    "content": f"Error: {str(e)}"
-                }
-                yield f"data: {json.dumps(error_message)}\n\n"
+                yield f"data: Error: {str(e)}\n\n"
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
