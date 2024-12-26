@@ -62,6 +62,13 @@ export interface TradeUpdate {
     suggestedAction?: string;
     userAddress?: string;
   }
+
+  export interface Alert {
+    type: 'PRICE' | 'RISK' | 'LIQUIDATION';
+    level: 'INFO' | 'WARNING' | 'CRITICAL';
+    message: string;
+    timestamp: string;
+  }
   
   export interface TradingState {
     connected: boolean;

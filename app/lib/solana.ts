@@ -1,6 +1,14 @@
 // app/lib/solana.ts
 import { SolanaAgentKit } from 'solana-agent-kit';
-import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
+import { Connection, PublicKey, TokenAccountsFilter, clusterApiUrl } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+
+interface TradeParams {
+    targetMint: PublicKey;
+    amount: number;
+    inputMint: PublicKey;
+    slippage: number;
+  }
 
 export class SolanaService {
   private connection: Connection;
@@ -23,6 +31,31 @@ export class SolanaService {
       publicKey.toString(),
       this.connection.rpcEndpoint,
       ""
+    );
+  }
+
+  async getPortfolio(walletAddress: PublicKey) {
+    const filter: TokenAccountsFilter = {
+      programId: TOKEN_PROGRAM_ID
+    };
+ 
+    const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(
+      walletAddress,
+      filter
+    );
+    return tokenAccounts.value.map(account => ({
+      mint: account.account.data.parsed.info.mint,
+      amount: account.account.data.parsed.info.tokenAmount.uiAmount,
+      decimals: account.account.data.parsed.info.tokenAmount.decimals
+    }));
+  }
+
+  async trade(params: TradeParams) {
+    return await this.agent.trade(
+      params.targetMint,
+      params.amount,
+      params.inputMint,
+      params.slippage
     );
   }
 
