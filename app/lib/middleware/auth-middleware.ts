@@ -88,10 +88,10 @@ export function withAuth(handler: (supabase: any, session: any) => Promise<NextR
         return NextResponse.json(
           { 
             error: 'Internal server error',
-            details: error.message,
-            code: error.code || 'HANDLER_ERROR'
+            details: error instanceof Error ? error.message : 'Unknown error',
+            code: error instanceof Error ? (error as any).code || 'HANDLER_ERROR' : 'HANDLER_ERROR'
           },
-          { status: error.status || 500 }
+          { status: error instanceof Error ? (error as any).status || 500 : 500 }
         );
       }
     } catch (error) {
@@ -99,7 +99,7 @@ export function withAuth(handler: (supabase: any, session: any) => Promise<NextR
       return NextResponse.json(
         { 
           error: 'Authentication error',
-          details: error.message,
+          details: error instanceof Error ? error.message : 'Unknown error',
           code: 'AUTH_ERROR'
         },
         { status: 500 }

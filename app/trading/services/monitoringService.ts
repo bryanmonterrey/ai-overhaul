@@ -31,11 +31,11 @@ export async function checkAlerts(positions: any[], priceAlerts: any[]): Promise
    );
    
    alerts.push(...matchingAlerts.map(alert => ({
-     type: 'PRICE',
-     level: 'WARNING',
-     message: `Price alert triggered for ${position.token} at ${currentPrice}`,
-     timestamp: new Date().toISOString()
-   })));
+    type: 'PRICE' as const,  // This fixes the type error
+    level: 'WARNING' as const,
+    message: `Price alert triggered for ${position.token} at ${currentPrice}`,
+    timestamp: new Date().toISOString()
+  })));
  }
  
  return alerts;
