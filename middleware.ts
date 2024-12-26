@@ -5,12 +5,30 @@ import type { Database } from '@/supabase/functions/supabase.types';
 import { TokenChecker } from './app/lib/blockchain/token-checker';
 
 export async function middleware(req: NextRequest) {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
+      },
+    });
+  }
+
   const res = NextResponse.next();
   const cookieStore = req.cookies;
   const supabase = createMiddlewareClient<Database>({ 
     req, 
     res 
   });
+
+  // Add CORS headers to all responses
+  res.headers.set('Access-Control-Allow-Origin', '*');
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   // Check authentication
   const {
@@ -133,6 +151,7 @@ export const config = {
     '/conversations/:path*',
     '/api/token-validation',
     '/api/chat/:path*',
+    '/api/ai/:path*',  // Added AI endpoint
     '/twitter/:path*',
     '/telegram/:path*',
     '/trading/admin/:path*',
