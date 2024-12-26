@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const { action, params, walletKey } = await request.json();
     
     // Set wallet for this request
-    solanaAgent.setWallet(walletKey);
+    solanaAgent.wallet = walletKey;
 
     switch(action) {
       case 'trade':
