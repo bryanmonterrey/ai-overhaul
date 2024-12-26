@@ -18,6 +18,15 @@ interface TradeExecutionData {
   price?: number;
 }
 
+interface EnhancedTradeExecutionData extends TradeExecutionData {
+    market_analysis?: {
+      price_trend: string;
+      volatility: number;
+      recommendation?: string;
+    };
+    requires_confirmation?: boolean;
+  }
+
 interface PortfolioUpdateData {
   type: 'portfolio_update';
   totalValue: number;
@@ -105,14 +114,35 @@ export function AdminTradingChat() {
     };
   }, []);
 
-  const handleTradeExecution = async (tradeData: TradeExecutionData) => {
+  const handleTradeExecution = async (tradeData: EnhancedTradeExecutionData) => {
     try {
-      await aiTradingService.executeManualTrade({
+      // Handle trade confirmation if required
+      if (tradeData.requires_confirmation) {
+        const confirmed = await confirmDialog({
+          title: "Confirm High Risk Trade",
+          message: `This trade has been flagged as high risk. ${tradeData.market_analysis?.recommendation || ''}`,
+          confirmText: "Execute Trade",
+          cancelText: "Cancel"
+        });
+        
+        if (!confirmed) return;
+      }
+
+      const result = await aiTradingService.executeManualTrade({
         token: tradeData.token,
         side: tradeData.side,
         amount: tradeData.amount,
         price: tradeData.price
       });
+
+      // Show market analysis if available
+      if (tradeData.market_analysis) {
+        toast({
+          title: "Market Analysis",
+          description: `Current trend: ${tradeData.market_analysis.price_trend}`,
+          variant: "info"
+        });
+      }
 
       toast({
         title: "Trade Executed",
@@ -122,11 +152,12 @@ export function AdminTradingChat() {
       console.error('Error executing trade:', error);
       toast({
         title: "Trade Failed",
-        description: "Failed to execute trade. Please try again.",
+        description: error.message || "Failed to execute trade. Please try again.",
         variant: "destructive",
       });
     }
   };
+
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

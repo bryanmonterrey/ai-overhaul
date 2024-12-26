@@ -2,6 +2,9 @@
 from typing import Dict, Any, Optional
 from datetime import datetime
 from enum import Enum
+import anthropic
+import os
+import json
 
 class CommandType(Enum):
     TRADE = "trade"
@@ -14,8 +17,9 @@ class TradingChat:
     def __init__(self, letta_service, memory_processor, dspy_service):
         self.letta = letta_service
         self.memory = memory_processor
-        self.dspy_service = dspy_service 
+        self.dspy_service = dspy_service
         self.command_handlers = self._init_command_handlers()
+        self.claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         
     def _init_command_handlers(self) -> Dict[str, callable]:
         return {
@@ -25,53 +29,94 @@ class TradingChat:
             CommandType.PORTFOLIO: self._handle_portfolio_command,
             CommandType.SYSTEM: self._handle_system_command
         }
+    
+    async def analyze_message_with_claude(self, message: str, context: str) -> Dict[str, Any]:
+        """Use Claude for natural language understanding of commands"""
+        try:
+            response = await self.claude.messages.create(
+                model="claude-3-opus-20240229",
+                max_tokens=1024,
+                messages=[{
+                    "role": "system",
+                    "content": "You are a Solana trading assistant helping users execute trades and analyze the market."
+                },
+                {
+                    "role": "user",
+                    "content": f"""Analyze this trading message and determine the command type and parameters:
+                    Message: {message}
+                    Context: {context}
+                    
+                    Available commands:
+                    - TRADE: For trade execution requests
+                    - ANALYSIS: For market analysis requests
+                    - SETTINGS: For system settings changes
+                    - PORTFOLIO: For portfolio information requests
+                    - SYSTEM: For system maintenance commands
+                    
+                    Respond with a JSON object containing:
+                    1. command_type: The type of command identified
+                    2. parameters: Relevant parameters extracted from the message
+                    3. natural_response: A conversational response to the user
+                    
+                    Example:
+                    {{
+                        "command_type": "TRADE",
+                        "parameters": {{
+                            "action": "buy",
+                            "token": "SOL",
+                            "amount": 10
+                        }},
+                        "natural_response": "I understand you want to buy 10 SOL. I'll help you execute this trade."
+                    }}"""
+                }]
+            )
+            
+            analysis = json.loads(response.content[0].text)
+            return analysis
+
+        except Exception as e:
+            print(f"Claude analysis error: {str(e)}")
+            return {
+                "command_type": "SYSTEM",
+                "parameters": {
+                    "action": "error",
+                    "error": str(e)
+                },
+                "natural_response": "I apologize, but I'm having trouble understanding your request. Could you please rephrase it?"
+            }
         
     async def process_admin_message(self, message: str) -> Dict[str, Any]:
         """Process admin chat messages"""
-        print("Starting process_admin_message with:", message)  # Debug log
+        print("Starting process_admin_message with:", message)
         try:
-            print("Calling dspy_service.analyze_trading_command")  # Debug log
-            # Use DSPy to analyze intent and extract command
-            analysis = await self.dspy_service.analyze_trading_command(
-                message,
-                context="admin"
-            )
-            print("DSPy analysis result:", analysis)  # Debug log
+            # Use Claude to analyze the message
+            analysis = await self.analyze_message_with_claude(message, "admin")
+            print("Claude analysis result:", analysis)
 
-            # For system messages, we can return them directly
+            # For system messages, return natural response
             if analysis["command_type"] == "SYSTEM":
-                if analysis["parameters"].get("action") == "greet":
-                    return {
-                        "response": analysis["parameters"]["message"]
-                    }
-                elif analysis["parameters"].get("action") == "error":
-                    return {
-                        "response": f"Error: {analysis['parameters'].get('error', 'Unknown error')}"
-                    }
-                elif analysis["parameters"].get("action") == "unknown":
-                    return {
-                        "response": "I'm not sure what you mean. Can you please be more specific about what you'd like me to do?"
-                    }
-            
+                return {
+                    "response": analysis.get("natural_response", "I'm here to help. What would you like to do?")
+                }
+
             # Get command handler
             handler = self.command_handlers.get(analysis["command_type"])
-            print("Found handler:", handler)  # Debug log
-            
+            print("Found handler:", handler)
+
             if not handler:
-                print("No handler found for command type")  # Debug log
                 return {
-                    "response": "I don't understand that command.",
+                    "response": "I don't understand that command. Could you try rephrasing it?",
                     "error": "Invalid command type"
                 }
-                
+
             # Execute command with admin privileges
-            print("Executing handler with parameters:", analysis["parameters"])  # Debug log
+            print("Executing handler with parameters:", analysis["parameters"])
             result = await handler(
                 analysis["parameters"],
                 is_admin=True
             )
-            print("Handler result:", result)  # Debug log
-            
+            print("Handler result:", result)
+
             # Store interaction in memory
             await self.memory.store_interaction(
                 content=message,
@@ -82,21 +127,19 @@ class TradingChat:
                     "timestamp": datetime.now().isoformat()
                 }
             )
-            print("Memory stored, returning result")  # Debug log
             
-            # Make sure we have a response field
-            if isinstance(result, dict) and "response" not in result:
-                result = {
-                    "response": str(result),
-                    "data": result
-                }
-                
-            return result
+            # Combine the natural response with the result
+            final_response = {
+                "response": analysis.get("natural_response", str(result)),
+                "data": result
+            }
             
+            return final_response
+
         except Exception as e:
-            print("Error in process_admin_message:", str(e))  # Debug log
+            print("Error in process_admin_message:", str(e))
             return {
-                "response": f"Error processing command: {str(e)}",
+                "response": f"I encountered an error: {str(e)}. Could you try again?",
                 "error": str(e)
             }
             

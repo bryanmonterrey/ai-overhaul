@@ -1,7 +1,3 @@
-"""
-Market Analyst Agent for Solana trading.
-Integrates DexScreener data with technical analysis and Jupiter liquidity.
-"""
 from typing import Dict, Any, List, Optional
 import aiohttp
 import numpy as np
@@ -10,6 +6,10 @@ import asyncio
 import pandas as pd
 from dataclasses import dataclass
 import logging
+import anthropic
+import json
+import os
+from solana_agent_kit import SolanaAgentKit
 from .base_agent import BaseAgent
 from ..utils.indicators import (
     calculate_ichimoku,
@@ -32,6 +32,8 @@ class MarketAnalysis:
     sentiment_score: float
     risk_score: float
     timestamp: datetime
+    ai_analysis: Optional[Dict[str, Any]] = None  # Added for Claude analysis
+    solana_metrics: Optional[Dict[str, Any]] = None  # Added for Solana Agent Kit data
 
 class AnalystAgent(BaseAgent):
     """Analyzes market data and generates trading signals"""
@@ -43,19 +45,27 @@ class AnalystAgent(BaseAgent):
         self.analysis_cache = {}
         self.analysis_expiry = timedelta(minutes=5)
         
+        # Initialize Claude and Solana Agent Kit
+        self.claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.solana_agent = SolanaAgentKit(
+            config.get("private_key", ""),
+            config.get("rpc_url", "https://api.mainnet-beta.solana.com")
+        )
+        
     async def analyze_market(self, token_address: str) -> MarketAnalysis:
-        """Perform comprehensive market analysis"""
+        """Perform comprehensive market analysis with AI enhancement"""
         try:
             # Check cache first
             cached = self._get_cached_analysis(token_address)
             if cached:
                 return cached
                 
-            # Fetch data in parallel
-            dex_data, price_data, routes = await asyncio.gather(
+            # Fetch all data in parallel including Solana Agent Kit data
+            dex_data, price_data, routes, solana_price = await asyncio.gather(
                 self._fetch_dex_data(token_address),
                 self._fetch_price_history(token_address),
-                self._fetch_jupiter_routes(token_address)
+                self._fetch_jupiter_routes(token_address),
+                self.solana_agent.pythFetchPrice(token_address)
             )
             
             # Calculate technical indicators
@@ -68,6 +78,10 @@ class AnalystAgent(BaseAgent):
             risk_score = await self._calculate_risk_score(token_address, dex_metrics)
             sentiment_score = await self._calculate_sentiment_score(token_address)
             
+            # Get Solana Agent Kit metrics
+            solana_metrics = await self._get_solana_metrics(token_address)
+            
+            # Create base analysis
             analysis = MarketAnalysis(
                 symbol=dex_data["symbol"],
                 contract_address=token_address,
@@ -79,8 +93,13 @@ class AnalystAgent(BaseAgent):
                 jupiter_routes=routes,
                 sentiment_score=sentiment_score,
                 risk_score=risk_score,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
+                solana_metrics=solana_metrics
             )
+            
+            # Enhance with Claude's analysis
+            ai_analysis = await self._get_claude_analysis(analysis)
+            analysis.ai_analysis = ai_analysis
             
             # Cache the analysis
             self._cache_analysis(token_address, analysis)
@@ -90,6 +109,76 @@ class AnalystAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Market analysis error: {str(e)}")
             raise
+
+    async def _get_claude_analysis(self, analysis: MarketAnalysis) -> Dict[str, Any]:
+        """Get enhanced analysis from Claude"""
+        try:
+            response = await self.claude.messages.create(
+                model="claude-3-opus-20240229",
+                messages=[{
+                    "role": "system",
+                    "content": "You are an expert Solana market analyst specializing in technical analysis and risk assessment."
+                },
+                {
+                    "role": "user",
+                    "content": f"""Analyze this market data and provide insights:
+
+Technical Indicators:
+{json.dumps(analysis.indicators, indent=2)}
+
+DEX Metrics:
+{json.dumps(analysis.dex_metrics, indent=2)}
+
+Market Data:
+- Price: {analysis.price}
+- 24h Volume: {analysis.volume_24h}
+- Liquidity: {analysis.liquidity}
+- Risk Score: {analysis.risk_score}
+- Sentiment Score: {analysis.sentiment_score}
+
+Solana Metrics:
+{json.dumps(analysis.solana_metrics, indent=2)}
+
+Provide analysis in JSON format including:
+1. market_sentiment: string (bullish, bearish, neutral)
+2. risk_assessment: object
+3. trading_opportunities: array
+4. key_metrics_analysis: object
+5. technical_outlook: string
+6. recommendation: string
+7. warning_flags: array
+"""
+                }]
+            )
+            
+            return json.loads(response.content[0].text)
+            
+        except Exception as e:
+            self.logger.error(f"Claude analysis error: {str(e)}")
+            return {
+                "market_sentiment": "neutral",
+                "risk_assessment": {"level": "high", "reason": str(e)},
+                "trading_opportunities": [],
+                "key_metrics_analysis": {},
+                "technical_outlook": "Analysis failed",
+                "recommendation": "Unable to provide recommendation",
+                "warning_flags": ["Analysis failed"]
+            }
+
+    async def _get_solana_metrics(self, token_address: str) -> Dict[str, Any]:
+        """Get additional metrics from Solana Agent Kit"""
+        try:
+            token_data = await self.solana_agent.getTokenData(token_address)
+            pyth_price = await self.solana_agent.pythFetchPrice(token_address)
+            
+            return {
+                "token_data": token_data,
+                "pyth_price": pyth_price,
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            self.logger.error(f"Solana metrics error: {str(e)}")
+            return {}
             
     async def _fetch_dex_data(self, token_address: str) -> Dict[str, Any]:
         """Fetch token data from DexScreener"""
