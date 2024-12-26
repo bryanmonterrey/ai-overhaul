@@ -132,7 +132,14 @@ export const configManager = {
         stopSequences: [],
         maxTokens: 1000
       },
-      model: process.env.AI_MODEL || 'claude-3-sonnet-20240229'
+      model: process.env.AI_MODEL || 'claude-3-sonnet-20240229',
+      fallback: {  // Add this
+        enabled: true,
+        provider: 'openai',
+        model: 'gpt-4-turbo-preview',
+        maxRetries: 3,
+        retryDelay: 1000
+      }
     },
     emotional: {
       baseState: 'neutral',

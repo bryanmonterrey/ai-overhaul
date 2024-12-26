@@ -9,7 +9,7 @@ import { TokenCounter, RateLimiter, CacheManager } from '../../lib/utils/ai';
 import { PersonalitySystem } from '../../core/personality/PersonalitySystem';
 import { DEFAULT_PERSONALITY } from '../../core/personality/config';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export function getPersonalitySystem(): PersonalitySystem {
   return new PersonalitySystem(DEFAULT_PERSONALITY);
