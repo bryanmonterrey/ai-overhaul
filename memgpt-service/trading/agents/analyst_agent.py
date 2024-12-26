@@ -9,7 +9,8 @@ import logging
 import anthropic
 import json
 import os
-from solana_agent_kit import SolanaAgentKit
+from ..services.solana_bridge import SolanaBridge
+
 from .base_agent import BaseAgent
 from ..utils.indicators import (
     calculate_ichimoku,
@@ -44,13 +45,11 @@ class AnalystAgent(BaseAgent):
         self.jupiter_api_url = "https://price.jup.ag/v4"
         self.analysis_cache = {}
         self.analysis_expiry = timedelta(minutes=5)
+        self.claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        self.solana_bridge = SolanaBridge(config.get("solana", {}))
         
         # Initialize Claude and Solana Agent Kit
         self.claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.solana_agent = SolanaAgentKit(
-            config.get("private_key", ""),
-            config.get("rpc_url", "https://api.mainnet-beta.solana.com")
-        )
         
     async def analyze_market(self, token_address: str) -> MarketAnalysis:
         """Perform comprehensive market analysis with AI enhancement"""
@@ -166,10 +165,10 @@ Provide analysis in JSON format including:
             }
 
     async def _get_solana_metrics(self, token_address: str) -> Dict[str, Any]:
-        """Get additional metrics from Solana Agent Kit"""
+        """Get additional metrics through Solana bridge"""
         try:
-            token_data = await self.solana_agent.getTokenData(token_address)
-            pyth_price = await self.solana_agent.pythFetchPrice(token_address)
+            token_data = await self.solana_bridge.get_token_data(token_address)
+            pyth_price = await self.solana_bridge.fetch_pyth_price(token_address)
             
             return {
                 "token_data": token_data,
