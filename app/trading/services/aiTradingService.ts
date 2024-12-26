@@ -1,5 +1,6 @@
 // app/trading/services/aiTradingService.ts
 import { createClient } from '@supabase/supabase-js';
+import { solanaService } from '../../lib/solana';
 
 class AITradingService {
   private supabase;
@@ -61,17 +62,47 @@ class AITradingService {
     amount: number;
     price?: number;
   }) {
-    const response = await fetch(`${this.baseUrl}/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(trade)
-    });
+    try {
+      // Get market data first
+      const [priceData, tokenData] = await Promise.all([
+        solanaService.pythFetchPrice(trade.token),
+        solanaService.getTokenData(trade.token)
+      ]);
 
-    if (!response.ok) {
-      throw new Error('Failed to execute trade');
+      // Execute trade through your backend
+      const response = await fetch(`${this.baseUrl}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...trade,
+          priceData,
+          tokenData
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to execute trade');
+      }
+
+      const result = await response.json();
+
+      // Broadcast update
+      this.supabase.channel('admin_trading')
+        .send({
+          type: 'broadcast',
+          event: 'trading_update',
+          payload: {
+            type: 'trade_execution',
+            ...trade,
+            result
+          }
+        });
+
+      return result;
+    } catch (error) {
+      console.error('Trade execution error:', error);
+      throw error;
     }
-
-    return response.json();
   }
 
   // Portfolio Management

@@ -9,6 +9,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from "@/hooks/use-toast";
 import { aiTradingService } from '../../services/aiTradingService';
 import InputMorphMessage from '@/components/InputMorphMessage';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { solanaService } from '@/app/lib/solana';
+import { confirmDialog } from '@/components/ui/confirm-dialog';
+
 
 interface TradeExecutionData {
   type: 'trade_execution';
@@ -47,6 +51,13 @@ function isPortfolioUpdate(data: any): data is PortfolioUpdateData {
 export function AdminTradingChat() {
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { publicKey } = useWallet();
+
+  useEffect(() => {
+    if (publicKey) {
+      solanaService.updateWalletConnection(publicKey);
+    }
+  }, [publicKey]);
   
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: '/api/trading/admin/chat',
@@ -140,7 +151,7 @@ export function AdminTradingChat() {
         toast({
           title: "Market Analysis",
           description: `Current trend: ${tradeData.market_analysis.price_trend}`,
-          variant: "info"
+          variant: "default"
         });
       }
 
@@ -152,7 +163,7 @@ export function AdminTradingChat() {
       console.error('Error executing trade:', error);
       toast({
         title: "Trade Failed",
-        description: error.message || "Failed to execute trade. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to execute trade. Please try again.",
         variant: "destructive",
       });
     }
