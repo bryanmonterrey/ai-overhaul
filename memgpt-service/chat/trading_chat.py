@@ -35,43 +35,54 @@ class TradingChat:
         try:
             response = await self.claude.messages.create(
                 model="claude-3-opus-20240229",
-                max_tokens=1024,
+                system="You are a Solana trading assistant helping users execute trades and analyze the market.",
                 messages=[{
-                    "role": "system",
-                    "content": "You are a Solana trading assistant helping users execute trades and analyze the market."
-                },
-                {
                     "role": "user",
-                    "content": f"""Analyze this trading message and determine the command type and parameters:
+                    "content": f"""Command Analysis Task:
                     Message: {message}
                     Context: {context}
-                    
+
                     Available commands:
-                    - TRADE: For trade execution requests
-                    - ANALYSIS: For market analysis requests
+                    - TRADE: For trade execution requests (e.g., "buy 100 SOL", "sell 50 USDC")
+                    - ANALYSIS: For market analysis requests (e.g., "analyze SOL price", "check market conditions")
                     - SETTINGS: For system settings changes
                     - PORTFOLIO: For portfolio information requests
                     - SYSTEM: For system maintenance commands
-                    
+
                     Respond with a JSON object containing:
                     1. command_type: The type of command identified
                     2. parameters: Relevant parameters extracted from the message
-                    3. natural_response: A conversational response to the user
-                    
-                    Example:
-                    {{
-                        "command_type": "TRADE",
-                        "parameters": {{
-                            "action": "buy",
-                            "token": "SOL",
-                            "amount": 10
-                        }},
-                        "natural_response": "I understand you want to buy 10 SOL. I'll help you execute this trade."
-                    }}"""
+                    3. natural_response: A conversational response to the user"""
                 }]
             )
-            
-            analysis = json.loads(response.content[0].text)
+
+            # Parse the response into structured format
+            analysis = {
+                "command_type": "SYSTEM",  # Default type
+                "parameters": {},
+                "natural_response": "I apologize, I'm having trouble understanding. Could you be more specific?"
+            }
+
+            try:
+                # Extract the actual content from Claude's response
+                content = response.content[0].text
+                # Parse if it's valid JSON
+                if content.strip().startswith('{'):
+                    analysis = json.loads(content)
+                else:
+                    # If not JSON, create a proper response
+                    analysis = {
+                        "command_type": "SYSTEM",
+                        "parameters": {
+                            "action": "response",
+                            "message": content
+                        },
+                        "natural_response": content
+                    }
+            except json.JSONDecodeError:
+                # If parsing fails, use the raw response
+                analysis["natural_response"] = response.content[0].text
+
             return analysis
 
         except Exception as e:
@@ -82,7 +93,7 @@ class TradingChat:
                     "action": "error",
                     "error": str(e)
                 },
-                "natural_response": "I apologize, but I'm having trouble understanding your request. Could you please rephrase it?"
+                "natural_response": "I apologize, I'm having trouble processing your request. Could you try again?"
             }
         
     async def process_admin_message(self, message: str) -> Dict[str, Any]:

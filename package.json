@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.18.0"
+    "node": ">=23.1.0"
   },
   "scripts": {
     "dev": "next dev --turbo",
@@ -43,6 +43,7 @@
     "@solana/web3.js": "^1.98.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.46.2",
+    "@types/ioredis": "^4.28.10",
     "@types/node": "18.11.18",
     "@types/react": "18.2.0",
     "@types/react-dom": "18.2.0",
@@ -58,7 +59,9 @@
     "crypto-browserify": "3.12.1",
     "deepmerge": "^4.3.1",
     "dotenv": "^16.4.5",
+    "express-rate-limit": "^7.5.0",
     "framer-motion": "^11.15.0",
+    "ioredis": "^5.4.2",
     "jsbi": "^4.3.0",
     "langchain": "^0.3.6",
     "llamaindex": "^0.8.21",
@@ -75,6 +78,7 @@
     "postcss": "^8.4.49",
     "pusher": "^5.2.0",
     "pusher-js": "^8.4.0-rc2",
+    "rate-limit-redis": "^4.2.0",
     "react": "19.0.0-rc-66855b96-20241106",
     "react-dom": "19.0.0-rc-66855b96-20241106",
     "react-query": "^3.39.3",
