@@ -2,6 +2,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Token, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import Redis from 'ioredis';
+import { getRedisClient } from '../redis/client';
 
 export class TokenChecker {
   private connection: Connection;
@@ -23,7 +24,7 @@ export class TokenChecker {
     
     // Initialize Redis connection if URL is provided
     if (process.env.REDIS_URL) {
-      this.redis = new Redis(process.env.REDIS_URL);
+      this.redis = getRedisClient();
     }
   }
 

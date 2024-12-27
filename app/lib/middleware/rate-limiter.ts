@@ -1,18 +1,15 @@
 // lib/middleware/rate-limiter.ts
 import rateLimit from 'express-rate-limit'
 import RedisStore from 'rate-limit-redis'
-import Redis from 'ioredis'
+import Redis, { RedisKey, RedisValue } from 'ioredis'
+import { getRedisClient } from '../redis/client';
 
 // Initialize Redis with proper type checking
-const redis = process.env.REDIS_URL ? new Redis({
-  url: process.env.REDIS_URL,
-  maxRetriesPerRequest: 3
-}) : null;
+const redis = getRedisClient();
 
 export const authRateLimiter = rateLimit({
   store: redis ? new RedisStore({
-    // Fixed the spread operator issue by explicitly defining the sendCommand
-    sendCommand: async (command: string, args: unknown[]) => {
+    sendCommand: async (command: string, ...args: (string | number | Buffer)[]): Promise<any> => {
       return redis.call(command, ...args);
     }
   }) : undefined,
