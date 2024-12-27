@@ -2,18 +2,16 @@
 import { NextResponse } from 'next/server';
 import { SolanaAgentKit } from 'solana-agent-kit';
 
-const solanaAgent = new SolanaAgentKit(
-  "",  // Empty wallet key - will be set per request
-  process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
-  process.env.OPENAI_API_KEY || ""
-);
-
 export async function POST(request: Request) {
   try {
     const { action, params, walletKey } = await request.json();
     
-    // Set wallet for this request
-    solanaAgent.wallet = walletKey;
+    // Create agent instance with the provided wallet key
+    const solanaAgent = new SolanaAgentKit(
+      walletKey,  // Wallet key from request
+      process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
+      process.env.OPENAI_API_KEY || ""
+    );
 
     switch(action) {
       case 'trade':
