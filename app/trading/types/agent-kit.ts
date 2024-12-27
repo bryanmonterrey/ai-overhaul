@@ -14,10 +14,17 @@ export interface TokenInfo {
   extensions?: Record<string, any>;
 }
 
+// Separate base responses for different timestamp types
 export interface BaseResponse {
   success: boolean;
   error?: string;
   timestamp?: string;
+}
+
+export interface BaseResponseWithUnixTime {
+  success: boolean;
+  error?: string;
+  timestamp: number;
 }
 
 // Token Management Responses
@@ -153,11 +160,10 @@ export interface OpenbookMarketResponse extends BaseResponse {
   signatures: string[];
 }
 
-// Price Oracle Responses
-export interface PythPriceResponse extends BaseResponse {
+// Price Oracle Responses - Using BaseResponseWithUnixTime
+export interface PythPriceResponse extends BaseResponseWithUnixTime {
   price: number;
   confidence: number;
-  timestamp: number;
   previousPrice?: number;
   priceChange24h?: number;
 }
@@ -189,7 +195,7 @@ export interface MarketDataResponse extends BaseResponse {
   }>;
 }
 
-// Update the TradeParams interface
+// Trade Parameters
 export interface TradeParams {
   inputMint: string;
   outputMint: string;
