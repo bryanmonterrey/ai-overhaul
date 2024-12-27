@@ -29,47 +29,42 @@ class TradingChat:
         }
     
     
+    # memgpt-service/chat/trading_chat.py
+
     async def analyze_message_with_claude(self, message: str, context: str) -> Dict[str, Any]:
         """Use Claude for natural language understanding of commands"""
         try:
-            response = await self.dspy_service.client.beta.messages.create(
-                messages=[{
-                    "role": "user",
-                    "content": f"""Command Analysis Task:
-                    Message: {message}
-                    Context: {context}
+            prompt = f"""Command Analysis Task:
+    Message: {message}
+    Context: {context}
 
-                    Available commands:
-                    - TRADE: For trade execution requests (e.g., "buy 100 SOL", "sell 50 USDC")
-                    - ANALYSIS: For market analysis requests (e.g., "analyze SOL price", "check market conditions")
-                    - SETTINGS: For system settings changes
-                    - PORTFOLIO: For portfolio information requests
-                    - SYSTEM: For system maintenance commands
+    Available commands:
+    - TRADE: For trade execution requests (e.g., "buy 100 SOL", "sell 50 USDC")
+    - ANALYSIS: For market analysis requests (e.g., "analyze SOL price", "check market conditions")
+    - SETTINGS: For system settings changes
+    - PORTFOLIO: For portfolio information requests
+    - SYSTEM: For system maintenance commands
 
-                    Respond with a JSON object containing:
-                    1. command_type: The type of command identified
-                    2. parameters: Relevant parameters extracted from the message
-                    3. natural_response: A conversational response to the user"""
-                }],
-                model="claude-3-opus-20240229",
-                max_tokens=1024
-            )
+    Respond with a JSON object containing:
+    1. command_type: The type of command identified
+    2. parameters: Relevant parameters extracted from the message
+    3. natural_response: A conversational response to the user"""
+
+            response = await self.dspy_service.predict_with_retry(prompt)
 
             try:
-                # Extract the actual content from Claude's response
-                content = response.content[0].text
                 # Parse if it's valid JSON
-                if content.strip().startswith('{'):
-                    analysis = json.loads(content)
+                if response.strip().startswith('{'):
+                    analysis = json.loads(response)
                 else:
                     # If not JSON, create a proper response
                     analysis = {
                         "command_type": "SYSTEM",
                         "parameters": {
                             "action": "response",
-                            "message": content
+                            "message": response
                         },
-                        "natural_response": content
+                        "natural_response": response
                     }
             except json.JSONDecodeError:
                 # If parsing fails, use the raw response
@@ -77,9 +72,9 @@ class TradingChat:
                     "command_type": "SYSTEM",
                     "parameters": {
                         "action": "response",
-                        "message": response.content[0].text
+                        "message": response
                     },
-                    "natural_response": response.content[0].text
+                    "natural_response": response
                 }
 
             return analysis
