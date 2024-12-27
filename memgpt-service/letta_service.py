@@ -794,6 +794,98 @@ class MemGPTService:
         except Exception as e:
             print(f"Error summarizing memories: {str(e)}")
             return {"success": False, "error": str(e)}
+        
+    async def _execute_ai_trade(self, command: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute trading operations through Jupiter on Solana"""
+        try:
+            # Extract basic parameters
+            asset = command.get('asset')
+            amount = command.get('amount')
+            side = command.get('side')
+
+            if not asset:
+                return {
+                    "success": False,
+                    "error": "Asset not specified"
+                }
+
+            if not amount:
+                return {
+                    "success": False,
+                    "error": "Amount not specified"
+                }
+
+            if not side:
+                return {
+                    "success": False,
+                    "error": "Trade side (buy/sell) not specified"
+                }
+
+            try:
+                # Store trade attempt
+                await self.trading_memory.store_trade_execution({
+                    "type": "trade_attempt",
+                    "data": command,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                # Execute through Jupiter/Solana
+                solana_params = {
+                    "targetMint": asset,
+                    "amount": amount,
+                    "side": side,
+                    "slippage": 1.0,  # 1% default slippage
+                }
+
+                # Execute trade through realtime monitor
+                trade_result = await self.realtime_monitor.execute_solana_trade(solana_params)
+
+                # Store successful trade
+                await self.trading_memory.store_trade_execution({
+                    "type": "trade_success",
+                    "data": {
+                        "params": solana_params,
+                        "result": trade_result
+                    },
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                return {
+                    "success": True,
+                    "data": {
+                        "trade_params": command,
+                        "result": trade_result,
+                        "status": "executed",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }
+
+            except Exception as trade_error:
+                error_msg = f"Trade execution error: {str(trade_error)}"
+                logging.error(error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg
+                }
+
+        except Exception as e:
+            error_msg = f"Trade processing error: {str(e)}"
+            logging.error(error_msg)
+            
+            # Store error
+            await self.trading_memory.store_trade_execution({
+                "type": "trade_error",
+                "data": {
+                    "command": command,
+                    "error": error_msg
+                },
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return {
+                "success": False,
+                "error": error_msg
+            }
 
     async def handle_ai_trading(self, command: Dict[str, Any]) -> Dict[str, Any]:
         """Handle AI trading operations with realtime monitoring and consciousness integration"""
