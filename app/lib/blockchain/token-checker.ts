@@ -1,6 +1,6 @@
 // app/lib/blockchain/token-checker.ts
 import { Connection, PublicKey } from '@solana/web3.js';
-import { Token, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { getAssociatedTokenAddress, ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import Redis from 'ioredis';
 import { getRedisClient } from '../redis/client';
 
@@ -8,7 +8,7 @@ export class TokenChecker {
   private connection: Connection;
   private tokenAddress: string;
   private redis?: Redis;
-  private readonly CACHE_TTL = 300; // 5 minutes cache
+  private readonly CACHE_TTL = 300;
   private readonly PRICE_RETRY_ATTEMPTS = 3;
   private readonly BIRDEYE_API_URL = 'https://public-api.birdeye.so/public/price';
   private readonly JUPITER_API_URL = 'https://price.jup.ag/v4/price';
@@ -22,8 +22,7 @@ export class TokenChecker {
     );
     this.tokenAddress = '9kG8CWxdNeZzg8PLHTaFYmH6ihD1JMegRE1y6G8Dpump';
     
-    // Initialize Redis connection if URL is provided
-    if (process.env.REDIS_URL) {
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
       this.redis = getRedisClient();
     }
   }
@@ -58,10 +57,8 @@ export class TokenChecker {
       const wallet = new PublicKey(walletAddress);
       const mint = new PublicKey(this.tokenAddress);
       
-      // Use Token.getAssociatedTokenAddress instead of direct import
-      const tokenAccount = await Token.getAssociatedTokenAddress(
-        ASSOCIATED_TOKEN_PROGRAM_ID,
-        TOKEN_PROGRAM_ID,
+      // Use getAssociatedTokenAddress directly
+      const tokenAccount = await getAssociatedTokenAddress(
         mint,
         wallet
       );

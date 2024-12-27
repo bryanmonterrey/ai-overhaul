@@ -1,24 +1,18 @@
 // lib/redis/client.ts
-import Redis from 'ioredis';
+import { Redis } from '@upstash/redis'
 
 let redis: Redis | null = null;
 
 export function getRedisClient() {
   if (!redis) {
-    if (!process.env.REDIS_URL) {
-      throw new Error('REDIS_URL is not defined');
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+      throw new Error('Upstash Redis credentials are not defined');
     }
 
-    redis = new Redis(
-      process.env.REDIS_URL,
-      {
-        maxRetriesPerRequest: 3,
-        retryStrategy: (times: number) => {
-          if (times > 3) return null;
-          return Math.min(times * 100, 3000);
-        }
-      }
-    );
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
   }
   return redis;
 }
