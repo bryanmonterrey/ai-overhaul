@@ -1,7 +1,7 @@
 // app/lib/blockchain/token-checker.ts
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress, ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import Redis from 'ioredis';
+import { Redis } from '@upstash/redis';
 import { getRedisClient } from '../redis/client';
 
 export class TokenChecker {
@@ -40,7 +40,7 @@ export class TokenChecker {
   private async setCache(key: string, value: string, ttl: number = this.CACHE_TTL): Promise<void> {
     if (!this.redis) return;
     try {
-      await this.redis.set(key, value, 'EX', ttl);
+      await this.redis.set(key, value, { ex: ttl });
     } catch (error) {
       console.error('Cache set error:', error);
     }

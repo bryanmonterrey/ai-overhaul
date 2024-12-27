@@ -44,9 +44,9 @@ class RateLimitError extends Error {
   }
 }
 
-export async function checkTwitterRateLimit(endpoint?: keyof typeof ENDPOINTS) {
+export async function checkTwitterRateLimit(endpoint: keyof typeof ENDPOINTS = 'default') {
   const limiter = ENDPOINTS[endpoint] || ENDPOINTS.default;
-  const canProceed = await limiter.checkLimit(`twitter:${endpoint || 'default'}`, 1);
+  const canProceed = await limiter.checkLimit(`twitter:${endpoint}`, 1);
   
   if (!canProceed) {
     throw new RateLimitError(endpoint);
