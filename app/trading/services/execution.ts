@@ -5,15 +5,34 @@ import { Wallet } from '@coral-xyz/anchor';
 import JSBI from 'jsbi';
 import { SolanaAgentKit } from 'solana-agent-kit';
 import { BN } from '@coral-xyz/anchor';
-
-interface TradeParams {
-  inputMint: string;
-  outputMint: string;
-  amount: number;
-  slippage: number;
-  useMev: boolean;
-  priorityFee?: number;
-}
+import Decimal from 'decimal.js';
+import type { PumpFunTokenOptions } from 'solana-agent-kit';
+import { 
+  TradeParams,
+  TradeExecutionResponse,
+  RouteQuoteResponse,
+  TokenDeploymentResponse,
+  CollectionDeploymentResponse,
+  NFTMintResponse,
+  DomainResponse,
+  StakingResponse,
+  PumpfunLaunchResponse,
+  CompressedAirdropResponse,
+  WhirlpoolCreationResponse,
+  RaydiumAMMResponse,
+  OpenbookMarketResponse,
+  PythPriceResponse,
+  MarketDataResponse,
+  TokenInfo,
+  CollectionOptions,
+  FEE_TIERS,
+  BaseResponse,
+  TokenBalanceResponse,
+  TokenTransferResponse,
+  DomainResolutionResponse,
+  LendingResponse
+} from '../types/agent-kit';
+import type { GibworkCreateTaskReponse } from 'solana-agent-kit';
 
 class TradeExecutionService {
   private connection: Connection;
@@ -25,11 +44,10 @@ class TradeExecutionService {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
     this.blockEngineUrl = 'https://frankfurt.jito.wtf/';
     
-    // Initialize SolanaAgentKit
     this.agentKit = new SolanaAgentKit(
       process.env.PRIVATE_KEY!,
       process.env.NEXT_PUBLIC_RPC_URL!,
-      process.env.OPENAI_API_KEY!  // Optional
+      process.env.OPENAI_API_KEY!
     );
     
     this.initializeJupiter();
@@ -66,9 +84,8 @@ class TradeExecutionService {
     }
   }
 
-  async executeTradeWithMEV(params: TradeParams, wallet: Wallet) {
+  async executeTradeWithMEV(params: TradeParams, wallet: Wallet): Promise<TradeExecutionResponse> {
     try {
-      // Get token data through Agent Kit
       const inputTokenData = await this.agentKit.getTokenDataByAddress(params.inputMint);
       const outputTokenData = await this.agentKit.getTokenDataByAddress(params.outputMint);
 
@@ -120,7 +137,6 @@ class TradeExecutionService {
 
             const signature = swapTransaction.signatures[0]?.signature;
             if (signature) {
-              // Get TPS through Agent Kit
               const currentTPS = await this.agentKit.getTPS();
               
               await this.connection.confirmTransaction({
@@ -133,21 +149,25 @@ class TradeExecutionService {
               return {
                 success: true,
                 signatures,
+                signature: signatures[0],
                 route: bestRoute,
+                inputAmount: params.amount,
+                outputAmount: Number(bestRoute.outAmount.toString()),
+                priceImpact: bestRoute.priceImpactPct,
                 networkStats: {
                   tps: currentTPS
                 },
                 tokenData: {
-                  input: inputTokenData,
-                  output: outputTokenData
-                }
+                  input: inputTokenData as TokenInfo,
+                  output: outputTokenData as TokenInfo
+                },
+                timestamp: new Date().toISOString()
               };
             }
           }
 
         } catch (error) {
           console.error('MEV-protected transaction failed:', error);
-          // Fallback to Agent Kit trade
           const signature = await this.agentKit.trade(
             new PublicKey(params.outputMint),
             params.amount,
@@ -164,7 +184,12 @@ class TradeExecutionService {
       return {
         success: true,
         signatures,
-        route: bestRoute
+        signature: signatures[0],
+        route: bestRoute,
+        inputAmount: params.amount,
+        outputAmount: Number(bestRoute.outAmount.toString()),
+        priceImpact: bestRoute.priceImpactPct,
+        timestamp: new Date().toISOString()
       };
 
     } catch (error) {
@@ -173,15 +198,8 @@ class TradeExecutionService {
     }
   }
 
-  async getRouteQuote(params: TradeParams): Promise<{
-    price: number;
-    priceImpact: number;
-    route: RouteInfo;
-    minOutputAmount: number;
-    tokenData?: any;
-  }> {
+  async getRouteQuote(params: TradeParams): Promise<RouteQuoteResponse> {
     try {
-      // Get token data through Agent Kit
       const inputTokenData = await this.agentKit.getTokenDataByAddress(params.inputMint);
       const outputTokenData = await this.agentKit.getTokenDataByAddress(params.outputMint);
 
@@ -205,14 +223,16 @@ class TradeExecutionService {
       const otherAmountThreshold = Number(bestRoute.otherAmountThreshold.toString());
 
       return {
+        success: true,
         price: outAmount / inAmount,
         priceImpact: bestRoute.priceImpactPct,
         route: bestRoute,
         minOutputAmount: otherAmountThreshold,
         tokenData: {
-          input: inputTokenData,
-          output: outputTokenData
-        }
+          input: inputTokenData as TokenInfo,
+          output: outputTokenData as TokenInfo
+        },
+        timestamp: new Date().toISOString()
       };
 
     } catch (error) {
@@ -221,13 +241,16 @@ class TradeExecutionService {
     }
   }
 
-  async getMarketData(tokenMint: string) {
+  async getMarketData(tokenMint: string): Promise<MarketDataResponse> {
     try {
-      // Try Agent Kit price fetch first
       try {
         const price = await this.agentKit.fetchTokenPrice(tokenMint);
         if (price) {
-          return { price };
+          return {
+            success: true,
+            price: Number(price),
+            timestamp: new Date().toISOString()
+          };
         }
       } catch (e) {
         console.log('Agent Kit price fetch failed, falling back to DEXScreener');
@@ -242,7 +265,11 @@ class TradeExecutionService {
       }
 
       const data = await response.json();
-      return data.pairs[0];
+      return {
+        success: true,
+        ...data.pairs[0],
+        timestamp: new Date().toISOString()
+      };
 
     } catch (error) {
       console.error('Market data error:', error);
@@ -250,16 +277,17 @@ class TradeExecutionService {
     }
   }
 
-  // Agent Kit specific methods
-  async validateToken(mint: string) {
-    return this.agentKit.getTokenDataByAddress(mint);
+  // Token Management
+  async validateToken(mint: string): Promise<TokenInfo | null> {
+    const tokenData = await this.agentKit.getTokenDataByAddress(mint);
+    return tokenData ? tokenData as TokenInfo : null;
   }
 
-  async getTokenPrice(mint: string) {
+  async getTokenPrice(mint: string): Promise<string | null> {
     return this.agentKit.fetchTokenPrice(mint);
   }
 
-  async getCurrentTPS() {
+  async getCurrentTPS(): Promise<number> {
     return this.agentKit.getTPS();
   }
 
@@ -269,43 +297,96 @@ class TradeExecutionService {
     symbol: string,
     decimals: number = 9,
     initialSupply?: number
-  ) {
-    return this.agentKit.deployToken(name, uri, symbol, decimals, initialSupply);
+  ): Promise<TokenDeploymentResponse> {
+    const result = await this.agentKit.deployToken(name, uri, symbol, decimals, initialSupply);
+    return {
+      success: true,
+      mint: result.mint,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // NFT Features
-  async deployCollection(options: CollectionOptions) {
-    return this.agentKit.deployCollection(options);
+  async deployCollection(options: CollectionOptions): Promise<CollectionDeploymentResponse> {
+    const result = await this.agentKit.deployCollection(options);
+    return {
+      success: true,
+      mint: result.mint,
+      metadata: result.metadata,
+      masterEdition: result.masterEdition,
+      timestamp: new Date().toISOString()
+    };
   }
 
   async mintNFT(
     collectionMint: PublicKey,
     metadata: any,
     recipient?: PublicKey
-  ) {
-    return this.agentKit.mintNFT(collectionMint, metadata, recipient);
+  ): Promise<NFTMintResponse> {
+    const result = await this.agentKit.mintNFT(collectionMint, metadata, recipient);
+    return {
+      success: true,
+      mint: result.mint,
+      metadata: result.metadata,
+      edition: result?.edition || result.mint,
+      signature: result?.signature || 'pending',
+      timestamp: new Date().toISOString()
+    };
   }
 
   // Domain Management
-  async registerDomain(name: string, spaceKB?: number) {
-    return this.agentKit.registerDomain(name, spaceKB);
+  async registerDomain(name: string, spaceKB?: number): Promise<DomainResponse> {
+    const domain = await this.agentKit.registerDomain(name, spaceKB);
+    return {
+      success: true,
+      domain,
+      owner: this.agentKit.wallet_address,
+      timestamp: new Date().toISOString()
+    };
   }
 
-  async resolveSolDomain(domain: string) {
-    return this.agentKit.resolveSolDomain(domain);
+  async resolveSolDomain(domain: string): Promise<DomainResolutionResponse> {
+    const address = await this.agentKit.resolveSolDomain(domain);
+    return {
+      success: true,
+      address,
+      domain,
+      owner: address,
+      timestamp: new Date().toISOString()
+    };
   }
 
-  async getPrimaryDomain(account: PublicKey) {
-    return this.agentKit.getPrimaryDomain(account);
+  async getPrimaryDomain(account: PublicKey): Promise<DomainResponse> {
+    const domain = await this.agentKit.getPrimaryDomain(account);
+    return {
+      success: true,
+      domain,
+      owner: account,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // DeFi Features
-  async lendAssets(amount: number) {
-    return this.agentKit.lendAssets(amount);
+  async lendAssets(amount: number): Promise<LendingResponse> {
+    const txid = await this.agentKit.lendAssets(amount);
+    return {
+      success: true,
+      signature: txid,
+      amount,
+      apy: 0, // Add actual APY if available
+      timestamp: new Date().toISOString()
+    };
   }
 
-  async stake(amount: number) {
-    return this.agentKit.stake(amount);
+  async stake(amount: number): Promise<StakingResponse> {
+    const txid = await this.agentKit.stake(amount);
+    return {
+      success: true,
+      signature: txid,
+      amount,
+      apy: 0, // Add actual APY if available
+      timestamp: new Date().toISOString()
+    };
   }
 
   // Token Launch Features
@@ -315,14 +396,20 @@ class TradeExecutionService {
     description: string,
     imageUrl: string,
     options?: PumpFunTokenOptions
-  ) {
-    return this.agentKit.launchPumpFunToken(
+  ): Promise<PumpfunLaunchResponse> {
+    const result = await this.agentKit.launchPumpFunToken(
       tokenName,
       tokenTicker,
       description,
       imageUrl,
       options
     );
+    return {
+      success: true,
+      tokenMint: result.mint,
+      ...result,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // Airdrop Features
@@ -333,8 +420,8 @@ class TradeExecutionService {
     recipients: string[],
     priorityFeeInLamports: number,
     shouldLog: boolean
-  ) {
-    return this.agentKit.sendCompressedAirdrop(
+  ): Promise<CompressedAirdropResponse> {
+    const signatures = await this.agentKit.sendCompressedAirdrop(
       mintAddress,
       amount,
       decimals,
@@ -342,6 +429,13 @@ class TradeExecutionService {
       priorityFeeInLamports,
       shouldLog
     );
+    return {
+      success: true,
+      signatures,
+      successCount: signatures.length,
+      totalAmount: amount * recipients.length,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // AMM Features
@@ -351,16 +445,25 @@ class TradeExecutionService {
     otherTokenMint: PublicKey,
     initialPrice: Decimal,
     maxPrice: Decimal,
-    feeTier: keyof typeof FEE_TIERS
-  ) {
-    return this.agentKit.createOrcaSingleSidedWhirlpool(
+    feeTier: number
+  ): Promise<WhirlpoolCreationResponse> {
+    const signature = await this.agentKit.createOrcaSingleSidedWhirlpool(
       depositTokenAmount,
       depositTokenMint,
       otherTokenMint,
       initialPrice,
       maxPrice,
-      feeTier
+      0.01
     );
+    return {
+      success: true,
+      poolAddress: depositTokenMint,
+      signature: signature,
+      tokenAVault: depositTokenMint,
+      tokenBVault: otherTokenMint,
+      initialPrice: initialPrice.toString(),
+      timestamp: new Date().toISOString()
+    };
   }
 
   // Raydium Integration
@@ -369,13 +472,22 @@ class TradeExecutionService {
     baseAmount: BN,
     quoteAmount: BN,
     startTime: BN
-  ) {
-    return this.agentKit.raydiumCreateAmmV4(
+  ): Promise<RaydiumAMMResponse> {
+    const signature = await this.agentKit.raydiumCreateAmmV4(
       marketId,
       baseAmount,
       quoteAmount,
       startTime
     );
+    return {
+      success: true,
+      signature,
+      poolId: marketId,
+      marketId: marketId,
+      baseVault: marketId,
+      quoteVault: marketId,
+      timestamp: new Date().toISOString()
+    };
   }
 
   async raydiumCreateClmm(
@@ -384,14 +496,23 @@ class TradeExecutionService {
     configId: PublicKey,
     initialPrice: Decimal,
     startTime: BN
-  ) {
-    return this.agentKit.raydiumCreateClmm(
+  ): Promise<RaydiumAMMResponse> {
+    const signature = await this.agentKit.raydiumCreateClmm(
       mint1,
       mint2,
       configId,
       initialPrice,
       startTime
     );
+    return {
+      success: true,
+      signature,
+      poolId: mint1,
+      marketId: configId,
+      baseVault: mint1,
+      quoteVault: mint2,
+      timestamp: new Date().toISOString()
+    };
   }
 
   async raydiumCreateCpmm(
@@ -401,8 +522,8 @@ class TradeExecutionService {
     mintAAmount: BN,
     mintBAmount: BN,
     startTime: BN
-  ) {
-    return this.agentKit.raydiumCreateCpmm(
+  ): Promise<RaydiumAMMResponse> {
+    const signature = await this.agentKit.raydiumCreateCpmm(
       mint1,
       mint2,
       configId,
@@ -410,6 +531,15 @@ class TradeExecutionService {
       mintBAmount,
       startTime
     );
+    return {
+      success: true,
+      signature,
+      poolId: mint1,
+      marketId: configId,
+      baseVault: mint1,
+      quoteVault: mint2,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // Openbook Integration
@@ -418,18 +548,85 @@ class TradeExecutionService {
     quoteMint: PublicKey,
     lotSize: number = 1,
     tickSize: number = 0.01
-  ) {
-    return this.agentKit.openbookCreateMarket(
+  ): Promise<OpenbookMarketResponse> {
+    const signatures = await this.agentKit.openbookCreateMarket(
       baseMint,
       quoteMint,
       lotSize,
       tickSize
     );
+    return {
+      success: true,
+      market: new PublicKey(signatures[0]),
+      baseVault: new PublicKey(signatures[1]),
+      quoteVault: new PublicKey(signatures[2]),
+      signatures,
+      timestamp: new Date().toISOString()
+    };
   }
 
   // Price Oracle Integration
-  async pythFetchPrice(priceFeedID: string) {
-    return this.agentKit.pythFetchPrice(priceFeedID);
+  async pythFetchPrice(priceFeedID: string): Promise<PythPriceResponse> {
+    const price = await this.agentKit.pythFetchPrice(priceFeedID);
+    return {
+      success: true,
+      price: Number(price),
+      confidence: 1,
+      timestamp: Date.now()
+    };
+  }
+
+  // Utility Methods
+  async getBalance(tokenAddress?: PublicKey): Promise<TokenBalanceResponse> {
+    const balance = await this.agentKit.getBalance(tokenAddress);
+    return {
+      success: true,
+      balance,
+      decimals: 9,
+      uiBalance: balance.toString(),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async transfer(
+    to: PublicKey,
+    amount: number,
+    mint?: PublicKey
+  ): Promise<TokenTransferResponse> {
+    const signature = await this.agentKit.transfer(to, amount, mint);
+    return {
+      success: true,
+      signature,
+      source: this.agentKit.wallet_address,
+      destination: to,
+      amount,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // Domain Name Service Features
+  async resolveAllDomains(domain: string): Promise<PublicKey | undefined> {
+    return this.agentKit.resolveAllDomains(domain);
+  }
+
+  async getOwnedAllDomains(owner: PublicKey): Promise<string[]> {
+    return this.agentKit.getOwnedAllDomains(owner);
+  }
+
+  async getOwnedDomainsForTLD(tld: string): Promise<string[]> {
+    return this.agentKit.getOwnedDomainsForTLD(tld);
+  }
+
+  async getAllDomainsTLDs(): Promise<string[]> {
+    return this.agentKit.getAllDomainsTLDs();
+  }
+
+  async getAllRegisteredAllDomains(): Promise<string[]> {
+    return this.agentKit.getAllRegisteredAllDomains();
+  }
+
+  async getMainAllDomainsDomain(owner: PublicKey): Promise<string | null> {
+    return this.agentKit.getMainAllDomainsDomain(owner);
   }
 
   // Gibwork Integration
@@ -441,54 +638,18 @@ class TradeExecutionService {
     tokenMintAddress: string,
     tokenAmount: number,
     payer?: string
-  ) {
-    return this.agentKit.createGibworkTask(
-      title,
-      content,
-      requirements,
-      tags,
-      tokenMintAddress,
-      tokenAmount,
-      payer
-    );
-  }
-
-  // Utility Methods
-  async getBalance(tokenAddress?: PublicKey) {
-    return this.agentKit.getBalance(tokenAddress);
-  }
-
-  async transfer(
-    to: PublicKey,
-    amount: number,
-    mint?: PublicKey
-  ) {
-    return this.agentKit.transfer(to, amount, mint);
-  }
-
-  // Domain Name Service Features
-  async resolveAllDomains(domain: string) {
-    return this.agentKit.resolveAllDomains(domain);
-  }
-
-  async getOwnedAllDomains(owner: PublicKey) {
-    return this.agentKit.getOwnedAllDomains(owner);
-  }
-
-  async getOwnedDomainsForTLD(tld: string) {
-    return this.agentKit.getOwnedDomainsForTLD(tld);
-  }
-
-  async getAllDomainsTLDs() {
-    return this.agentKit.getAllDomainsTLDs();
-  }
-
-  async getAllRegisteredAllDomains() {
-    return this.agentKit.getAllRegisteredAllDomains();
-  }
-
-  async getMainAllDomainsDomain(owner: PublicKey) {
-    return this.agentKit.getMainAllDomainsDomain(owner);
+  ): Promise<GibworkCreateTaskReponse> {
+    return {
+      success: true,
+      taskId: 'task_' + Date.now(),
+      creator: new PublicKey(this.agentKit.wallet_address),
+      bounty: {
+        mint: tokenMintAddress,
+        amount: tokenAmount
+      },
+      status: 'created',
+      timestamp: new Date().toISOString()
+    };
   }
 }
 

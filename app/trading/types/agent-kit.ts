@@ -169,7 +169,7 @@ export interface PythPriceResponse extends BaseResponseWithUnixTime {
 }
 
 // Task System Responses
-export interface GibworkTaskResponse extends BaseResponse {
+export interface GibworkCreateTaskReponse extends BaseResponse {
   taskId: string;
   creator: PublicKey;
   bounty: {
@@ -194,6 +194,53 @@ export interface MarketDataResponse extends BaseResponse {
     volume24h: number;
   }>;
 }
+
+export interface CollectionOptions {
+    name: string;
+    symbol: string;
+    uri: string;
+    sellerFeeBasisPoints?: number;
+    creators?: Array<{
+      address: string;
+      share: number;
+    }>;
+    isMutable?: boolean;
+  }
+
+  export interface PumpFunTokenOptions {
+    supply?: number;
+    decimals?: number;
+    mintCap?: number;
+    vesting?: {
+      amount: number;
+      duration: number;
+      interval: number;
+    };
+    liquiditySettings?: {
+      percentage: number;
+      lockDuration: number;
+    };
+    tradingSettings?: {
+      maxTxAmount?: number;
+      maxWalletAmount?: number;
+    };
+    fees?: {
+      buyTax?: number;
+      sellTax?: number;
+      transferTax?: number;
+      reflectionPercentage?: number;
+    };
+  }
+
+  export const FEE_TIERS = {
+    STABLE: 0.0001,  // 0.01%
+    LOW: 0.0004,     // 0.04%
+    MEDIUM: 0.0010,  // 0.1%
+    HIGH: 0.0020,    // 0.2%
+    ULTRA: 0.0040    // 0.4%
+  } as const;
+  
+  export type FeeTier = keyof typeof FEE_TIERS;
 
 // Trade Parameters
 export interface TradeParams {
