@@ -795,7 +795,7 @@ class MemGPTService:
             print(f"Error summarizing memories: {str(e)}")
             return {"success": False, "error": str(e)}
         
-    async def _execute_ai_trade(self, command: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_ai_trade(self, command: Dict[str, Any]) -> Dict[str, Any]:
         """Execute trading operations through Jupiter on Solana"""
         try:
             # Extract basic parameters
