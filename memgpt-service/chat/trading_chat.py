@@ -2,7 +2,6 @@
 from typing import Dict, Any, Optional
 from datetime import datetime
 from enum import Enum
-import anthropic
 import os
 import json
 
@@ -19,7 +18,6 @@ class TradingChat:
         self.memory = memory_processor
         self.dspy_service = dspy_service
         self.command_handlers = self._init_command_handlers()
-        self.claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         
     def _init_command_handlers(self) -> Dict[str, callable]:
         return {
@@ -30,12 +28,11 @@ class TradingChat:
             CommandType.SYSTEM: self._handle_system_command
         }
     
+    
     async def analyze_message_with_claude(self, message: str, context: str) -> Dict[str, Any]:
         """Use Claude for natural language understanding of commands"""
         try:
-            response = await self.claude.messages.create(
-                model="claude-3-opus-20240229",
-                system="You are a Solana trading assistant helping users execute trades and analyze the market.",
+            response = await self.dspy_service.client.beta.messages.create(
                 messages=[{
                     "role": "user",
                     "content": f"""Command Analysis Task:
@@ -53,15 +50,10 @@ class TradingChat:
                     1. command_type: The type of command identified
                     2. parameters: Relevant parameters extracted from the message
                     3. natural_response: A conversational response to the user"""
-                }]
+                }],
+                model="claude-3-opus-20240229",
+                max_tokens=1024
             )
-
-            # Parse the response into structured format
-            analysis = {
-                "command_type": "SYSTEM",  # Default type
-                "parameters": {},
-                "natural_response": "I apologize, I'm having trouble understanding. Could you be more specific?"
-            }
 
             try:
                 # Extract the actual content from Claude's response
@@ -81,7 +73,14 @@ class TradingChat:
                     }
             except json.JSONDecodeError:
                 # If parsing fails, use the raw response
-                analysis["natural_response"] = response.content[0].text
+                analysis = {
+                    "command_type": "SYSTEM",
+                    "parameters": {
+                        "action": "response",
+                        "message": response.content[0].text
+                    },
+                    "natural_response": response.content[0].text
+                }
 
             return analysis
 
@@ -95,7 +94,7 @@ class TradingChat:
                 },
                 "natural_response": "I apologize, I'm having trouble processing your request. Could you try again?"
             }
-        
+    
     async def process_admin_message(self, message: str) -> Dict[str, Any]:
         """Process admin chat messages"""
         print("Starting process_admin_message with:", message)
