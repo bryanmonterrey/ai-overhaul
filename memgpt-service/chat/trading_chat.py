@@ -21,16 +21,15 @@ class TradingChat:
         
     def _init_command_handlers(self) -> Dict[str, callable]:
         return {
-            CommandType.TRADE: self._handle_trade_command,
-            CommandType.ANALYSIS: self._handle_analysis_command,
-            CommandType.SETTINGS: self._handle_settings_command,
-            CommandType.PORTFOLIO: self._handle_portfolio_command,
-            CommandType.SYSTEM: self._handle_system_command
+            CommandType.TRADE.value.lower(): self._handle_trade_command,
+            CommandType.ANALYSIS.value.lower(): self._handle_analysis_command,
+            CommandType.SETTINGS.value.lower(): self._handle_settings_command,
+            CommandType.PORTFOLIO.value.lower(): self._handle_portfolio_command,
+            CommandType.SYSTEM.value.lower(): self._handle_system_command
         }
     
     
     # memgpt-service/chat/trading_chat.py
-
     async def analyze_message_with_claude(self, message: str, context: str) -> Dict[str, Any]:
         """Use Claude for natural language understanding of commands"""
         try:
@@ -45,10 +44,13 @@ class TradingChat:
     - PORTFOLIO: For portfolio information requests
     - SYSTEM: For system maintenance commands
 
-    Respond with a JSON object containing:
+    Respond with only a JSON object containing:
     1. command_type: The type of command identified
     2. parameters: Relevant parameters extracted from the message
-    3. natural_response: A conversational response to the user"""
+    3. natural_response: A clear, concise response (do not include any technical details or JSON in this response)
+
+    Example response format:
+    {{"command_type": "TRADE", "parameters": {{"asset": "SOL", "amount": 100, "side": "buy"}}, "natural_response": "I understand you want to buy 100 SOL. Please confirm this trade."}}"""
 
             response = await self.dspy_service.predict_with_retry(prompt)
 
@@ -56,25 +58,32 @@ class TradingChat:
                 # Parse if it's valid JSON
                 if response.strip().startswith('{'):
                     analysis = json.loads(response)
+                    # Keep original command type
+                    analysis["command_type"] = analysis.get("command_type", "SYSTEM")
+                    # Clean up natural response
+                    analysis["natural_response"] = (
+                        analysis.get("natural_response", "")
+                        .replace("Here is the analysis:", "")
+                        .replace("`", "")
+                        .replace("json", "")
+                        .strip()
+                    )
+                    # Ensure parameters is a dict
+                    if not isinstance(analysis.get("parameters"), dict):
+                        analysis["parameters"] = {}
                 else:
                     # If not JSON, create a proper response
                     analysis = {
                         "command_type": "SYSTEM",
-                        "parameters": {
-                            "action": "response",
-                            "message": response
-                        },
-                        "natural_response": response
+                        "parameters": {},
+                        "natural_response": response.strip()
                     }
             except json.JSONDecodeError:
-                # If parsing fails, use the raw response
+                # If parsing fails, create a clean response
                 analysis = {
                     "command_type": "SYSTEM",
-                    "parameters": {
-                        "action": "response",
-                        "message": response
-                    },
-                    "natural_response": response
+                    "parameters": {},
+                    "natural_response": "I'm sorry, I'm having trouble understanding. Could you try rephrasing that?"
                 }
 
             return analysis
@@ -98,19 +107,22 @@ class TradingChat:
             analysis = await self.analyze_message_with_claude(message, "admin")
             print("Claude analysis result:", analysis)
 
+            # Get command type and convert to lowercase for comparison
+            command_type = analysis["command_type"].lower() if analysis.get("command_type") else "system"
+
             # For system messages, return natural response
-            if analysis["command_type"] == "SYSTEM":
+            if command_type == "system":
                 return {
                     "response": analysis.get("natural_response", "I'm here to help. What would you like to do?")
                 }
 
-            # Get command handler
-            handler = self.command_handlers.get(analysis["command_type"])
+            # Get command handler using lowercase command type
+            handler = self.command_handlers.get(command_type)
             print("Found handler:", handler)
 
             if not handler:
                 return {
-                    "response": "I don't understand that command. Could you try rephrasing it?",
+                    "response": analysis.get("natural_response", "I don't understand that command. Could you try rephrasing it?"),
                     "error": "Invalid command type"
                 }
 
@@ -128,7 +140,7 @@ class TradingChat:
                 response=result,
                 metadata={
                     "type": "admin_trading_chat",
-                    "command": analysis["command_type"],
+                    "command": analysis["command_type"],  # Store original command type
                     "timestamp": datetime.now().isoformat()
                 }
             )
