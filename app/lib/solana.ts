@@ -39,11 +39,13 @@ export class SolanaService {
 
   updateWalletConnection(publicKey: PublicKey) {
     try {
-      // Update agent with connected wallet
+      // Only update if we have a valid public key
+      if (!publicKey) return;
+  
       this.agent = new SolanaAgentKit(
-        publicKey.toString(),
+        publicKey.toBase58(), // Use proper key format
         this.connection.rpcEndpoint,
-        ""
+        process.env.NEXT_PUBLIC_OPENAI_API_KEY || ""
       );
       this.initialized = true;
     } catch (error) {

@@ -169,6 +169,52 @@ export function AdminTradingChat() {
     }
   };
 
+  useEffect(() => {
+    // Subscribe to both trading updates and trade status
+    const tradingSubscription = aiTradingService.subscribeToUpdates((update) => {
+      if (update.type === 'trade_execution' || update.type === 'portfolio_update') {
+        console.log('Received trading update:', update);
+      }
+    });
+  
+    const statusSubscription = aiTradingService.subscribeToTradeStatus((status) => {
+      console.log('Trade status update:', status);
+      // Handle different status updates
+      switch(status.status) {
+        case 'initiated':
+          toast({
+            title: "Trade Initiated",
+            description: `Starting trade execution...`
+          });
+          break;
+        case 'checking_route':
+          toast({
+            title: "Finding Best Route",
+            description: "Checking available trading routes..."
+          });
+          break;
+        case 'confirmed':
+          toast({
+            title: "Trade Confirmed",
+            description: `Trade successfully executed!`
+          });
+          break;
+        case 'error':
+          toast({
+            title: "Trade Error",
+            description: status.error,
+            variant: "destructive"
+          });
+          break;
+      }
+    });
+  
+    return () => {
+      tradingSubscription.unsubscribe();
+      statusSubscription.unsubscribe();
+    };
+  }, [toast]);
+
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
