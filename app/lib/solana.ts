@@ -14,6 +14,7 @@ export class SolanaService {
   private connection: Connection;
   private agent: SolanaAgentKit | null = null;
   private initialized = false;
+  private walletPublicKey: PublicKey | null = null;
 
   constructor() {
     this.connection = new Connection(
@@ -42,12 +43,11 @@ export class SolanaService {
       // Only update if we have a valid public key
       if (!publicKey) return;
   
-      this.agent = new SolanaAgentKit(
-        publicKey.toBase58(), // Use proper key format
-        this.connection.rpcEndpoint,
-        process.env.NEXT_PUBLIC_OPENAI_API_KEY || ""
-      );
+      // Do not try to create SolanaAgentKit with public key
+      // Instead, just store the public key for reference
       this.initialized = true;
+      this.walletPublicKey = publicKey;
+      
     } catch (error) {
       console.error('Failed to update wallet connection:', error);
       throw error;
