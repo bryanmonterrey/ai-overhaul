@@ -558,6 +558,43 @@ class MemoryProcessor:
         except Exception as e:
             self.logger.error(f"Error processing memories: {str(e)}")
             return []
+        
+    async def store_memory(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Store a memory directly"""
+        try:
+            # Store in database
+            response = await self.agent.supabase.table('memories')\
+                .insert(memory_data)\
+                .execute()
+
+            if not response.data:
+                raise ValueError("Failed to store memory")
+
+            memory_id = response.data[0]['id']
+
+            # If there's content, create and store vector embedding
+            if 'content' in memory_data:
+                analysis = await self.analyze_content(memory_data['content'])
+                if 'vector_embedding' in analysis:
+                    await self.vector_store.store_vector(
+                        memory_id,
+                        np.array(analysis['vector_embedding'])
+                    )
+
+            return {
+                'success': True,
+                'data': {
+                    **response.data[0],
+                    'id': memory_id
+                }
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error storing memory: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     async def maintain_memory_system(self):
         """Periodic maintenance of the memory system"""

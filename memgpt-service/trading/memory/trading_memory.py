@@ -6,6 +6,7 @@ from decimal import Decimal
 from dataclasses import dataclass
 from memory_base import Memory
 from ..risk_helpers import RiskHelpers
+import json
 
 @dataclass
 class TradingState:
@@ -82,18 +83,22 @@ class TradingMemory:
         })
         
     async def store_trade_execution(self, trade_result: Dict[str, Any]) -> str:
-        """Store trade execution in LettA memory"""
+        """Store trade execution in memory"""
         try:
             # Format trade data for memory storage
             trade_memory = {
                 "type": "trading_history",
                 "content": {
-                    "token_in": trade_result.get("asset") or trade_result.get("tokenIn"),
-                    "token_out": trade_result.get("tokenOut", "SOL"),
-                    "amount_in": str(trade_result.get("amount", 0)),
-                    "amount_out": str(trade_result.get("amountOut", 0)),
+                    "trade_type": trade_result["type"],
+                    "token_in": trade_result["tokenIn"],
+                    "token_out": trade_result["tokenOut"],
+                    "amount_in": str(trade_result["amountIn"]),
+                    "amount_out": str(trade_result["amountOut"]),
                     "timestamp": datetime.now().isoformat(),
-                    "status": trade_result.get("status", "pending"),
+                    "tx_hash": trade_result.get("txHash"),
+                    "status": trade_result["status"],
+                    "price_impact": trade_result.get("priceImpact", 0),
+                    "route_info": trade_result.get("routeInfo", {}),
                 },
                 "metadata": {
                     "importance": 0.8,  # High importance for trades
@@ -103,14 +108,14 @@ class TradingMemory:
                 }
             }
 
-            # Store in LettA memory system
-            memory_result = await self.memory_processor.store_memory(trade_memory)
-            
-            # Update state history
-            await self._update_trading_state(trade_result)
-            
-            return memory_result["data"]["id"]
-            
+            # Use process_new_memory instead of store_memory
+            result = await self.memory_processor.process_new_memory(
+                content=json.dumps(trade_memory["content"]),
+                metadata=trade_memory["metadata"]
+            )
+
+            return result.get('id') if result else None
+
         except Exception as e:
             print(f"Error storing trade execution: {str(e)}")
             return None
