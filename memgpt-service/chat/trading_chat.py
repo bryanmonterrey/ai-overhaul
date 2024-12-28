@@ -38,19 +38,34 @@ class TradingChat:
     Context: {context}
 
     Available commands:
-    - TRADE: For trade execution requests (e.g., "buy 100 SOL", "sell 50 USDC")
+    - TRADE: For trade execution requests (e.g., "buy 100 SOL", "sell 50 USDC", "swap 0.01 SOL for BONK")
+        Required parameters: 
+        - asset: The token to trade
+        - amount: The amount to trade
+        - side: 'buy' or 'sell'
     - ANALYSIS: For market analysis requests (e.g., "analyze SOL price", "check market conditions")
     - SETTINGS: For system settings changes
     - PORTFOLIO: For portfolio information requests
     - SYSTEM: For system maintenance commands
+
+    For swap operations, map the parameters as follows:
+    - For "swap X tokenA for tokenB": 
+        asset = tokenB
+        amount = X
+        side = "buy"
+    - For "swap tokenA for X tokenB":
+        asset = tokenB
+        amount = X
+        side = "buy"
 
     Respond with only a JSON object containing:
     1. command_type: The type of command identified
     2. parameters: Relevant parameters extracted from the message
     3. natural_response: A clear, concise response (do not include any technical details or JSON in this response)
 
-    Example response format:
-    {{"command_type": "TRADE", "parameters": {{"asset": "SOL", "amount": 100, "side": "buy"}}, "natural_response": "I understand you want to buy 100 SOL. Please confirm this trade."}}"""
+    Example responses:
+    {{"command_type": "TRADE", "parameters": {{"asset": "SOL", "amount": 100, "side": "buy"}}, "natural_response": "I understand you want to buy 100 SOL. Please confirm this trade."}}
+    {{"command_type": "TRADE", "parameters": {{"asset": "BONK", "amount": 0.01, "side": "buy"}}, "natural_response": "I understand you want to swap 0.01 SOL for BONK. Please confirm this trade."}}"""
 
             response = await self.dspy_service.predict_with_retry(prompt)
 

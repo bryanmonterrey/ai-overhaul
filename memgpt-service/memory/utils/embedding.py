@@ -1,12 +1,13 @@
 import numpy as np
 import asyncio
 from typing import List, Dict, Any, Optional, Union
-import openai
+from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 import tiktoken
 from collections import deque
 import logging
 from datetime import datetime, timedelta
+import os
 
 class EmbeddingManager:
     def __init__(self, model: str = "text-embedding-ada-002", batch_size: int = 8):
@@ -19,6 +20,7 @@ class EmbeddingManager:
         self.semaphore = asyncio.Semaphore(10)  # Rate limiting
         self.last_request = datetime.now()
         self.requests_per_minute = 0
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def get_embedding(self, text: str) -> np.ndarray:
@@ -40,11 +42,16 @@ class EmbeddingManager:
             self.last_request = now
             
             try:
-                response = await openai.Embedding.acreate(
-                    input=text,
-                    model=self.model
+                # Use the new API format
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None, 
+                    lambda: self.client.embeddings.create(
+                        input=text,
+                        model=self.model
+                    )
                 )
-                embedding = np.array(response['data'][0]['embedding'])
+                embedding = np.array(response.data[0].embedding)
                 self.cache[text] = embedding
                 return embedding
             except Exception as e:
