@@ -1109,18 +1109,14 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
 
 @app.websocket("/ws/trading") 
 async def websocket_endpoint(websocket: WebSocket):
+    client_id = websocket.query_params.get("clientId", str(uuid.uuid4()))
     try:
-        # Accept the connection
-        await websocket.accept()
-        client_id = websocket.headers.get("client-id", str(uuid.uuid4()))
-        
-        # Initialize the connection
+        # Let the WebSocketEventHandler handle the connection
         await app.state.memgpt_service.ws_handler.handle_connection(websocket, client_id)
-        
+    except WebSocketDisconnect:
+        print(f"Client {client_id} disconnected normally")
     except Exception as e:
-        logging.error(f"Error in websocket_endpoint: {str(e)}")
-        if websocket.client_state.connected:
-            await websocket.close(code=1011, reason=str(e))
+        print(f"Error in websocket_endpoint: {str(e)}")
 
 @app.post("/memories/chain/{memory_key}")
 async def chain_memories(memory_key: str, config: ChainConfig):

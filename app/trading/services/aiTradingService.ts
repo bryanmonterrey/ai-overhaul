@@ -13,14 +13,66 @@ class AITradingService {
   private baseUrl = '/api/admin/trading/chat';
   private ws: WebSocket | null = null;
   private clientId: string = '';
+  private isConnected: boolean = false;
   private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
   private tradeStatusCallbacks: Set<(status: any) => void> = new Set();
+  private reconnectAttempts = 0;
+  private readonly MAX_RECONNECT_ATTEMPTS = 5;
+  private readonly RECONNECT_INTERVAL = 2000;
 
   constructor() {
     this.supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
+    this.initializeWebSocket();
+  }
+
+  private initializeWebSocket() {
+    if (!this.ws && this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
+      const wsBase = process.env.NODE_ENV === 'production' 
+        ? 'wss://ai-overhaul.onrender.com'
+        : 'ws://localhost:3001';
+      
+      const wsUrl = `${wsBase}/ws/trading?clientId=${this.clientId}`;
+      
+      try {
+        this.ws = new WebSocket(wsUrl);
+        
+        this.ws.onopen = () => {
+          console.log('WebSocket connected successfully');
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+        };
+        
+        this.ws.onclose = (event) => {
+          this.isConnected = false;
+          console.log(`WebSocket closed with code: ${event.code}`);
+          this.attemptReconnect();
+        };
+        
+        this.ws.onerror = (error) => {
+          console.warn('WebSocket connection error:', error);
+          // Don't call handleConnectionError here as onclose will be called
+        };
+        
+        this.setupMessageHandlers();
+      } catch (error) {
+        console.error('Failed to initialize WebSocket:', error);
+        this.attemptReconnect();
+      }
+    }
+  }
+
+  private attemptReconnect() {
+    if (this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
+      this.reconnectAttempts++;
+      const delay = this.RECONNECT_INTERVAL * Math.pow(2, this.reconnectAttempts - 1);
+      console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+      setTimeout(() => this.initializeWebSocket(), delay);
+    } else {
+      console.error('Max reconnection attempts reached');
+    }
   }
 
   // WebSocket subscription for real-time updates
@@ -164,15 +216,17 @@ class AITradingService {
 
       this.ws.onopen = () => {
         console.log('WebSocket connected to:', wsUrl);
-        // Subscribe to trade updates
-        this.sendMessage({
-          type: 'subscribe',
-          clientId: this.clientId,
-          data: {
-            channel: 'trade_status'
-          }
-        });
-      };
+        // Add a small delay before sending subscription message
+        setTimeout(() => {
+            this.sendMessage({
+                type: 'subscribe',
+                clientId: this.clientId,
+                data: {
+                    channel: 'trade_status'
+                }
+            });
+        }, 100);  // 100ms delay to ensure the server is ready
+    };
 
       this.ws.onmessage = (event) => {
         try {
@@ -293,7 +347,6 @@ class AITradingService {
       this.subscribeToTradeStatus(Array.from(this.tradeStatusCallbacks)[0]);
     }
   }
-
 
   // Portfolio Management
   async getPortfolio() {
