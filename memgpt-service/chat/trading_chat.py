@@ -11,6 +11,7 @@ class CommandType(Enum):
     SETTINGS = "settings"
     PORTFOLIO = "portfolio"
     SYSTEM = "system"
+    CONFIRM = "confirm"
 
 class TradingChat:
     def __init__(self, letta_service, memory_processor, dspy_service):
@@ -18,6 +19,8 @@ class TradingChat:
         self.memory = memory_processor
         self.dspy_service = dspy_service
         self.command_handlers = self._init_command_handlers()
+        self.realtime_monitor = letta_service.realtime_monitor  # Add this line
+        self.trading_memory = letta_service.trading_memory 
         
     def _init_command_handlers(self) -> Dict[str, callable]:
         return {
@@ -25,7 +28,8 @@ class TradingChat:
             CommandType.ANALYSIS.value.lower(): self._handle_analysis_command,
             CommandType.SETTINGS.value.lower(): self._handle_settings_command,
             CommandType.PORTFOLIO.value.lower(): self._handle_portfolio_command,
-            CommandType.SYSTEM.value.lower(): self._handle_system_command
+            CommandType.SYSTEM.value.lower(): self._handle_system_command,
+            CommandType.CONFIRM.value.lower(): self._handle_trade_command
         }
     
     
@@ -43,6 +47,11 @@ class TradingChat:
         - asset: The token to trade
         - amount: The amount to trade
         - side: 'buy' or 'sell'
+    - CONFIRM: For confirming trades (maps to TRADE command)
+        Should extract parameters from previous trade context:
+        - asset: Same as previous trade
+        - amount: Same as previous trade
+        - side: Same as previous trade
     - ANALYSIS: For market analysis requests (e.g., "analyze SOL price", "check market conditions")
     - SETTINGS: For system settings changes
     - PORTFOLIO: For portfolio information requests
@@ -58,6 +67,9 @@ class TradingChat:
         amount = X
         side = "buy"
 
+    For confirmation messages, if user confirms (e.g., "yes", "confirm", "do it"):
+        Use command_type = "TRADE" and include previous trade parameters
+
     Respond with only a JSON object containing:
     1. command_type: The type of command identified
     2. parameters: Relevant parameters extracted from the message
@@ -65,7 +77,8 @@ class TradingChat:
 
     Example responses:
     {{"command_type": "TRADE", "parameters": {{"asset": "SOL", "amount": 100, "side": "buy"}}, "natural_response": "I understand you want to buy 100 SOL. Please confirm this trade."}}
-    {{"command_type": "TRADE", "parameters": {{"asset": "BONK", "amount": 0.01, "side": "buy"}}, "natural_response": "I understand you want to swap 0.01 SOL for BONK. Please confirm this trade."}}"""
+    {{"command_type": "TRADE", "parameters": {{"asset": "BONK", "amount": 0.01, "side": "buy"}}, "natural_response": "I understand you want to swap 0.01 SOL for BONK. Please confirm this trade."}}
+    {{"command_type": "TRADE", "parameters": {{"asset": "BONK", "amount": 0.01, "side": "buy"}}, "natural_response": "Executing the trade of 0.01 SOL for BONK."}}"""
 
             response = await self.dspy_service.predict_with_retry(prompt)
 
@@ -230,20 +243,6 @@ class TradingChat:
                 "response": f"Error processing command: {str(e)}",
                 "error": str(e)
             }
-            
-    async def _handle_trade_command(
-        self,
-        params: Dict[str, Any],
-        is_admin: bool,
-        user_address: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Handle trade execution commands"""
-        if is_admin:
-            # Admin can execute system-wide trades
-            return await self.letta.execute_ai_trade(params)
-        else:
-            # Holders can only manage their own trades
-            return await self.letta.execute_holder_trade(user_address, params)
         
     async def _handle_trade_command(
     self,
