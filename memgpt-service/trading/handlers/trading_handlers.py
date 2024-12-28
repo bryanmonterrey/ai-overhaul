@@ -198,3 +198,46 @@ class TradingHandlers:
                 "volatility_threshold": 0.50
             }
         }
+    
+    async def handle_chat_trade(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle trading commands from chat"""
+        try:
+            # Parse chat command
+            command = await self.dspy_service.analyze_command(message)
+            
+            if command["type"] == "trade":
+                # Convert chat parameters to trade parameters
+                trade_params = TradeParams(
+                    input_token=command["params"]["tokenIn"],
+                    output_token=command["params"]["tokenOut"],
+                    amount=Decimal(str(command["params"]["amount"])),
+                    slippage=float(command["params"].get("slippage", 0.01)),
+                    priority_fee=float(command["params"].get("priorityFee", 0.0025)),
+                    use_jito=command["params"].get("useMev", True),
+                    auto_retry=True
+                )
+                
+                # Execute through trader agent
+                result = await self.trader_agent.execute_trade(
+                    trade_params,
+                    self.letta_service.wallet
+                )
+                
+                # Store in memory
+                await self.trading_memory.store_trade_execution(result)
+                
+                # Update monitoring
+                await self.monitor.process_trade(result)
+                
+                return {
+                    "success": True,
+                    "trade_result": result,
+                    "natural_response": f"Trade executed: {result.tx_hash}"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "natural_response": f"Trade failed: {str(e)}"
+            }
