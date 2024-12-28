@@ -21,6 +21,7 @@ class TradingChat:
         self.command_handlers = self._init_command_handlers()
         self.realtime_monitor = letta_service.realtime_monitor  # Add this line
         self.trading_memory = letta_service.trading_memory 
+        self.last_trade = None
         
     def _init_command_handlers(self) -> Dict[str, callable]:
         return {
@@ -40,6 +41,7 @@ class TradingChat:
             prompt = f"""Command Analysis Task:
     Message: {message}
     Context: {context}
+    Previous Trade Parameters: {json.dumps(self.last_trade) if self.last_trade else 'None'}
 
     Available commands:
     - TRADE: For trade execution requests (e.g., "buy 100 SOL", "sell 50 USDC", "swap 0.01 SOL for BONK")
@@ -143,6 +145,15 @@ class TradingChat:
                 return {
                     "response": analysis.get("natural_response", "I'm here to help. What would you like to do?")
                 }
+
+            # Handle confirmation - use last trade parameters
+            if command_type == "confirm" and self.last_trade:
+                analysis["parameters"] = self.last_trade
+                command_type = "trade"
+
+            # Store trade parameters for future confirmation
+            elif command_type == "trade" and not command_type == "confirm":
+                self.last_trade = analysis["parameters"]
 
             # Get command handler using lowercase command type
             handler = self.command_handlers.get(command_type)

@@ -89,3 +89,50 @@ class RiskHelpers:
         if portfolio_value == 0:
             return 1.0
         return float(position_value / portfolio_value)
+    
+    async def calculate_trade_risk_metrics(self, trade: Dict[str, Any]) -> Dict[str, float]:
+        """Calculate risk metrics for a trade"""
+        try:
+            # Extract trade parameters
+            amount = Decimal(str(trade.get('amount', 0)))
+            asset = trade.get('asset', '')
+            side = trade.get('side', 'buy')
+
+            # Default metrics
+            metrics = {
+                "position_risk": 0.0,
+                "liquidity_risk": 0.0,
+                "slippage_risk": 0.0,
+                "overall_risk": 0.0
+            }
+
+            # If we have market data, calculate detailed metrics
+            if hasattr(self, 'get_market_data'):
+                market_data = await self.get_market_data(asset)
+                if market_data:
+                    # Calculate individual risk components
+                    metrics["liquidity_risk"] = 1.0 - self.calculate_liquidity_score(
+                        market_data,
+                        amount
+                    )
+                    metrics["slippage_risk"] = self.estimate_slippage(
+                        amount,
+                        market_data
+                    )
+
+                    # Overall risk is weighted average of components
+                    metrics["overall_risk"] = (
+                        metrics["liquidity_risk"] * 0.4 +
+                        metrics["slippage_risk"] * 0.6
+                    )
+
+            return metrics
+
+        except Exception as e:
+            print(f"Error calculating trade risk metrics: {str(e)}")
+            return {
+                "position_risk": 1.0,  # Maximum risk on error
+                "liquidity_risk": 1.0,
+                "slippage_risk": 1.0,
+                "overall_risk": 1.0
+            }

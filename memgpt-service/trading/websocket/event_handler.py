@@ -94,13 +94,17 @@ class WebSocketEventHandler:
             return False
 
     async def broadcast_update(
-        self,
-        channel: str,
-        data: Dict[str, Any],
-        user_address: Optional[str] = None
-    ):
+    self,
+    channel: str,
+    data: Dict[str, Any],
+    user_address: Optional[str] = None
+):
         """Broadcast update to subscribed clients"""
         try:
+            if channel not in self.channels:
+                logging.warning(f"Attempting to broadcast to non-existent channel: {channel}")
+                return
+
             message = {
                 "type": "update",
                 "channel": channel,
@@ -196,6 +200,10 @@ class WebSocketEventHandler:
             
             # Register client
             await self.register_client(client_id)
+            
+            # Auto-subscribe to required channels
+            default_channels = ['trades', 'alerts']
+            await self.subscribe(client_id, default_channels)
             
             try:
                 while True:
