@@ -306,3 +306,36 @@ class TraderAgent(BaseAgent):
                 max(1, self.trading_stats["total_trades"])
             )
         }
+    
+    async def execute_autonomous_trade(self, strategy: Dict[str, Any]) -> TradeResult:
+        """Execute autonomous trade based on strategy"""
+        try:
+            # Get market conditions
+            market_data = await self._analyze_market_conditions()
+            
+            # Make trading decision
+            decision = await self._evaluate_trading_opportunity(
+                market_data,
+                strategy
+            )
+            
+            if decision["should_trade"]:
+                # Execute trade
+                params = TradeParams(
+                    input_token=decision["tokenIn"],
+                    output_token=decision["tokenOut"],
+                    amount=decision["amount"],
+                    slippage=strategy.get("slippage", 0.01),
+                    priority_fee=strategy.get("priorityFee", 0.0025),
+                    use_jito=strategy.get("useMev", True),
+                    auto_retry=True
+                )
+                
+                return await self.execute_trade(params, self.wallet)
+                
+        except Exception as e:
+            self.logger.error(f"Autonomous trade error: {str(e)}")
+            return TradeResult(
+                success=False,
+                error=str(e)
+            )
