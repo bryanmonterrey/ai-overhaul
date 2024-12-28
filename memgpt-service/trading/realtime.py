@@ -9,7 +9,7 @@ from dataclasses import dataclass, asdict
 import logging
 from .risk_helpers import RiskHelpers
 from .portfolio.risk_calculator import RiskCalculator
-
+import uuid
 @dataclass
 class ConsciousnessMetrics:
     """Metrics for the consciousness system"""
@@ -236,9 +236,162 @@ class RealTimeMonitor:
             # Continue execution even if broadcast fails
             pass
 
+    async def execute_solana_trade(self, params: dict) -> dict:
+        """Execute trade through Jupiter with WebSocket updates"""
+        try:
+            trade_id = str(uuid.uuid4())
+            
+            # Send initial status
+            await self.broadcast_trading_update(
+                update_type="trade_status",
+                data={
+                    "trade_id": trade_id,
+                    "status": "initiated",
+                    "params": params,
+                    "timestamp": datetime.now().isoformat()
+                },
+                channel="trading_updates"
+            )
+
+            # Validate parameters
+            required_fields = ['asset', 'amount', 'side']
+            missing_fields = [field for field in required_fields if field not in params]
+            if missing_fields:
+                await self._send_trade_error(trade_id, f"Missing fields: {missing_fields}")
+                return {
+                    "success": False,
+                    "error": f"Missing required fields: {', '.join(missing_fields)}"
+                }
+
+            # Convert parameters for execution
+            trade_params = {
+                'tokenIn': params['asset'] if params['side'] == 'sell' else params.get('receive_asset', 'So11111111111111111111111111111111111111112'),
+                'tokenOut': params.get('receive_asset', 'So11111111111111111111111111111111111111112') if params['side'] == 'sell' else params['asset'],
+                'amount': float(params['amount']),
+                'slippage': params.get('slippage', 100),
+                'priorityFee': params.get('priorityFee', 0.0025)
+            }
+
+            # Send route check status
+            await self.broadcast_trading_update(
+                update_type="trade_status",
+                data={
+                    "trade_id": trade_id,
+                    "status": "checking_route",
+                    "timestamp": datetime.now().isoformat()
+                },
+                channel="trading_updates"
+            )
+
+            # Store trade intent
+            trade_intent = {
+                'id': trade_id,
+                'params': trade_params,
+                'status': 'pending',
+                'timestamp': datetime.now().isoformat()
+            }
+
+            try:
+                # Store in Supabase
+                await self.supabase.table('trade_intents').insert(trade_intent).execute()
+
+                # Send confirmation
+                await self.broadcast_trading_update(
+                    update_type="trade_status",
+                    data={
+                        "trade_id": trade_id,
+                        "status": "confirmed",
+                        "params": trade_params,
+                        "timestamp": datetime.now().isoformat()
+                    },
+                    channel="trading_updates"
+                )
+
+                return {
+                    'success': True,
+                    'trade_params': trade_params,
+                    'trade_id': trade_id,
+                    'status': 'pending',
+                    'timestamp': datetime.now().isoformat()
+                }
+
+            except Exception as e:
+                await self._send_trade_error(trade_id, str(e))
+                raise
+
+        except Exception as e:
+            error_msg = f"Trade execution error: {str(e)}"
+            logging.error(error_msg)
+            if 'trade_id' in locals():
+                await self._send_trade_error(trade_id, error_msg)
+            return {
+                'success': False,
+                'error': error_msg
+            }
+
     def set_supabase_client(self, supabase_client):
         """Set Supabase client for realtime updates"""
         self.supabase = supabase_client
+
+    async def store_trade_execution(self, data: dict) -> None:
+        """Store trade execution data"""
+        try:
+            execution_data = {
+                **data,
+                'timestamp': datetime.now().isoformat()
+            }
+            await self.supabase.table('trade_executions').insert(execution_data).execute()
+        except Exception as e:
+            logging.error(f"Error storing trade execution: {str(e)}")
+
+    async def _send_trade_error(self, trade_id: str, error: str):
+        """Send trade error update via WebSocket"""
+        await self.broadcast_trading_update(
+            update_type="trade_status",
+            data={
+                "trade_id": trade_id,
+                "status": "error",
+                "error": error,
+                "timestamp": datetime.now().isoformat()
+            },
+            channel="trading_updates"
+        )
+
+    async def handle_trade_update(self, tx_signature: str, status: str):
+        """Handle trade status updates from frontend"""
+        try:
+            # Find trade intent
+            response = await self.supabase.table('trade_intents')\
+                .select('*')\
+                .eq('status', 'pending')\
+                .order('timestamp', desc=True)\
+                .limit(1)\
+                .execute()
+
+            if response.data:
+                trade_intent = response.data[0]
+                trade_id = trade_intent['id']
+
+                # Update status
+                await self.broadcast_trading_update(
+                    update_type="trade_status",
+                    data={
+                        "trade_id": trade_id,
+                        "status": status,
+                        "signature": tx_signature,
+                        "timestamp": datetime.now().isoformat()
+                    },
+                    channel="trading_updates"
+                )
+
+                # Update in database
+                await self.supabase.table('trade_intents')\
+                    .update({'status': status, 'tx_signature': tx_signature})\
+                    .eq('id', trade_id)\
+                    .execute()
+
+        except Exception as e:
+            logging.error(f"Error handling trade update: {str(e)}")
 
     async def get_portfolio_data(self) -> Dict[str, Any]:
         """Get current portfolio data"""

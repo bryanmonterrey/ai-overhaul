@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 import os
 import json
-
+import logging
 class CommandType(Enum):
     TRADE = "trade"
     ANALYSIS = "analysis"
@@ -229,6 +229,58 @@ class TradingChat:
         else:
             # Holders can only manage their own trades
             return await self.letta.execute_holder_trade(user_address, params)
+        
+    async def _handle_trade_command(
+    self,
+    params: Dict[str, Any],
+    is_admin: bool,
+    user_address: Optional[str] = None
+) -> Dict[str, Any]:
+        """Handle trade execution commands"""
+        try:
+            # Validate required parameters
+            required_params = ['asset', 'amount', 'side']
+            missing_params = [p for p in required_params if not params.get(p)]
+            if missing_params:
+                return {
+                    "success": False,
+                    "error": f"Missing required parameters: {', '.join(missing_params)}"
+                }
+
+            # Format trade parameters
+            trade_params = {
+                "asset": params['asset'],
+                "amount": float(params['amount']),
+                "side": params['side'].lower(),
+                "slippage": params.get('slippage', 100),  # 1% default
+                "useMev": params.get('useMev', True)
+            }
+
+            if is_admin:
+                # Execute through realtime monitor
+                result = await self.realtime_monitor.execute_solana_trade(trade_params)
+                
+                try:
+                    await self.trading_memory.store_trade_execution({
+                        "type": "trade_attempt",
+                        "data": trade_params,
+                        "result": result,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                except Exception as mem_error:
+                    logging.error(f"Error storing trade execution: {str(mem_error)}")
+
+                return result
+            else:
+                return await self.letta.execute_holder_trade(user_address, trade_params)
+
+        except Exception as e:
+            error_msg = f"Trade execution error: {str(e)}"
+            logging.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
+            }
             
     async def _handle_analysis_command(
         self,

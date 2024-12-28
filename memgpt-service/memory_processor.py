@@ -181,6 +181,29 @@ class MemoryProcessor:
         """Original summary generation"""
         return text[:100] + '...' if len(text) > 100 else text
 
+    async def store_interaction(self, content: str, response: dict, metadata: dict) -> None:
+        """Store an interaction in the memory system"""
+        try:
+            interaction_data = {
+                'content': content,
+                'response': response,
+                'metadata': metadata,
+                'timestamp': datetime.now().isoformat(),
+                'type': metadata.get('type', 'interaction'),
+                'platform': metadata.get('platform', 'default'),
+                'archive_status': 'active'
+            }
+            
+            # Store in memory system
+            await self.process_new_memory(content, {
+                **metadata,
+                'interaction_type': 'trading',
+                'response': response
+            })
+            
+        except Exception as e:
+            logging.error(f"Error storing interaction: {str(e)}")
+
     async def cluster_memories(
         self,
         memories: List[Dict],
