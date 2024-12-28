@@ -25,7 +25,8 @@ class WebSocketEventHandler:
             'trades': set(),
             'alerts': set(),
             'admin': set(),
-            'holder': set()
+            'holder': set(),
+            'trading_updates': set()
         }
 
     async def start(self):

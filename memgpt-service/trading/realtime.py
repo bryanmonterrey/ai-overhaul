@@ -10,6 +10,8 @@ import logging
 from .risk_helpers import RiskHelpers
 from .portfolio.risk_calculator import RiskCalculator
 import uuid
+import logging
+
 @dataclass
 class ConsciousnessMetrics:
     """Metrics for the consciousness system"""
@@ -41,6 +43,7 @@ class MonitoringMetrics:
 class RealTimeMonitor:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
+        self.ws_handler = None  # Will be set later
         self.risk_calculator = RiskCalculator(config.get("risk_calculator", {
             "max_position_size": 100,
             "max_portfolio_var": 0.05,
@@ -64,6 +67,10 @@ class RealTimeMonitor:
                 "volatility_threshold": 0.50,  # 50% annualized
             })
         }
+
+    def set_ws_handler(self, ws_handler):
+        """Set WebSocket handler"""
+        self.ws_handler = ws_handler
 
     async def start_monitoring(self):
         """Start the monitoring loop"""
@@ -197,18 +204,12 @@ class RealTimeMonitor:
                 logging.error(f"Error notifying subscriber: {str(e)}")
 
     async def broadcast_trading_update(self, update_type: str, data: Dict[str, Any], channel: str):
-        """Broadcast trading updates to WebSocket clients via Supabase"""
+        """Broadcast trading updates to WebSocket clients"""
         try:
-            if not self.supabase:
-                logging.error("Supabase client not initialized")
+            if not self.ws_handler:
+                logging.error("WebSocket handler not initialized")
                 return
 
-            # Create a realtime channel
-            channel = self.supabase.realtime.channel(channel)
-            
-            # Subscribe to the channel
-            channel.subscribe()
-            
             formatted_update = {
                 "type": update_type,
                 "data": data,
@@ -223,18 +224,27 @@ class RealTimeMonitor:
             elif update_type == "risk_alert":
                 formatted_update["priority"] = data.get("level", "medium")
                 formatted_update["requires_action"] = data.get("requires_action", False)
-            
-            # Broadcast via Supabase
-            await channel.send({
-                "type": "broadcast",
-                "event": "trading_update",
-                "payload": formatted_update
-            })
-            
+
+            # Broadcast via WebSocket handler
+            await self.ws_handler.broadcast_update(channel, formatted_update)
+
+            # Also broadcast to Supabase if available
+            if self.supabase:
+                try:
+                    supabase_channel = self.supabase.channel(channel)
+                    supabase_channel.subscribe()
+                    await supabase_channel.send({
+                        "type": "broadcast",
+                        "event": "trading_update",
+                        "payload": formatted_update
+                    })
+                except Exception as se:
+                    logging.error(f"Supabase broadcast error: {str(se)}")
+                    # Continue execution even if Supabase broadcast fails
+                    pass
+                
         except Exception as e:
             logging.error(f"Error broadcasting update: {str(e)}")
-            # Continue execution even if broadcast fails
-            pass
 
     async def execute_solana_trade(self, params: dict) -> dict:
         """Execute trade through Jupiter with WebSocket updates"""
