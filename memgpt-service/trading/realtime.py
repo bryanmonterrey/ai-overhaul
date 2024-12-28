@@ -12,6 +12,7 @@ from .portfolio.risk_calculator import RiskCalculator
 import uuid
 import logging
 from .solana_service import SolanaService
+import aiohttp
 
 @dataclass
 class ConsciousnessMetrics:
@@ -55,6 +56,7 @@ class RealTimeMonitor:
         self.risk_helpers = RiskHelpers()
         self.supabase = None  # Will be set by the trading handler
         self.solana_service = SolanaService()
+        self.wallet = None
         
         # Initialize monitoring state
         self.monitoring_state = {
@@ -73,6 +75,17 @@ class RealTimeMonitor:
     def set_ws_handler(self, ws_handler):
         """Set WebSocket handler"""
         self.ws_handler = ws_handler
+
+    async def setup_wallet(self, private_key: str):
+        """Initialize wallet for trading"""
+        from solana.keypair import Keypair
+        try:
+            keypair = Keypair.from_secret_key(bytes.fromhex(private_key))
+            self.wallet = keypair
+            return True
+        except Exception as e:
+            logging.error(f"Wallet setup error: {str(e)}")
+            return False
 
     async def start_monitoring(self):
         """Start the monitoring loop"""
@@ -205,6 +218,27 @@ class RealTimeMonitor:
             except Exception as e:
                 logging.error(f"Error notifying subscriber: {str(e)}")
 
+    async def setup_wallet(self, private_key: str = None):
+        """Initialize wallet for trading"""
+        try:
+            if not private_key:
+                return False
+                
+            from solana.keypair import Keypair
+            try:
+                # Try to load as hex
+                key_bytes = bytes.fromhex(private_key.strip())
+            except ValueError:
+                # Try to load as base58
+                from base58 import b58decode
+                key_bytes = b58decode(private_key)
+                
+            self.wallet = Keypair.from_secret_key(key_bytes)
+            return True
+        except Exception as e:
+            logging.error(f"Wallet setup error: {str(e)}")
+            return False
+
     async def broadcast_trading_update(self, update_type: str, data: Dict[str, Any], channel: str):
         """Broadcast trading updates to WebSocket clients"""
         try:
@@ -249,7 +283,7 @@ class RealTimeMonitor:
             logging.error(f"Error broadcasting update: {str(e)}")
 
     async def execute_solana_trade(self, params: dict) -> dict:
-        """Execute trade through Jupiter with WebSocket updates"""
+        """Execute trade through Jupiter API with WebSocket updates"""
         try:
             trade_id = str(uuid.uuid4())
             
@@ -277,85 +311,127 @@ class RealTimeMonitor:
 
             # Convert parameters for execution
             trade_params = {
-                'tokenIn': params['asset'] if params['side'] == 'sell' else params.get('receive_asset', 'So11111111111111111111111111111111111111112'),
-                'tokenOut': params.get('receive_asset', 'So11111111111111111111111111111111111111112') if params['side'] == 'sell' else params['asset'],
-                'amount': float(params['amount']),
-                'slippage': params.get('slippage', 100),
-                'priorityFee': params.get('priorityFee', 0.0025)
-            }
-
-            # Initialize Jupiter client
-            jupiter = JupiterAg()
-
-            # Get quote first
-            quote = await jupiter.quote(
-                input_mint=trade_params['tokenIn'],
-                output_mint=trade_params['tokenOut'],
-                amount=int(trade_params['amount'] * 10**9)  # Convert to lamports
-            )
-
-            # Send route check status
-            await self.broadcast_trading_update(
-                update_type="trade_status",
-                data={
-                    "trade_id": trade_id,
-                    "status": "checking_route",
-                    "quote": quote,
-                    "timestamp": datetime.now().isoformat()
-                },
-                channel="trading_updates"
-            )
-
-            # Store trade intent
-            trade_intent = {
-                'id': trade_id,
-                'params': trade_params,
-                'quote': quote,
-                'status': 'pending',
-                'timestamp': datetime.now().isoformat()
+                'inputMint': self.solana_service.token_addresses['SOL'] if params['side'] == 'buy' else params['asset'],
+                'outputMint': params['asset'] if params['side'] == 'buy' else self.solana_service.token_addresses['SOL'],
+                'amount': str(int(float(params['amount']) * 10**9)),  # Convert to lamports
+                'slippageBps': params.get('slippage', 100),
+                'onlyDirectRoutes': False,
+                'asLegacyTransaction': True
             }
 
             try:
-                # Store in Supabase
-                await self.supabase.table('trade_intents').insert(trade_intent).execute()
-
-                # Execute the swap
-                swap_result = await jupiter.swap(
-                    quote_response=quote,
-                    signer_wallet=self.wallet,  # Make sure wallet is properly initialized
-                    slippage_bps=trade_params['slippage']
-                )
-
-                # Send execution confirmation
+                # Get quote from Jupiter
+                quote_result = await self.solana_service.execute_swap(trade_params)
+                
+                # Send route check status
                 await self.broadcast_trading_update(
                     update_type="trade_status",
                     data={
                         "trade_id": trade_id,
-                        "status": "executed",
-                        "params": trade_params,
-                        "result": swap_result,
+                        "status": "route_found",
+                        "quote": quote_result,
                         "timestamp": datetime.now().isoformat()
                     },
                     channel="trading_updates"
                 )
 
-                # Update trade status in database
-                await self.supabase.table('trade_intents')\
-                    .update({
-                        'status': 'executed',
-                        'result': swap_result
-                    })\
-                    .eq('id', trade_id)\
-                    .execute()
-
-                return {
-                    'success': True,
-                    'trade_id': trade_id,
-                    'status': 'executed',
+                # Store trade intent
+                trade_intent = {
+                    'id': trade_id,
                     'params': trade_params,
-                    'result': swap_result,
+                    'quote': quote_result,
+                    'status': 'pending',
                     'timestamp': datetime.now().isoformat()
                 }
+
+                # Store in Supabase
+                await self.supabase.table('trade_intents').insert(trade_intent).execute()
+
+                # Now we need to get transaction data and sign it
+                async with aiohttp.ClientSession() as session:
+                    # Get swap transaction data
+                    swap_url = "https://quote-api.jup.ag/v6/swap"
+                    swap_data = {
+                        'quoteResponse': quote_result,
+                        'userPublicKey': self.wallet.public_key if self.wallet else None,
+                        'wrapUnwrapSOL': True
+                    }
+
+                    async with session.post(swap_url, json=swap_data) as response:
+                        if response.status != 200:
+                            error_data = await response.json()
+                            raise ValueError(f"Swap error: {error_data.get('error', 'Unknown error')}")
+                        
+                        swap_transaction = await response.json()
+                        
+                        if not self.wallet:
+                            # Return unsigned transaction if no wallet
+                            return {
+                                'success': True,
+                                'trade_id': trade_id,
+                                'status': 'needs_signature',
+                                'transaction': swap_transaction,
+                                'params': trade_params,
+                                'quote': quote_result,
+                                'timestamp': datetime.now().isoformat()
+                            }
+
+                        # If wallet is available, sign and submit transaction
+                        try:
+                            from solana.transaction import Transaction
+                            from base58 import b58decode
+                            
+                            # Decode and sign transaction
+                            transaction = Transaction.deserialize(b58decode(swap_transaction['transaction']))
+                            signed_tx = transaction.sign(self.wallet)
+                            
+                            # Submit transaction
+                            submit_url = "https://quote-api.jup.ag/v6/swap/submit"
+                            submit_data = {
+                                'transaction': signed_tx.serialize()
+                            }
+                            
+                            async with session.post(submit_url, json=submit_data) as submit_response:
+                                if submit_response.status != 200:
+                                    error_data = await submit_response.json()
+                                    raise ValueError(f"Submit error: {error_data.get('error', 'Unknown error')}")
+                                
+                                result = await submit_response.json()
+                                
+                                # Update trade status
+                                await self.broadcast_trading_update(
+                                    update_type="trade_status",
+                                    data={
+                                        "trade_id": trade_id,
+                                        "status": "executed",
+                                        "signature": result.get('txid'),
+                                        "params": trade_params,
+                                        "timestamp": datetime.now().isoformat()
+                                    },
+                                    channel="trading_updates"
+                                )
+                                
+                                # Update in database
+                                await self.supabase.table('trade_intents')\
+                                    .update({
+                                        'status': 'executed',
+                                        'signature': result.get('txid')
+                                    })\
+                                    .eq('id', trade_id)\
+                                    .execute()
+                                
+                                return {
+                                    'success': True,
+                                    'trade_id': trade_id,
+                                    'status': 'executed',
+                                    'signature': result.get('txid'),
+                                    'params': trade_params,
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                                
+                        except Exception as e:
+                            await self._send_trade_error(trade_id, f"Transaction error: {str(e)}")
+                            raise
 
             except Exception as e:
                 await self._send_trade_error(trade_id, str(e))
