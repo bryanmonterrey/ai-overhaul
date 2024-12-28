@@ -685,3 +685,31 @@ class MemoryProcessor:
             },
             'thresholds': MEMORY_CONFIG
         }
+
+    async def query_memories(
+        self,
+        memory_type: str,
+        limit: int = 10,
+        filters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Query memories by type with optional filters"""
+        try:
+            query = self.agent.supabase.table('memories')\
+                .select('*')\
+                .eq('type', memory_type)\
+                .eq('archive_status', 'active')
+            
+            if filters:
+                for key, value in filters.items():
+                    query = query.eq(key, value)
+                    
+            response = await query\
+                .order('created_at', desc=True)\
+                .limit(limit)\
+                .execute()
+                
+            return response.data if response.data else []
+            
+        except Exception as e:
+            print(f"Error querying memories: {str(e)}")
+            return []

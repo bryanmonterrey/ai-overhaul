@@ -360,10 +360,30 @@ class TradingChat:
     async def store_interaction(self, message: str, response: Dict[str, Any]):
         try:
             await self.memory_processor.process_new_memory({
-                "content": message,
-                "type": "trading_chat",
-                "metadata": {
-                    "response": response,
-                    "timestamp": datetime.now().isoformat()
+                'content': message,
+                'type': 'trading_chat',
+                'metadata': {
+                    'response': response,
+                    'timestamp': datetime.now().isoformat()
                 }
             })
+        except Exception as e:
+            print(f"Error storing interaction: {str(e)}")
+            raise e
+
+    async def get_trading_context(self) -> Dict[str, Any]:
+        """Get relevant trading context from memory"""
+        try:
+            # Query recent trading memories
+            memories = await self.memory_processor.query_memories(
+                memory_type="trading_history",
+                limit=10
+            )
+            
+            return {
+                "recent_trades": memories,
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            print(f"Error getting trading context: {str(e)}")
+            return {}
