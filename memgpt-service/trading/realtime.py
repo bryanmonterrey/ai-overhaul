@@ -11,7 +11,7 @@ from .risk_helpers import RiskHelpers
 from .portfolio.risk_calculator import RiskCalculator
 import uuid
 import logging
-from jup_ag import JupiterAg
+from .solana_service import SolanaService
 
 @dataclass
 class ConsciousnessMetrics:
@@ -54,6 +54,7 @@ class RealTimeMonitor:
         }))
         self.risk_helpers = RiskHelpers()
         self.supabase = None  # Will be set by the trading handler
+        self.solana_service = SolanaService()
         
         # Initialize monitoring state
         self.monitoring_state = {
@@ -283,12 +284,23 @@ class RealTimeMonitor:
                 'priorityFee': params.get('priorityFee', 0.0025)
             }
 
+            # Initialize Jupiter client
+            jupiter = JupiterAg()
+
+            # Get quote first
+            quote = await jupiter.quote(
+                input_mint=trade_params['tokenIn'],
+                output_mint=trade_params['tokenOut'],
+                amount=int(trade_params['amount'] * 10**9)  # Convert to lamports
+            )
+
             # Send route check status
             await self.broadcast_trading_update(
                 update_type="trade_status",
                 data={
                     "trade_id": trade_id,
                     "status": "checking_route",
+                    "quote": quote,
                     "timestamp": datetime.now().isoformat()
                 },
                 channel="trading_updates"
@@ -298,6 +310,7 @@ class RealTimeMonitor:
             trade_intent = {
                 'id': trade_id,
                 'params': trade_params,
+                'quote': quote,
                 'status': 'pending',
                 'timestamp': datetime.now().isoformat()
             }
@@ -306,23 +319,41 @@ class RealTimeMonitor:
                 # Store in Supabase
                 await self.supabase.table('trade_intents').insert(trade_intent).execute()
 
-                # Send confirmation
+                # Execute the swap
+                swap_result = await jupiter.swap(
+                    quote_response=quote,
+                    signer_wallet=self.wallet,  # Make sure wallet is properly initialized
+                    slippage_bps=trade_params['slippage']
+                )
+
+                # Send execution confirmation
                 await self.broadcast_trading_update(
                     update_type="trade_status",
                     data={
                         "trade_id": trade_id,
-                        "status": "confirmed",
+                        "status": "executed",
                         "params": trade_params,
+                        "result": swap_result,
                         "timestamp": datetime.now().isoformat()
                     },
                     channel="trading_updates"
                 )
 
+                # Update trade status in database
+                await self.supabase.table('trade_intents')\
+                    .update({
+                        'status': 'executed',
+                        'result': swap_result
+                    })\
+                    .eq('id', trade_id)\
+                    .execute()
+
                 return {
                     'success': True,
-                    'trade_params': trade_params,
                     'trade_id': trade_id,
-                    'status': 'pending',
+                    'status': 'executed',
+                    'params': trade_params,
+                    'result': swap_result,
                     'timestamp': datetime.now().isoformat()
                 }
 
