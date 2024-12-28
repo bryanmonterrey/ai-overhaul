@@ -11,6 +11,7 @@ from .risk_helpers import RiskHelpers
 from .portfolio.risk_calculator import RiskCalculator
 import uuid
 import logging
+from jup_ag import JupiterAg
 
 @dataclass
 class ConsciousnessMetrics:
