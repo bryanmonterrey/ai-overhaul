@@ -795,6 +795,71 @@ class MemGPTService:
             print(f"Error summarizing memories: {str(e)}")
             return {"success": False, "error": str(e)}
         
+    async def update_system_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """Update system settings."""
+        try:
+            command_type = settings.get('type')
+            
+            if command_type == 'trading':
+                # Update trading settings through realtime monitor
+                await self.realtime_monitor.update_settings(settings)
+                
+            # Store settings in memory
+            await self.trading_memory.store_settings_update({
+                "type": "settings_update",
+                "data": settings,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return {
+                "success": True,
+                "data": {
+                    "settings": settings,
+                    "updated_at": datetime.now().isoformat()
+                }
+            }
+        except Exception as e:
+            logging.error(f"Error updating system settings: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    async def analyze_market(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze market data."""
+        try:
+            asset = parameters.get('asset')
+            if not asset:
+                raise ValueError("Asset parameter is required")
+
+            # Get market data from realtime monitor
+            market_data = await self.realtime_monitor.get_market_data(asset)
+            
+            # Store analysis in memory
+            await self.trading_memory.store_market_analysis({
+                "type": "market_analysis",
+                "data": {
+                    "asset": asset,
+                    "market_data": market_data
+                },
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return {
+                "success": True,
+                "data": {
+                    "asset": asset,
+                    "market_data": market_data,
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
+        except Exception as e:
+            logging.error(f"Error analyzing market: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+        
     async def execute_ai_trade(self, command: Dict[str, Any]) -> Dict[str, Any]:
         """Execute trading operations through Jupiter on Solana"""
         try:
