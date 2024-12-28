@@ -274,10 +274,11 @@ class TradingChat:
 
             # Format trade parameters
             trade_params = {
-                "asset": params['asset'],
-                "amount": float(params['amount']),
+                "tokenIn": "So11111111111111111111111111111111111111112",  # SOL token address
+                "tokenOut": params['asset'],  # WIF token
+                "amountIn": float(params['amount']),
                 "side": params['side'].lower(),
-                "slippage": params.get('slippage', 100),  # 1% default
+                "slippage": params.get('slippage', 1.0),  # 1% default
                 "useMev": params.get('useMev', True)
             }
 

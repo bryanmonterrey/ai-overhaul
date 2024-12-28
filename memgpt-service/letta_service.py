@@ -142,6 +142,9 @@ class MemGPTService:
         try:
             # Initialize Supabase
             self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+            # Initialize WebSocket event handler early
+            self.ws_handler = WebSocketEventHandler()
             
             # Initialize RealTimeMonitor first
             self.realtime_monitor = RealTimeMonitor({
@@ -162,9 +165,6 @@ class MemGPTService:
             self.realtime_monitor.set_supabase_client(self.supabase)
 
             self.realtime_monitor.set_ws_handler(self.ws_handler)
-
-            # Initialize WebSocket event handler early
-            self.ws_handler = WebSocketEventHandler()
 
             # Create LLM config with all necessary settings
             llm_config = LLMConfig(
