@@ -70,7 +70,7 @@ class AITradingService {
         solanaService.pythFetchPrice(trade.token),
         solanaService.getTokenData(trade.token)
       ]);
-
+  
       // Execute trade through your backend
       const response = await fetch(`${this.baseUrl}/execute`, {
         method: 'POST',
@@ -81,13 +81,14 @@ class AITradingService {
           tokenData
         })
       });
-
+  
       if (!response.ok) {
         throw new Error('Failed to execute trade');
       }
-
+  
       const result = await response.json();
-
+  
+      // Create trade status promise with timeout
       const tradeStatusPromise = new Promise((resolve, reject) => {
         const subscription = this.subscribeToTradeStatus((status) => {
           if (status.trade_id === result.trade_id) {
@@ -100,8 +101,17 @@ class AITradingService {
             }
           }
         });
+  
+        // Add timeout
+        setTimeout(() => {
+          subscription.unsubscribe();
+          reject(new Error('Trade confirmation timeout'));
+        }, 30000);  // 30 seconds timeout
       });
-
+  
+      // Wait for trade confirmation
+      await tradeStatusPromise;
+  
       // Broadcast update
       this.supabase.channel('admin_trading')
         .send({
@@ -113,8 +123,7 @@ class AITradingService {
             result
           }
         });
-        
-
+  
       return result;
     } catch (error) {
       console.error('Trade execution error:', error);
