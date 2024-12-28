@@ -2,10 +2,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { solanaService } from '../../lib/solana';
 
+interface WSMessage {
+  type: string;
+  clientId?: string;
+  data?: any;
+}
+
 class AITradingService {
   private supabase;
   private baseUrl = '/api/admin/trading/chat';
   private ws: WebSocket | null = null;
+  private clientId: string = '';
+  private messageHandlers: Map<string, ((data: any) => void)[]> = new Map();
   private tradeStatusCallbacks: Set<(status: any) => void> = new Set();
 
   constructor() {
@@ -137,24 +145,82 @@ class AITradingService {
 
     // Initialize WebSocket if not already done
     if (!this.ws) {
-      this.ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws/trading');
+      // Generate client ID
+      this.clientId = crypto.randomUUID();
+
+      // Get WebSocket URL based on environment
+      const isProduction = process.env.NODE_ENV === 'production';
+      const wsBase = isProduction 
+        ? 'wss://ai-overhaul.onrender.com'
+        : 'ws://localhost:3001';
       
+      const wsUrl = `${wsBase}/ws/trading?clientId=${this.clientId}`;
+      
+      console.log('Connecting to WebSocket:', wsUrl);
+      this.ws = new WebSocket(wsUrl);
+
+      // Set up message handlers
+      this.setupMessageHandlers();
+
+      this.ws.onopen = () => {
+        console.log('WebSocket connected to:', wsUrl);
+        // Subscribe to trade updates
+        this.sendMessage({
+          type: 'subscribe',
+          clientId: this.clientId,
+          data: {
+            channel: 'trade_status'
+          }
+        });
+      };
+
       this.ws.onmessage = (event) => {
-        const update = JSON.parse(event.data);
-        
-        if (update.type === 'trade_status') {
-          // Notify all callbacks
-          this.tradeStatusCallbacks.forEach(cb => cb(update.data));
+        try {
+          const message: WSMessage = JSON.parse(event.data);
+          
+          // Handle initial connection message
+          if (message.type === 'connected') {
+            console.log('Connection confirmed, client ID:', message.clientId);
+            this.clientId = message.clientId || this.clientId;
+          }
+          // Handle trade status updates
+          else if (message.type === 'trade_status') {
+            this.tradeStatusCallbacks.forEach(cb => {
+              try {
+                cb(message.data);
+              } catch (callbackError) {
+                console.error('Error in trade status callback:', callbackError);
+              }
+            });
+          }
+          // Handle other message types
+          else {
+            const handlers = this.messageHandlers.get(message.type);
+            if (handlers) {
+              handlers.forEach(handler => {
+                try {
+                  handler(message.data);
+                } catch (error) {
+                  console.error(`Error in ${message.type} handler:`, error);
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
         }
       };
 
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        this.handleConnectionError();
       };
 
-      this.ws.onclose = () => {
-        // Attempt to reconnect after a delay
-        setTimeout(() => this.reconnectWebSocket(), 5000);
+      this.ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason);
+        if (event.code !== 1000) {
+          this.handleConnectionError();
+        }
       };
     }
 
@@ -162,17 +228,68 @@ class AITradingService {
     return {
       unsubscribe: () => {
         this.tradeStatusCallbacks.delete(callback);
-        if (this.tradeStatusCallbacks.size === 0) {
-          this.ws?.close();
+        if (this.tradeStatusCallbacks.size === 0 && this.ws) {
+          // Send unsubscribe message before closing
+          this.sendMessage({
+            type: 'unsubscribe',
+            clientId: this.clientId,
+            data: {
+              channel: 'trade_status'
+            }
+          });
+          this.ws.close(1000, 'Client unsubscribed');
           this.ws = null;
         }
       }
     };
   }
 
+  private setupMessageHandlers() {
+    // Add default message handlers
+    this.messageHandlers.set('error', [(data) => {
+      console.error('WebSocket server error:', data);
+    }]);
+
+    this.messageHandlers.set('heartbeat', [(data) => {
+      this.sendMessage({
+        type: 'pong',
+        clientId: this.clientId
+      });
+    }]);
+  }
+
+  private sendMessage(message: WSMessage) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      console.warn('WebSocket not ready, message not sent:', message);
+    }
+  }
+
+  private handleConnectionError() {
+    // Implement exponential backoff
+    const backoff = (retryCount: number) => Math.min(1000 * Math.pow(2, retryCount), 30000);
+    let retries = 0;
+
+    const tryReconnect = () => {
+      if (this.tradeStatusCallbacks.size > 0 && retries < 5) {
+        setTimeout(() => {
+          console.log(`Attempting to reconnect (attempt ${retries + 1})...`);
+          this.reconnectWebSocket();
+          retries++;
+        }, backoff(retries));
+      }
+    };
+
+    tryReconnect();
+  }
+  
   private reconnectWebSocket() {
+    if (this.ws) {
+      this.ws.close();
+    }
+    this.ws = null;
     if (this.tradeStatusCallbacks.size > 0) {
-      this.ws = null;
       this.subscribeToTradeStatus(Array.from(this.tradeStatusCallbacks)[0]);
     }
   }

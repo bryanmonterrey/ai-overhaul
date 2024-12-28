@@ -1,75 +1,56 @@
-// app/api/ws/trading/route.ts
 import { WebSocketServer } from 'ws';
 import type { NextApiRequest } from 'next';
 import { NextApiResponseServerIO } from '../../../types/socket';
-import { Server } from 'socket.io';
-import cors from 'cors';
 
-// Add CORS middleware
-const corsMiddleware = cors({
-  origin: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-  methods: ['GET', 'POST'],
-  credentials: true,
-});
-
-export default async function handler(req: NextApiRequest, res: NextApiResponseServerIO) {
-  // Handle CORS
-  await new Promise((resolve, reject) => {
-    corsMiddleware(req, res, (result) => {
-      if (result instanceof Error) {
-        return reject(result);
-      }
-      return resolve(result);
-    });
-  });
-
+export default function handler(req: NextApiRequest, res: NextApiResponseServerIO) {
   if (!res.socket.server.ws) {
-    const wss = new WebSocketServer({ 
-      noServer: true,
-      path: '/ws/trading',
-      clientTracking: true,
-    });
-
-    // Store WSS instance
+    // Initialize WebSocket server
+    const wss = new WebSocketServer({ noServer: true });
     res.socket.server.ws = wss;
 
-    // Handle upgrade
+    // Handle WebSocket upgrade
     res.socket.server.on('upgrade', (request, socket, head) => {
-      // Check origin
-      const origin = request.headers.origin;
-      if (!origin || origin !== (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')) {
-        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
     });
 
+    // Handle WebSocket connections
     wss.on('connection', (ws, request) => {
-      console.log('Client connected to WebSocket');
-      
+      // Extract client ID from URL
+      const clientId = request.url?.split('/').pop() || 'unknown';
+
+      // Send initial connection message
+      ws.send(JSON.stringify({ 
+        type: 'connected', 
+        clientId 
+      }));
+
+      // Handle incoming messages
       ws.on('message', async (data) => {
         try {
           const message = JSON.parse(data.toString());
-          console.log('Received message:', message);
           
-          // Broadcast to all clients
-          wss.clients.forEach((client) => {
-            if (client !== ws && client.readyState === ws.OPEN) {
-              client.send(JSON.stringify(message));
-            }
-          });
-          
+          // Handle different message types
+          switch (message.type) {
+            case 'subscribe':
+              // Handle subscription requests
+              break;
+            case 'unsubscribe':
+              // Handle unsubscription requests
+              break;
+            default:
+              // Forward other messages to appropriate handlers
+              break;
+          }
         } catch (error) {
           console.error('WebSocket message error:', error);
         }
       });
 
+      // Handle client disconnect
       ws.on('close', () => {
-        console.log('Client disconnected');
+        // Cleanup when client disconnects
       });
     });
   }
