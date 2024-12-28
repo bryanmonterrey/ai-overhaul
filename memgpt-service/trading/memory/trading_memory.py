@@ -88,16 +88,12 @@ class TradingMemory:
             trade_memory = {
                 "type": "trading_history",
                 "content": {
-                    "trade_type": trade_result["type"],
-                    "token_in": trade_result["tokenIn"],
-                    "token_out": trade_result["tokenOut"],
-                    "amount_in": str(trade_result["amountIn"]),
-                    "amount_out": str(trade_result["amountOut"]),
+                    "token_in": trade_result.get("asset") or trade_result.get("tokenIn"),
+                    "token_out": trade_result.get("tokenOut", "SOL"),
+                    "amount_in": str(trade_result.get("amount", 0)),
+                    "amount_out": str(trade_result.get("amountOut", 0)),
                     "timestamp": datetime.now().isoformat(),
-                    "tx_hash": trade_result.get("txHash"),
-                    "status": trade_result["status"],
-                    "price_impact": trade_result.get("priceImpact", 0),
-                    "route_info": trade_result.get("routeInfo", {}),
+                    "status": trade_result.get("status", "pending"),
                 },
                 "metadata": {
                     "importance": 0.8,  # High importance for trades

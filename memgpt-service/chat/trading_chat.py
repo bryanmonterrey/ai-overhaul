@@ -356,3 +356,14 @@ class TradingChat:
             }
             
         return await self.letta.execute_system_command(params)
+
+    async def store_interaction(self, message: str, response: Dict[str, Any]):
+        try:
+            await self.memory_processor.process_new_memory({
+                "content": message,
+                "type": "trading_chat",
+                "metadata": {
+                    "response": response,
+                    "timestamp": datetime.now().isoformat()
+                }
+            })

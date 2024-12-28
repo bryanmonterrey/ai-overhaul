@@ -143,6 +143,27 @@ class MemGPTService:
             # Initialize Supabase
             self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
             
+            # Initialize RealTimeMonitor first
+            self.realtime_monitor = RealTimeMonitor({
+                "risk_thresholds": {
+                    "max_drawdown": 0.15,
+                    "position_concentration": 0.25,
+                    "volatility_threshold": 0.50
+                },
+                "update_interval": 5,
+                "risk_calculator": {
+                    "max_position_size": 100,
+                    "max_portfolio_var": 0.05,
+                    "max_concentration": 0.2,
+                    "var_confidence": 0.95,
+                    "var_window": 30
+                }
+            })
+            self.realtime_monitor.set_supabase_client(self.supabase)
+
+            # Initialize WebSocket event handler early
+            self.ws_handler = WebSocketEventHandler()
+
             # Create LLM config with all necessary settings
             llm_config = LLMConfig(
                 model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
@@ -186,7 +207,7 @@ class MemGPTService:
             # Initialize memory processor
             self.memory_processor = MemoryProcessor(self.agent)
 
-            # Initialize DSPy service
+            # Initialize DSPy service before trading chat
             prompt_dir = Path('../app/core/prompts')  # Points to your Next.js prompts
             self.dspy_service = DSPyService(
                 prompt_dir=prompt_dir,
@@ -197,39 +218,17 @@ class MemGPTService:
                 }
             )
 
+            # Initialize trading memory before trading chat
+            self.trading_memory = TradingMemory(self.memory_processor)
+            self.trading_memory.set_realtime_monitor(self.realtime_monitor)
+
+            # Initialize trading chat after DSPy service and trading memory
             self.trading_chat = TradingChat(
-            self,
-            self.memory_processor,
-            self.dspy_service
-            )
-            self.trading_memory = TradingMemory(
-                self.memory_processor
+                self,
+                self.memory_processor,
+                self.dspy_service
             )
 
-            # Initialize WebSocket event handler
-            self.ws_handler = WebSocketEventHandler()
-            
-            # Initialize RealTimeMonitor with consciousness integration
-            self.realtime_monitor = RealTimeMonitor({
-                "risk_thresholds": {
-                    "max_drawdown": 0.15,
-                    "position_concentration": 0.25,
-                    "volatility_threshold": 0.50
-                },
-                "update_interval": 5,
-                "risk_calculator": {
-                    "max_position_size": 100,  # In SOL
-                    "max_portfolio_var": 0.05,  # 5% VaR
-                    "max_concentration": 0.2,   # 20% max in single position
-                    "var_confidence": 0.95,     # 95% confidence for VaR
-                    "var_window": 30            # 30-day window for VaR
-                }
-            })
-            self.realtime_monitor.set_supabase_client(self.supabase)
-            
-            # Connect trading memory to realtime monitor
-            self.trading_memory.set_realtime_monitor(self.realtime_monitor)
-            
             # Initialize consciousness connection
             self._init_consciousness_connection()
 

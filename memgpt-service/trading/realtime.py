@@ -196,19 +196,19 @@ class RealTimeMonitor:
             except Exception as e:
                 logging.error(f"Error notifying subscriber: {str(e)}")
 
-    async def broadcast_trading_update(
-        self,
-        update_type: str,
-        data: Dict[str, Any],
-        channel: str
-    ):
+    async def broadcast_trading_update(self, update_type: str, data: Dict[str, Any], channel: str):
         """Broadcast trading updates to WebSocket clients via Supabase"""
         try:
             if not self.supabase:
                 logging.error("Supabase client not initialized")
                 return
 
-            # Format the update with standard fields
+            # Create a realtime channel
+            channel = self.supabase.realtime.channel(channel)
+            
+            # Subscribe to the channel
+            channel.subscribe()
+            
             formatted_update = {
                 "type": update_type,
                 "data": data,
@@ -225,7 +225,7 @@ class RealTimeMonitor:
                 formatted_update["requires_action"] = data.get("requires_action", False)
             
             # Broadcast via Supabase
-            await self.supabase.channel(channel).send({
+            await channel.send({
                 "type": "broadcast",
                 "event": "trading_update",
                 "payload": formatted_update
