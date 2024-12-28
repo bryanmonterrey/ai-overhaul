@@ -1107,12 +1107,21 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
         )
     return result
 
-@app.websocket("/ws")
+@app.websocket("/ws/trading") 
 async def websocket_endpoint(websocket: WebSocket):
-    client_id = websocket.headers.get("client-id", str(uuid.uuid4()))
-    await app.state.memgpt_service.ws_handler.handle_connection(websocket, client_id)
+    try:
+        # Accept the connection
+        await websocket.accept()
+        client_id = websocket.headers.get("client-id", str(uuid.uuid4()))
+        
+        # Initialize the connection
+        await app.state.memgpt_service.ws_handler.handle_connection(websocket, client_id)
+        
+    except Exception as e:
+        logging.error(f"Error in websocket_endpoint: {str(e)}")
+        if websocket.client_state.connected:
+            await websocket.close(code=1011, reason=str(e))
 
-# New feature endpoints
 @app.post("/memories/chain/{memory_key}")
 async def chain_memories(memory_key: str, config: ChainConfig):
     """Chain memories endpoint with better error handling."""
