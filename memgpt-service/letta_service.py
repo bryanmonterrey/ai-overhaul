@@ -27,7 +27,7 @@ from chat.trading_chat import TradingChat
 import logging
 from dataclasses import asdict
 from fastapi.responses import StreamingResponse
-
+from trading.solana_service import SolanaService
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -145,6 +145,9 @@ class MemGPTService:
 
             # Initialize WebSocket event handler early
             self.ws_handler = WebSocketEventHandler()
+
+            # Initialize SolanaService first
+            self.solana_service = SolanaService() 
             
             # Initialize RealTimeMonitor first
             self.realtime_monitor = RealTimeMonitor({
@@ -163,6 +166,8 @@ class MemGPTService:
                 }
             })
             self.realtime_monitor.set_supabase_client(self.supabase)
+
+            self.realtime_monitor.solana_service = self.solana_service
 
             self.realtime_monitor.set_ws_handler(self.ws_handler)
 

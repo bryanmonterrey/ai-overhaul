@@ -22,6 +22,8 @@ class TradingChat:
         self.realtime_monitor = letta_service.realtime_monitor  # Add this line
         self.trading_memory = letta_service.trading_memory 
         self.last_trade = None
+
+        self.solana_service = letta_service.solana_service
         
     def _init_command_handlers(self) -> Dict[str, callable]:
         return {

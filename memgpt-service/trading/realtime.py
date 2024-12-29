@@ -313,7 +313,7 @@ class RealTimeMonitor:
             trade_params = {
                 'inputMint': self.solana_service.token_addresses['SOL'] if params['side'] == 'buy' else params['asset'],
                 'outputMint': params['asset'] if params['side'] == 'buy' else self.solana_service.token_addresses['SOL'],
-                'amount': str(int(float(params['amount']) * 10**9)),  # Convert to lamports
+                'amount': str(int(float(params['amount']) * 10**9)),
                 'slippageBps': params.get('slippage', 100),
                 'onlyDirectRoutes': False,
                 'asLegacyTransaction': True
