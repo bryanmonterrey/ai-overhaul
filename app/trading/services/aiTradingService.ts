@@ -1,6 +1,7 @@
 // app/trading/services/aiTradingService.ts
 import { createClient } from '@supabase/supabase-js';
 import { solanaService } from '../../lib/solana';
+import { PublicKey, WalletContextState } from '@solana/web3.js';
 
 interface WSMessage {
   type: string;
@@ -123,6 +124,12 @@ class AITradingService {
     side: 'buy' | 'sell';
     amount: number;
     price?: number;
+    wallet?: {
+      publicKey: PublicKey;
+      signTransaction: WalletContextState['signTransaction'];
+      signAllTransactions: WalletContextState['signAllTransactions'];
+      timestamp: number;
+    };
   }) {
     try {
       // Get market data first
