@@ -34,11 +34,43 @@ import {
 } from '../types/agent-kit';
 import type { GibworkCreateTaskReponse } from 'solana-agent-kit';
 
+interface WebSocketMessage {
+  type: 'trade_status' | 'quote_update' | 'execution_update';
+  data: any;
+}
+
+interface WebSocketTradeStatus {
+  tradeId: string;
+  status: 'initiated' | 'pending' | 'executed' | 'failed';
+  signature?: string;
+  error?: string;
+}
+
+interface WebSocketQuoteUpdate {
+  inputMint: string;
+  outputMint: string;
+  price: number;
+  priceImpact: number;
+}
+
+interface WebSocketExecutionUpdate {
+  tradeId: string;
+  signature: string;
+  status: 'confirmed' | 'finalized';
+  slot: number;
+}
+
 class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
   private agentKit: SolanaAgentKit;
+  private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
+  private ws: WebSocket | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000; // Start with 1 second
+  private listeners: { [key: string]: Function[] } = {};
 
   constructor() {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
@@ -51,6 +83,99 @@ class TradeExecutionService {
     );
     
     this.initializeJupiter();
+    this.connectWebSocket();
+  }
+
+  private connectWebSocket() {
+    if (typeof window !== 'undefined') {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        return;
+      }
+
+      this.ws = new WebSocket(this.wsUrl);
+      
+      this.ws.onopen = () => {
+        console.log('WebSocket connected');
+        this.reconnectAttempts = 0;
+        this.reconnectDelay = 1000;
+        this.emit('connection', { status: 'connected' });
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleWebSocketMessage(data);
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+        }
+      };
+
+      this.ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        this.emit('connection', { status: 'disconnected' });
+        
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.reconnectAttempts++;
+          this.reconnectDelay *= 2; // Exponential backoff
+          setTimeout(() => this.connectWebSocket(), this.reconnectDelay);
+        } else {
+          console.error('Max reconnection attempts reached');
+          this.emit('connection', { 
+            status: 'failed', 
+            error: 'Max reconnection attempts reached' 
+          });
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        this.emit('error', error);
+      };
+    }
+  }
+
+  private handleWebSocketMessage(data: WebSocketMessage) {
+    switch (data.type) {
+      case 'trade_status':
+        this.handleTradeStatus(data.data as WebSocketTradeStatus);
+        break;
+      case 'quote_update':
+        this.handleQuoteUpdate(data.data as WebSocketQuoteUpdate);
+        break;
+      case 'execution_update':
+        this.handleExecutionUpdate(data.data as WebSocketExecutionUpdate);
+        break;
+      default:
+        console.log('Unknown message type:', data.type);
+    }
+  }
+
+  private handleTradeStatus(data: WebSocketTradeStatus) {
+    this.emit('tradeStatus', data);
+  }
+
+  private handleQuoteUpdate(data: WebSocketQuoteUpdate) {
+    this.emit('quoteUpdate', data);
+  }
+
+  private handleExecutionUpdate(data: WebSocketExecutionUpdate) {
+    this.emit('executionUpdate', data);
+  }
+
+  public on(event: string, callback: Function) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+    return () => {
+      this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+    };
+  }
+
+  private emit(event: string, data: any) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach(callback => callback(data));
+    }
   }
 
   private async initializeJupiter() {
@@ -108,6 +233,14 @@ class TradeExecutionService {
 
       const bestRoute = route.routesInfos[0];
 
+      // Emit quote update
+      this.emit('quoteUpdate', {
+        inputMint: params.inputMint,
+        outputMint: params.outputMint,
+        price: Number(bestRoute.outAmount) / Number(bestRoute.inAmount),
+        priceImpact: bestRoute.priceImpactPct
+      });
+
       const { swapTransaction } = await this.jupiter.exchange({
         routeInfo: bestRoute,
         userPublicKey: wallet.publicKey,
@@ -115,6 +248,7 @@ class TradeExecutionService {
 
       let signatures: string[] = [];
 
+      // Your existing MEV logic...
       if (params.useMev) {
         const priorityFee = params.priorityFee || 0.0025;
         
@@ -139,12 +273,27 @@ class TradeExecutionService {
             if (signature) {
               const currentTPS = await this.agentKit.getTPS();
               
+              // Emit trade status
+              this.emit('tradeStatus', {
+                tradeId: bundleId,
+                status: 'pending',
+                signature: signature.toString()
+              });
+
               await this.connection.confirmTransaction({
                 signature: signature.toString(),
                 blockhash: swapTransaction.recentBlockhash!,
                 lastValidBlockHeight: await this.connection.getBlockHeight()
               });
               signatures.push(signature.toString());
+
+              // Emit execution update
+              this.emit('executionUpdate', {
+                tradeId: bundleId,
+                signature: signature.toString(),
+                status: 'confirmed',
+                slot: await this.connection.getSlot()
+              });
 
               return {
                 success: true,
@@ -165,9 +314,15 @@ class TradeExecutionService {
               };
             }
           }
-
         } catch (error) {
           console.error('MEV-protected transaction failed:', error);
+          // Emit error status
+          this.emit('tradeStatus', {
+            status: 'failed',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          
+          // Fallback to regular trade
           const signature = await this.agentKit.trade(
             new PublicKey(params.outputMint),
             params.amount,
@@ -194,6 +349,11 @@ class TradeExecutionService {
 
     } catch (error) {
       console.error('Trade execution error:', error);
+      // Emit error status
+      this.emit('tradeStatus', {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       throw error;
     }
   }
@@ -222,6 +382,14 @@ class TradeExecutionService {
       const inAmount = Number(bestRoute.inAmount.toString());
       const otherAmountThreshold = Number(bestRoute.otherAmountThreshold.toString());
 
+      // Emit quote update
+      this.emit('quoteUpdate', {
+        inputMint: params.inputMint,
+        outputMint: params.outputMint,
+        price: outAmount / inAmount,
+        priceImpact: bestRoute.priceImpactPct
+      });
+
       return {
         success: true,
         price: outAmount / inAmount,
@@ -241,6 +409,7 @@ class TradeExecutionService {
     }
   }
 
+  // Keep all your existing methods...
   async getMarketData(tokenMint: string): Promise<MarketDataResponse> {
     try {
       try {
@@ -277,18 +446,9 @@ class TradeExecutionService {
     }
   }
 
-  // Token Management
   async validateToken(mint: string): Promise<TokenInfo | null> {
     const tokenData = await this.agentKit.getTokenDataByAddress(mint);
     return tokenData ? tokenData as TokenInfo : null;
-  }
-
-  async getTokenPrice(mint: string): Promise<string | null> {
-    return this.agentKit.fetchTokenPrice(mint);
-  }
-
-  async getCurrentTPS(): Promise<number> {
-    return this.agentKit.getTPS();
   }
 
   async deployToken(
@@ -306,7 +466,15 @@ class TradeExecutionService {
     };
   }
 
-  // NFT Features
+  async getTokenPrice(mint: string): Promise<string | null> {
+    return this.agentKit.fetchTokenPrice(mint);
+  }
+
+
+  async getCurrentTPS(): Promise<number> {
+    return this.agentKit.getTPS();
+  }
+
   async deployCollection(options: CollectionOptions): Promise<CollectionDeploymentResponse> {
     const result = await this.agentKit.deployCollection(options);
     return {
@@ -334,7 +502,6 @@ class TradeExecutionService {
     };
   }
 
-  // Domain Management
   async registerDomain(name: string, spaceKB?: number): Promise<DomainResponse> {
     const domain = await this.agentKit.registerDomain(name, spaceKB);
     return {
@@ -356,17 +523,6 @@ class TradeExecutionService {
     };
   }
 
-  async getPrimaryDomain(account: PublicKey): Promise<DomainResponse> {
-    const domain = await this.agentKit.getPrimaryDomain(account);
-    return {
-      success: true,
-      domain,
-      owner: account,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  // DeFi Features
   async lendAssets(amount: number): Promise<LendingResponse> {
     const txid = await this.agentKit.lendAssets(amount);
     return {
@@ -374,6 +530,16 @@ class TradeExecutionService {
       signature: txid,
       amount,
       apy: 0, // Add actual APY if available
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async getPrimaryDomain(account: PublicKey): Promise<DomainResponse> {
+    const domain = await this.agentKit.getPrimaryDomain(account);
+    return {
+      success: true,
+      domain,
+      owner: account,
       timestamp: new Date().toISOString()
     };
   }
@@ -389,7 +555,6 @@ class TradeExecutionService {
     };
   }
 
-  // Token Launch Features
   async launchPumpFunToken(
     tokenName: string,
     tokenTicker: string,
@@ -412,7 +577,6 @@ class TradeExecutionService {
     };
   }
 
-  // Airdrop Features
   async sendCompressedAirdrop(
     mintAddress: string,
     amount: number,
@@ -438,7 +602,6 @@ class TradeExecutionService {
     };
   }
 
-  // AMM Features
   async createOrcaSingleSidedWhirlpool(
     depositTokenAmount: BN,
     depositTokenMint: PublicKey,
@@ -466,7 +629,6 @@ class TradeExecutionService {
     };
   }
 
-  // Raydium Integration
   async raydiumCreateAmmV4(
     marketId: PublicKey,
     baseAmount: BN,
@@ -542,7 +704,6 @@ class TradeExecutionService {
     };
   }
 
-  // Openbook Integration
   async openbookCreateMarket(
     baseMint: PublicKey,
     quoteMint: PublicKey,
@@ -565,7 +726,6 @@ class TradeExecutionService {
     };
   }
 
-  // Price Oracle Integration
   async pythFetchPrice(priceFeedID: string): Promise<PythPriceResponse> {
     const price = await this.agentKit.pythFetchPrice(priceFeedID);
     return {
@@ -576,7 +736,6 @@ class TradeExecutionService {
     };
   }
 
-  // Utility Methods
   async getBalance(tokenAddress?: PublicKey): Promise<TokenBalanceResponse> {
     const balance = await this.agentKit.getBalance(tokenAddress);
     return {
@@ -604,6 +763,8 @@ class TradeExecutionService {
     };
   }
 
+  
+
   // Domain Name Service Features
   async resolveAllDomains(domain: string): Promise<PublicKey | undefined> {
     return this.agentKit.resolveAllDomains(domain);
@@ -629,7 +790,6 @@ class TradeExecutionService {
     return this.agentKit.getMainAllDomainsDomain(owner);
   }
 
-  // Gibwork Integration
   async createGibworkTask(
     title: string,
     content: string,
@@ -650,6 +810,28 @@ class TradeExecutionService {
       status: 'created',
       timestamp: new Date().toISOString()
     };
+  }
+
+  // Add WebSocket cleanup method
+  public disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+      this.listeners = {};
+    }
+  }
+
+  // Add reconnect method
+  public reconnect() {
+    this.disconnect();
+    this.reconnectAttempts = 0;
+    this.reconnectDelay = 1000;
+    this.connectWebSocket();
+  }
+
+  // Add method to check connection status
+  public isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
   }
 }
 

@@ -202,7 +202,7 @@ export interface CollectionOptions {
     sellerFeeBasisPoints?: number;
     creators?: Array<{
       address: string;
-      share: number;
+      percentage: number;
     }>;
     isMutable?: boolean;
   }

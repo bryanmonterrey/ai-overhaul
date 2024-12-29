@@ -9,10 +9,22 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from "@/hooks/use-toast";
 import { aiTradingService } from '../../services/aiTradingService';
 import InputMorphMessage from '@/components/InputMorphMessage';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { solanaService } from '@/app/lib/solana';
 import { confirmDialog } from '@/components/ui/confirm-dialog';
+import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { PublicKey } from '@solana/web3.js';
+import { SignerWalletAdapterProps } from '@solana/wallet-adapter-base';
 
+
+declare global {
+  var walletCredentials: {
+    publicKey: PublicKey;
+    signTransaction: WalletContextState['signTransaction'];
+    signAllTransactions: WalletContextState['signAllTransactions'];
+    timestamp: number;
+  } | undefined;
+}
 
 interface TradeExecutionData {
   type: 'trade_execution';
@@ -51,13 +63,25 @@ function isPortfolioUpdate(data: any): data is PortfolioUpdateData {
 export function AdminTradingChat() {
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction, signAllTransactions, connected, select } = useWallet() as WalletContextState;
+  const { setVisible } = useWalletModal();
 
   useEffect(() => {
     if (publicKey) {
       solanaService.updateWalletConnection(publicKey);
     }
   }, [publicKey]);
+
+  useEffect(() => {
+    if (!connected) {
+      toast({
+        title: "Wallet Required",
+        description: "Please connect your wallet to continue",
+        variant: "default",
+      });
+      setVisible(true);  // Show wallet modal
+    }
+  }, [connected, setVisible]);
   
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: '/api/trading/admin/chat',
@@ -127,6 +151,17 @@ export function AdminTradingChat() {
 
   const handleTradeExecution = async (tradeData: EnhancedTradeExecutionData) => {
     try {
+      // Check wallet connection and signing capabilities
+      if (!publicKey || !signTransaction || !signAllTransactions || !connected) {
+        toast({
+          title: "Wallet Required",
+          description: "Please connect your wallet with signing capabilities to execute trades",
+          variant: "destructive"
+        });
+        setVisible(true);  // Show wallet modal
+        return;
+      }
+
       // Handle trade confirmation if required
       if (tradeData.requires_confirmation) {
         const confirmed = await confirmDialog({
@@ -139,11 +174,23 @@ export function AdminTradingChat() {
         if (!confirmed) return;
       }
 
+      // Cache wallet credentials if not already cached
+      if (!global.walletCredentials) {
+        global.walletCredentials = {
+          publicKey,
+          signTransaction,
+          signAllTransactions,
+          timestamp: Date.now()
+        };
+      }
+
+      // Execute trade using cached credentials
       const result = await aiTradingService.executeManualTrade({
         token: tradeData.token,
         side: tradeData.side,
         amount: tradeData.amount,
-        price: tradeData.price
+        price: tradeData.price,
+        wallet: global.walletCredentials
       });
 
       // Show market analysis if available
@@ -155,11 +202,16 @@ export function AdminTradingChat() {
         });
       }
 
+      // Show success notification
       toast({
         title: "Trade Executed",
         description: `Successfully executed ${tradeData.side} trade for ${tradeData.amount} ${tradeData.token}`,
       });
+
     } catch (error) {
+      // Clear credentials on error
+      global.walletCredentials = undefined;
+      
       console.error('Error executing trade:', error);
       toast({
         title: "Trade Failed",
@@ -167,7 +219,7 @@ export function AdminTradingChat() {
         variant: "destructive",
       });
     }
-  };
+};
 
   useEffect(() => {
     // Subscribe to both trading updates and trade status

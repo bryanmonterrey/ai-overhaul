@@ -1,148 +1,79 @@
-from typing import Dict, Any, Optional, List
-import os
+# memgpt-service/trading/solana_service.py
+from typing import Dict, Any, Optional
 import logging
 from decimal import Decimal
-import aiohttp
 from datetime import datetime
+import aiohttp
+import os
 
 class SolanaService:
+    """Solana utilities that coordinate with frontend agent-kit"""
     def __init__(self):
-        # Known token addresses
+        self.agent_kit_url = os.getenv('NEXT_PUBLIC_FRONTEND_URL') + '/api/agent-kit'
         self.token_addresses = {
             'SOL': 'So11111111111111111111111111111111111111112',
-            'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',  # BONK token
-            'WIF': 'EKLq75w7HHq8pSqGrHRNn6ow5QkxdQPWHNrg4RfnN7Nf',   # WIF token
-            'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',  # Added USDC
-            # Add more tokens as needed
+            'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+            'WIF': 'EKLq75w7HHq8pSqGrHRNn6ow5QkxdQPWHNrg4RfnN7Nf',
+            'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
         }
-        self.JUPITER_API_URL = "https://quote-api.jup.ag/v6"
-        
-    async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a token swap using Jupiter API"""
+
+    async def _call_agent_kit(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Make call to agent-kit API"""
         try:
-            # Extract parameters
-            input_mint = params.get('tokenIn', self.token_addresses['SOL'])
-            output_mint = params.get('tokenOut')
-            amount = int(float(params['amount']) * 10**9)  # Convert to lamports
-            slippage_bps = int(params.get('slippage', 100))  # Default 1%
-            
-            # Prepare quote parameters
-            quote_params = {
-                'inputMint': input_mint,
-                'outputMint': output_mint,
-                'amount': str(amount),
-                'slippageBps': slippage_bps,
-                'onlyDirectRoutes': False,
-                'asLegacyTransaction': True  # For better compatibility
-            }
-            
             async with aiohttp.ClientSession() as session:
-                # Get quote
-                async with session.get(
-                    f"{self.JUPITER_API_URL}/quote",
-                    params=quote_params
+                async with session.post(
+                    self.agent_kit_url,
+                    json={
+                        'action': action,
+                        'params': params
+                    }
                 ) as response:
                     if response.status != 200:
                         error_data = await response.json()
-                        raise ValueError(f"Quote error: {error_data.get('error', 'Unknown error')}")
-                    
-                    quote_data = await response.json()
-                    
-                    return {
-                        'inputMint': input_mint,
-                        'outputMint': output_mint,
-                        'inAmount': str(amount),
-                        'outAmount': quote_data.get('outAmount'),
-                        'routes': quote_data.get('routes'),
-                        'otherAmountThreshold': quote_data.get('otherAmountThreshold'),
-                        'swapMode': "ExactIn",
-                        'slippageBps': slippage_bps,
-                        'platformFee': quote_data.get('platformFee', None),
-                        'priceImpactPct': quote_data.get('priceImpactPct', 0),
-                        'contextSlot': quote_data.get('contextSlot'),
-                        'timestamp': datetime.now().isoformat()
-                    }
+                        raise ValueError(f"Agent-kit error: {error_data.get('error', 'Unknown error')}")
+                    return await response.json()
+        except Exception as e:
+            logging.error(f"Agent-kit API call error: {str(e)}")
+            raise
+        
+    async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute swap through agent-kit"""
+        try:
+            # First validate the trade
+            validation = await self._call_agent_kit('validateTransaction', params)
+            if not validation.get('isValid'):
+                raise ValueError(f"Trade validation failed: {validation.get('reason')}")
+
+            # Execute the trade
+            result = await self._call_agent_kit('trade', params)
+            
+            return {
+                'success': True,
+                'signature': result.get('signature'),
+                'params': params,
+                'result': result,
+                'timestamp': datetime.now().isoformat()
+            }
 
         except Exception as e:
             logging.error(f"Swap execution error: {str(e)}")
             raise
 
-    async def get_token_price(self, token: str) -> Decimal:
-        """Get token price from Jupiter"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                params = {
-                    'inputMint': self.token_addresses.get(token.upper(), token),
-                    'outputMint': self.token_addresses['USDC'],
-                    'amount': '1000000000'  # 1 token in lamports
-                }
-                
-                async with session.get(
-                    f"{self.JUPITER_API_URL}/quote",
-                    params=params
-                ) as response:
-                    if response.status == 200:
-                        quote_data = await response.json()
-                        # Calculate price from quote (in USDC)
-                        out_amount = Decimal(quote_data['outAmount']) / Decimal('1000000')  # USDC decimals
-                        return out_amount
-                    else:
-                        error_data = await response.json()
-                        raise ValueError(f"Jupiter price error: {error_data.get('error', 'Unknown error')}")
-
-        except Exception as e:
-            logging.error(f"Error fetching token price: {str(e)}")
-            raise
-
     async def get_token_data(self, token_address: str) -> Dict[str, Any]:
-        """Get token metadata from Jupiter"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get('https://token.jup.ag/all') as response:
-                    if response.status != 200:
-                        raise ValueError(f"Failed to get token list: {response.status}")
-                    
-                    tokens = await response.json()
-                    token_info = next((t for t in tokens if t['address'] == token_address), None)
-                    
-                    if not token_info:
-                        raise ValueError(f"No data found for token: {token_address}")
-                    
-                    return {
-                        "address": token_address,
-                        "decimals": token_info.get('decimals', 9),
-                        "name": token_info.get('name'),
-                        "symbol": token_info.get('symbol'),
-                        "logoURI": token_info.get('logoURI'),
-                        "tags": token_info.get('tags', []),
-                        "verified": token_info.get('verified', False)
-                    }
+        """Get token data through agent-kit"""
+        return await self._call_agent_kit('getTokenData', {'mint': token_address})
 
-        except Exception as e:
-            logging.error(f"Error fetching token data: {str(e)}")
-            raise
+    async def get_token_price(self, token: str) -> Decimal:
+        """Get token price through agent-kit"""
+        result = await self._call_agent_kit('getPrice', {
+            'mint': self.token_addresses.get(token.upper(), token)
+        })
+        return Decimal(str(result.get('price', 0)))
 
-    async def get_token_list(self) -> List[Dict[str, Any]]:
-        """Get Jupiter's token list"""
-        async with aiohttp.ClientSession() as session:
-            async with session.get('https://token.jup.ag/all') as response:
-                if response.status == 200:
-                    return await response.json()
-                raise ValueError(f"Failed to get token list: {response.status}")
-            
-    async def get_routes(self, input_mint: str, output_mint: str, amount: int) -> List[Dict[str, Any]]:
-        """Get available swap routes from Jupiter"""
-        params = {
+    async def get_routes(self, input_mint: str, output_mint: str, amount: float) -> Dict[str, Any]:
+        """Get routes through agent-kit"""
+        return await self._call_agent_kit('getRoutes', {
             'inputMint': input_mint,
             'outputMint': output_mint,
-            'amount': str(amount),
-            'slippageBps': 100,
-            'onlyDirectRoutes': False
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{self.JUPITER_API_URL}/quote", params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get('routes', [])
-                raise ValueError(f"Failed to get routes: {response.status}")
+            'amount': amount
+        })
