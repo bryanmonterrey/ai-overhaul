@@ -9,7 +9,17 @@ import os
 class SolanaService:
     """Solana utilities that coordinate with frontend agent-kit"""
     def __init__(self):
-        self.agent_kit_url = os.getenv('NEXT_PUBLIC_FRONTEND_URL') + '/api/agent-kit'
+        # Check if we're in production or development
+        is_production = os.getenv('NODE_ENV') == 'production'
+        default_url = 'https://terminal.goatse.app' if is_production else 'http://localhost:3000'
+        
+        # Get frontend URL with appropriate default
+        frontend_url = os.getenv('NEXT_PUBLIC_FRONTEND_URL', default_url)
+        self.agent_kit_url = f"{frontend_url}/api/agent-kit"
+        
+        # Log which environment we're using
+        logging.info(f"Initializing SolanaService with frontend URL: {self.agent_kit_url}")
+        
         self.token_addresses = {
             'SOL': 'So11111111111111111111111111111111111111112',
             'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
