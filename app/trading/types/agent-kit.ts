@@ -49,10 +49,22 @@ export interface TokenTransferResponse extends BaseResponse {
 }
 
 // NFT Responses
+export interface CollectionDeployment {
+  collectionMint: PublicKey;
+  metadata: PublicKey;
+  masterEdition: PublicKey;
+}
+
 export interface CollectionDeploymentResponse extends BaseResponse {
   mint: PublicKey;
   metadata: PublicKey;
   masterEdition: PublicKey;
+}
+
+export interface MintCollectionNFTResponse {
+  mint: PublicKey;
+  metadata: PublicKey;
+  signature: string;
 }
 
 export interface NFTMintResponse extends BaseResponse {
@@ -115,6 +127,7 @@ export interface LendingResponse extends BaseResponse {
 export interface StakingResponse extends BaseResponse {
   signature: string;
   amount: number;
+  apy: number;
   validatorAddress?: PublicKey;
   epoch?: number;
 }
@@ -268,6 +281,8 @@ export interface TradeStatusUpdate {
     error?: string;
   };
 }
+
+
 
 export interface NetworkStatusUpdate {
   type: 'network';
