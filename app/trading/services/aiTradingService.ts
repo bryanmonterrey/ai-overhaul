@@ -1,7 +1,8 @@
 // app/trading/services/aiTradingService.ts
 import { createClient } from '@supabase/supabase-js';
 import { solanaService } from '../../lib/solana';
-import { PublicKey, WalletContextState } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
+import { WalletContextState } from '@solana/wallet-adapter-react';
 
 interface WSMessage {
   type: string;

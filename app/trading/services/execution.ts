@@ -32,7 +32,6 @@ import {
   DomainResolutionResponse,
   LendingResponse
 } from '../types/agent-kit';
-import type { GibworkCreateTaskReponse } from 'solana-agent-kit';
 
 interface WebSocketMessage {
   type: 'trade_status' | 'quote_update' | 'execution_update';
@@ -532,8 +531,8 @@ class TradeExecutionService {
     const result = await agentKit.deployCollection(options);
     return {
       success: true,
-      mint: result.collectionMint,
-      metadata: result.collectionMetadata,
+      mint: result.mint,
+      metadata: result.metadata,
       masterEdition: result.masterEditionAccount,
       timestamp: new Date().toISOString()
     };
@@ -551,8 +550,8 @@ class TradeExecutionService {
       success: true,
       mint: result.mint,
       metadata: result.metadata,
-      edition: result?.edition || result.mint,
-      signature: result?.signature || 'pending',
+      edition: result.mint,
+      signature: 'pending',
       timestamp: new Date().toISOString()
     };
   }
@@ -605,7 +604,7 @@ class TradeExecutionService {
     );
     return {
       success: true,
-      tokenMint: result.mint,
+      tokenMint: new PublicKey(result.mint),
       ...result,
       timestamp: new Date().toISOString()
     };
