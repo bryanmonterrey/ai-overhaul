@@ -30,32 +30,63 @@ class SolanaService:
     async def _call_agent_kit(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Make call to agent-kit API"""
         try:
+            logging.info(f"Making request to {self.agent_kit_url}")
+            logging.info(f"Request payload: action={action}, params={params}")
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     self.agent_kit_url,
                     json={
                         'action': action,
                         'params': params
+                    },
+                    headers={
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     }
                 ) as response:
-                    if response.status != 200:
-                        error_data = await response.json()
-                        raise ValueError(f"Agent-kit error: {error_data.get('error', 'Unknown error')}")
-                    return await response.json()
+                    logging.info(f"Response status: {response.status}")
+                    logging.info(f"Response headers: {dict(response.headers)}")
+                    
+                    content_type = response.headers.get('Content-Type', '')
+                    if response.status != 200 or 'application/json' not in content_type.lower():
+                        error_text = await response.text()
+                        logging.error(f"Error response: {error_text}")
+                        logging.error(f"Status: {response.status}, Content-Type: {content_type}")
+                        raise ValueError(f"API error: status={response.status}, content-type={content_type}, body={error_text[:200]}")
+                    
+                    data = await response.json()
+                    logging.info(f"Response data: {data}")
+                    return data
+                    
         except Exception as e:
             logging.error(f"Agent-kit API call error: {str(e)}")
             raise
+
         
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute swap through agent-kit"""
         try:
             # First validate the trade
-            validation = await self._call_agent_kit('validateTransaction', params)
+            validation = await self._call_agent_kit('validateTransaction', {
+                'inputMint': params.get('receive_asset'),  # This should be SOL address
+                'outputMint': self.token_addresses.get(params['asset'].upper()),  # Target token address
+                'amount': params['amount'],
+                'slippage': params.get('slippage', 100),
+                'useMev': params.get('useMev', True)
+            })
+            
             if not validation.get('isValid'):
                 raise ValueError(f"Trade validation failed: {validation.get('reason')}")
 
             # Execute the trade
-            result = await self._call_agent_kit('trade', params)
+            result = await self._call_agent_kit('trade', {
+                'inputMint': params.get('receive_asset'),  # SOL address
+                'outputMint': self.token_addresses.get(params['asset'].upper()),  # Target token address
+                'amount': params['amount'],
+                'slippage': params.get('slippage', 100),
+                'useMev': params.get('useMev', True)
+            })
             
             return {
                 'success': True,
