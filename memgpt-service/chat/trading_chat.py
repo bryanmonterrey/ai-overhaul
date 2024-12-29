@@ -277,6 +277,29 @@ class TradingChat:
                     "error": f"Missing required parameters: {', '.join(missing_params)}"
                 }
 
+            # Get token info first - handles both symbol and contract address
+            try:
+                token_data = await self.solana_service._call_agent_kit('getTokenData', {
+                    'symbol': params['asset'],
+                    'discover': True
+                })
+                
+                if not token_data:
+                    return {
+                        'success': False,
+                        'error': f"Could not verify token: {params['asset']}",
+                        'user_message': f"I couldn't verify the token {params['asset']}. Please check the symbol/address and try again."
+                    }
+
+                # Store token info for the trade
+                params['token_data'] = token_data
+                params['asset'] = token_data['symbol']  # Use verified symbol
+
+            except Exception as token_error:
+                logging.error(f"Error verifying token: {str(token_error)}")
+                # Continue with original asset if token verification fails
+                logging.info("Proceeding with unverified token")
+
             # For "swap X SOL for TOKEN" we need to adjust the amount calculation
             input_amount = float(params['amount'])
             if params['side'] == 'buy' and params.get('asset').upper() != 'SOL':
@@ -300,7 +323,8 @@ class TradingChat:
                 'side': params['side'].lower(),
                 'slippage': params.get('slippage', 100),  # 1% default
                 'useMev': params.get('useMev', True),
-                'receive_asset': self.solana_service.token_addresses.get('SOL')
+                'receive_asset': self.solana_service.token_addresses.get('SOL'),
+                'token_data': params.get('token_data')  # Include token data if available
             }
             
             logging.info(f"Formatted trade parameters: {trade_params}")
@@ -334,8 +358,13 @@ class TradingChat:
                             **result,
                             'formatted_amount': params['amount'],  # Original amount
                             'token_symbol': params['asset'].upper(),
+                            'token_data': params.get('token_data'),  # Include token data
                             'user_message': f"Successfully executed {params['side']} trade for {params['amount']} {params['asset'].upper()}"
                         }
+                        
+                        # Add warnings for unverified tokens
+                        if params.get('token_data') and not params['token_data'].get('verified'):
+                            response['warnings'] = ["This token is not verified. Please verify the contract address."]
                     else:
                         response = {
                             **result,

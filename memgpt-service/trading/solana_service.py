@@ -67,32 +67,48 @@ class SolanaService:
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute swap through agent-kit"""
         try:
-            # First validate the trade
-            validation = await self._call_agent_kit('validateTransaction', {
-                'inputMint': params.get('receive_asset'),  # This should be SOL address
-                'outputMint': self.token_addresses.get(params['asset'].upper()),  # Target token address
+            # First get token data to validate - handles both symbol and address
+            token_data = await self._call_agent_kit('getTokenData', {
+                'symbol': params['asset'],
+                'discover': True
+            })
+            
+            # Use token address from params if provided directly
+            token_address = None
+            if params['asset'].startswith('0x') or len(params['asset']) == 44:  # Direct contract address
+                token_address = params['asset']
+            elif token_data and token_data.get('address'):
+                token_address = token_data['address']
+            else:
+                # Try hardcoded addresses as fallback
+                token_address = self.token_addresses.get(params['asset'].upper())
+            
+            if not token_address:
+                raise ValueError(f"Could not resolve token address for: {params['asset']}")
+
+            validation_params = {
+                'inputMint': params.get('receive_asset'),
+                'outputMint': token_address,
                 'amount': params['amount'],
                 'slippage': params.get('slippage', 100),
                 'useMev': params.get('useMev', True)
-            })
-            
+            }
+
+            # First validate the trade
+            validation = await self._call_agent_kit('validateTransaction', validation_params)
             if not validation.get('isValid'):
                 raise ValueError(f"Trade validation failed: {validation.get('reason')}")
 
             # Execute the trade
-            result = await self._call_agent_kit('trade', {
-                'inputMint': params.get('receive_asset'),  # SOL address
-                'outputMint': self.token_addresses.get(params['asset'].upper()),  # Target token address
-                'amount': params['amount'],
-                'slippage': params.get('slippage', 100),
-                'useMev': params.get('useMev', True)
-            })
+            result = await self._call_agent_kit('trade', validation_params)
             
             return {
                 'success': True,
                 'signature': result.get('signature'),
                 'params': params,
                 'result': result,
+                'token_data': token_data,  # Include token data if available
+                'token_address': token_address,  # Include resolved address
                 'timestamp': datetime.now().isoformat()
             }
 
