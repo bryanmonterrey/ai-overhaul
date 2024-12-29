@@ -64,26 +64,38 @@ class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
-  private agentKit: SolanaAgentKit;
+  private agentKit?: SolanaAgentKit;
   private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000; // Start with 1 second
+  private reconnectDelay = 1000;
   private listeners: { [key: string]: Function[] } = {};
 
   constructor() {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
     this.blockEngineUrl = 'https://frankfurt.jito.wtf/';
-    
-    this.agentKit = new SolanaAgentKit(
-      process.env.PRIVATE_KEY!,
-      process.env.NEXT_PUBLIC_RPC_URL!,
-      process.env.OPENAI_API_KEY!
-    );
-    
     this.initializeJupiter();
     this.connectWebSocket();
+  }
+
+  private async getOrCreateAgentKit(wallet?: Wallet): Promise<SolanaAgentKit> {
+    if (!wallet) {
+      if (!this.agentKit) {
+        this.agentKit = new SolanaAgentKit(
+          'readonly',
+          process.env.NEXT_PUBLIC_RPC_URL!,
+          process.env.OPENAI_API_KEY!
+        );
+      }
+      return this.agentKit;
+    }
+
+    return new SolanaAgentKit(
+      process.env.NEXT_PUBLIC_RPC_URL!,
+      process.env.OPENAI_API_KEY!,
+      wallet.publicKey.toString()
+    );
   }
 
   private connectWebSocket() {
@@ -116,7 +128,7 @@ class TradeExecutionService {
         
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;
-          this.reconnectDelay *= 2; // Exponential backoff
+          this.reconnectDelay *= 2;
           setTimeout(() => this.connectWebSocket(), this.reconnectDelay);
         } else {
           console.error('Max reconnection attempts reached');
@@ -209,10 +221,51 @@ class TradeExecutionService {
     }
   }
 
+  async getTokenInfo(symbolOrAddress: string) {
+    try {
+      // Try Jupiter token list first
+      const jupiterTokenList = await (await fetch(TOKEN_LIST_URL['mainnet-beta'])).json();
+      
+      // Look for exact matches first
+      let token = jupiterTokenList.find((t: any) => 
+        t.symbol.toUpperCase() === symbolOrAddress.toUpperCase() || 
+        t.address === symbolOrAddress
+      );
+
+      if (token) {
+        return {
+          symbol: token.symbol,
+          address: token.address,
+          name: token.name,
+          decimals: token.decimals,
+          logoURI: token.logoURI
+        };
+      }
+
+      // If not found and it looks like an address, try token metadata
+      if (symbolOrAddress.length === 44 || symbolOrAddress.startsWith('0x')) {
+        const mint = new PublicKey(symbolOrAddress);
+        return {
+          symbol: symbolOrAddress.slice(0, 8),
+          address: symbolOrAddress,
+          name: `Token ${symbolOrAddress.slice(0, 8)}`,
+          decimals: 9
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error getting token info:', error);
+      return null;
+    }
+  }
+
   async executeTradeWithMEV(params: TradeParams, wallet: Wallet): Promise<TradeExecutionResponse> {
     try {
-      const inputTokenData = await this.agentKit.getTokenDataByAddress(params.inputMint);
-      const outputTokenData = await this.agentKit.getTokenDataByAddress(params.outputMint);
+      const agentKit = await this.getOrCreateAgentKit(wallet);
+      
+      const inputTokenData = await agentKit.getTokenDataByAddress(params.inputMint);
+      const outputTokenData = await agentKit.getTokenDataByAddress(params.outputMint);
 
       if (!inputTokenData || !outputTokenData) {
         throw new Error('Invalid token mints');
@@ -233,7 +286,6 @@ class TradeExecutionService {
 
       const bestRoute = route.routesInfos[0];
 
-      // Emit quote update
       this.emit('quoteUpdate', {
         inputMint: params.inputMint,
         outputMint: params.outputMint,
@@ -248,7 +300,6 @@ class TradeExecutionService {
 
       let signatures: string[] = [];
 
-      // Your existing MEV logic...
       if (params.useMev) {
         const priorityFee = params.priorityFee || 0.0025;
         
@@ -271,9 +322,8 @@ class TradeExecutionService {
 
             const signature = swapTransaction.signatures[0]?.signature;
             if (signature) {
-              const currentTPS = await this.agentKit.getTPS();
+              const currentTPS = await agentKit.getTPS();
               
-              // Emit trade status
               this.emit('tradeStatus', {
                 tradeId: bundleId,
                 status: 'pending',
@@ -287,7 +337,6 @@ class TradeExecutionService {
               });
               signatures.push(signature.toString());
 
-              // Emit execution update
               this.emit('executionUpdate', {
                 tradeId: bundleId,
                 signature: signature.toString(),
@@ -316,14 +365,12 @@ class TradeExecutionService {
           }
         } catch (error) {
           console.error('MEV-protected transaction failed:', error);
-          // Emit error status
           this.emit('tradeStatus', {
             status: 'failed',
             error: error instanceof Error ? error.message : 'Unknown error'
           });
           
-          // Fallback to regular trade
-          const signature = await this.agentKit.trade(
+          const signature = await agentKit.trade(
             new PublicKey(params.outputMint),
             params.amount,
             new PublicKey(params.inputMint),
@@ -349,7 +396,6 @@ class TradeExecutionService {
 
     } catch (error) {
       console.error('Trade execution error:', error);
-      // Emit error status
       this.emit('tradeStatus', {
         status: 'failed',
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -360,8 +406,10 @@ class TradeExecutionService {
 
   async getRouteQuote(params: TradeParams): Promise<RouteQuoteResponse> {
     try {
-      const inputTokenData = await this.agentKit.getTokenDataByAddress(params.inputMint);
-      const outputTokenData = await this.agentKit.getTokenDataByAddress(params.outputMint);
+      const agentKit = await this.getOrCreateAgentKit();
+      
+      const inputTokenData = await agentKit.getTokenDataByAddress(params.inputMint);
+      const outputTokenData = await agentKit.getTokenDataByAddress(params.outputMint);
 
       const amountBigInt = JSBI.BigInt(params.amount.toString());
 
@@ -382,7 +430,6 @@ class TradeExecutionService {
       const inAmount = Number(bestRoute.inAmount.toString());
       const otherAmountThreshold = Number(bestRoute.otherAmountThreshold.toString());
 
-      // Emit quote update
       this.emit('quoteUpdate', {
         inputMint: params.inputMint,
         outputMint: params.outputMint,
@@ -409,11 +456,12 @@ class TradeExecutionService {
     }
   }
 
-  // Keep all your existing methods...
   async getMarketData(tokenMint: string): Promise<MarketDataResponse> {
     try {
+      const agentKit = await this.getOrCreateAgentKit();
+      
       try {
-        const price = await this.agentKit.fetchTokenPrice(tokenMint);
+        const price = await agentKit.fetchTokenPrice(tokenMint);
         if (price) {
           return {
             success: true,
@@ -447,8 +495,19 @@ class TradeExecutionService {
   }
 
   async validateToken(mint: string): Promise<TokenInfo | null> {
-    const tokenData = await this.agentKit.getTokenDataByAddress(mint);
+    const agentKit = await this.getOrCreateAgentKit();
+    const tokenData = await agentKit.getTokenDataByAddress(mint);
     return tokenData ? tokenData as TokenInfo : null;
+  }
+
+  async getTokenPrice(mint: string): Promise<string | null> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.fetchTokenPrice(mint);
+  }
+
+  async getCurrentTPS(): Promise<number> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getTPS();
   }
 
   async deployToken(
@@ -456,9 +515,11 @@ class TradeExecutionService {
     uri: string,
     symbol: string,
     decimals: number = 9,
-    initialSupply?: number
+    initialSupply?: number,
+    wallet?: Wallet
   ): Promise<TokenDeploymentResponse> {
-    const result = await this.agentKit.deployToken(name, uri, symbol, decimals, initialSupply);
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const result = await agentKit.deployToken(name, uri, symbol, decimals, initialSupply);
     return {
       success: true,
       mint: result.mint,
@@ -466,22 +527,14 @@ class TradeExecutionService {
     };
   }
 
-  async getTokenPrice(mint: string): Promise<string | null> {
-    return this.agentKit.fetchTokenPrice(mint);
-  }
-
-
-  async getCurrentTPS(): Promise<number> {
-    return this.agentKit.getTPS();
-  }
-
-  async deployCollection(options: CollectionOptions): Promise<CollectionDeploymentResponse> {
-    const result = await this.agentKit.deployCollection(options);
+  async deployCollection(options: CollectionOptions, wallet?: Wallet): Promise<CollectionDeploymentResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const result = await agentKit.deployCollection(options);
     return {
       success: true,
-      mint: result.mint,
-      metadata: result.metadata,
-      masterEdition: result.masterEdition,
+      mint: result.collectionMint,
+      metadata: result.collectionMetadata,
+      masterEdition: result.masterEditionAccount,
       timestamp: new Date().toISOString()
     };
   }
@@ -489,9 +542,11 @@ class TradeExecutionService {
   async mintNFT(
     collectionMint: PublicKey,
     metadata: any,
-    recipient?: PublicKey
+    recipient?: PublicKey,
+    wallet?: Wallet
   ): Promise<NFTMintResponse> {
-    const result = await this.agentKit.mintNFT(collectionMint, metadata, recipient);
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const result = await agentKit.mintNFT(collectionMint, metadata, recipient);
     return {
       success: true,
       mint: result.mint,
@@ -502,55 +557,32 @@ class TradeExecutionService {
     };
   }
 
-  async registerDomain(name: string, spaceKB?: number): Promise<DomainResponse> {
-    const domain = await this.agentKit.registerDomain(name, spaceKB);
+  async getBalance(tokenAddress?: PublicKey, wallet?: Wallet): Promise<TokenBalanceResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const balance = await agentKit.getBalance(tokenAddress);
     return {
       success: true,
-      domain,
-      owner: this.agentKit.wallet_address,
+      balance,
+      decimals: 9,
+      uiBalance: balance.toString(),
       timestamp: new Date().toISOString()
     };
   }
 
-  async resolveSolDomain(domain: string): Promise<DomainResolutionResponse> {
-    const address = await this.agentKit.resolveSolDomain(domain);
+  async transfer(
+    to: PublicKey,
+    amount: number,
+    mint?: PublicKey,
+    wallet?: Wallet
+  ): Promise<TokenTransferResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.transfer(to, amount, mint);
     return {
       success: true,
-      address,
-      domain,
-      owner: address,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async lendAssets(amount: number): Promise<LendingResponse> {
-    const txid = await this.agentKit.lendAssets(amount);
-    return {
-      success: true,
-      signature: txid,
+      signature,
+      source: agentKit.wallet_address,
+      destination: to,
       amount,
-      apy: 0, // Add actual APY if available
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async getPrimaryDomain(account: PublicKey): Promise<DomainResponse> {
-    const domain = await this.agentKit.getPrimaryDomain(account);
-    return {
-      success: true,
-      domain,
-      owner: account,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async stake(amount: number): Promise<StakingResponse> {
-    const txid = await this.agentKit.stake(amount);
-    return {
-      success: true,
-      signature: txid,
-      amount,
-      apy: 0, // Add actual APY if available
       timestamp: new Date().toISOString()
     };
   }
@@ -560,9 +592,11 @@ class TradeExecutionService {
     tokenTicker: string,
     description: string,
     imageUrl: string,
-    options?: PumpFunTokenOptions
+    options?: PumpFunTokenOptions,
+    wallet?: Wallet
   ): Promise<PumpfunLaunchResponse> {
-    const result = await this.agentKit.launchPumpFunToken(
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const result = await agentKit.launchPumpFunToken(
       tokenName,
       tokenTicker,
       description,
@@ -576,41 +610,17 @@ class TradeExecutionService {
       timestamp: new Date().toISOString()
     };
   }
-
-  async sendCompressedAirdrop(
-    mintAddress: string,
-    amount: number,
-    decimals: number,
-    recipients: string[],
-    priorityFeeInLamports: number,
-    shouldLog: boolean
-  ): Promise<CompressedAirdropResponse> {
-    const signatures = await this.agentKit.sendCompressedAirdrop(
-      mintAddress,
-      amount,
-      decimals,
-      recipients,
-      priorityFeeInLamports,
-      shouldLog
-    );
-    return {
-      success: true,
-      signatures,
-      successCount: signatures.length,
-      totalAmount: amount * recipients.length,
-      timestamp: new Date().toISOString()
-    };
-  }
-
   async createOrcaSingleSidedWhirlpool(
     depositTokenAmount: BN,
     depositTokenMint: PublicKey,
     otherTokenMint: PublicKey,
     initialPrice: Decimal,
     maxPrice: Decimal,
-    feeTier: number
+    feeTier: number,
+    wallet?: Wallet
   ): Promise<WhirlpoolCreationResponse> {
-    const signature = await this.agentKit.createOrcaSingleSidedWhirlpool(
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.createOrcaSingleSidedWhirlpool(
       depositTokenAmount,
       depositTokenMint,
       otherTokenMint,
@@ -633,9 +643,11 @@ class TradeExecutionService {
     marketId: PublicKey,
     baseAmount: BN,
     quoteAmount: BN,
-    startTime: BN
+    startTime: BN,
+    wallet?: Wallet
   ): Promise<RaydiumAMMResponse> {
-    const signature = await this.agentKit.raydiumCreateAmmV4(
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.raydiumCreateAmmV4(
       marketId,
       baseAmount,
       quoteAmount,
@@ -657,9 +669,11 @@ class TradeExecutionService {
     mint2: PublicKey,
     configId: PublicKey,
     initialPrice: Decimal,
-    startTime: BN
+    startTime: BN,
+    wallet?: Wallet
   ): Promise<RaydiumAMMResponse> {
-    const signature = await this.agentKit.raydiumCreateClmm(
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.raydiumCreateClmm(
       mint1,
       mint2,
       configId,
@@ -683,9 +697,11 @@ class TradeExecutionService {
     configId: PublicKey,
     mintAAmount: BN,
     mintBAmount: BN,
-    startTime: BN
+    startTime: BN,
+    wallet?: Wallet
   ): Promise<RaydiumAMMResponse> {
-    const signature = await this.agentKit.raydiumCreateCpmm(
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.raydiumCreateCpmm(
       mint1,
       mint2,
       configId,
@@ -708,9 +724,11 @@ class TradeExecutionService {
     baseMint: PublicKey,
     quoteMint: PublicKey,
     lotSize: number = 1,
-    tickSize: number = 0.01
+    tickSize: number = 0.01,
+    wallet?: Wallet
   ): Promise<OpenbookMarketResponse> {
-    const signatures = await this.agentKit.openbookCreateMarket(
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signatures = await agentKit.openbookCreateMarket(
       baseMint,
       quoteMint,
       lotSize,
@@ -727,7 +745,8 @@ class TradeExecutionService {
   }
 
   async pythFetchPrice(priceFeedID: string): Promise<PythPriceResponse> {
-    const price = await this.agentKit.pythFetchPrice(priceFeedID);
+    const agentKit = await this.getOrCreateAgentKit();
+    const price = await agentKit.pythFetchPrice(priceFeedID);
     return {
       success: true,
       price: Number(price),
@@ -736,58 +755,119 @@ class TradeExecutionService {
     };
   }
 
-  async getBalance(tokenAddress?: PublicKey): Promise<TokenBalanceResponse> {
-    const balance = await this.agentKit.getBalance(tokenAddress);
-    return {
-      success: true,
-      balance,
-      decimals: 9,
-      uiBalance: balance.toString(),
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async transfer(
-    to: PublicKey,
+  async sendCompressedAirdrop(
+    mintAddress: string,
     amount: number,
-    mint?: PublicKey
-  ): Promise<TokenTransferResponse> {
-    const signature = await this.agentKit.transfer(to, amount, mint);
+    decimals: number,
+    recipients: string[],
+    priorityFeeInLamports: number,
+    shouldLog: boolean,
+    wallet?: Wallet
+  ): Promise<CompressedAirdropResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signatures = await agentKit.sendCompressedAirdrop(
+      mintAddress,
+      amount,
+      decimals,
+      recipients,
+      priorityFeeInLamports,
+      shouldLog
+    );
     return {
       success: true,
-      signature,
-      source: this.agentKit.wallet_address,
-      destination: to,
-      amount,
+      signatures,
+      successCount: signatures.length,
+      totalAmount: amount * recipients.length,
+      timestamp: new Date().toISOString()
+    };
+  }
+  async registerDomain(name: string, spaceKB?: number, wallet?: Wallet): Promise<DomainResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const domain = await agentKit.registerDomain(name, spaceKB);
+    return {
+      success: true,
+      domain,
+      owner: agentKit.wallet_address,
       timestamp: new Date().toISOString()
     };
   }
 
-  
+  async resolveSolDomain(domain: string): Promise<DomainResolutionResponse> {
+    const agentKit = await this.getOrCreateAgentKit();
+    const address = await agentKit.resolveSolDomain(domain);
+    return {
+      success: true,
+      address,
+      domain,
+      owner: address,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async lendAssets(amount: number, wallet?: Wallet): Promise<LendingResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const txid = await agentKit.lendAssets(amount);
+    return {
+      success: true,
+      signature: txid,
+      amount,
+      apy: 0,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async stake(amount: number, wallet?: Wallet): Promise<StakingResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const txid = await agentKit.stake(amount);
+    return {
+      success: true,
+      signature: txid,
+      amount,
+      apy: 0,
+      timestamp: new Date().toISOString()
+    };
+  }
 
   // Domain Name Service Features
   async resolveAllDomains(domain: string): Promise<PublicKey | undefined> {
-    return this.agentKit.resolveAllDomains(domain);
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.resolveAllDomains(domain);
   }
 
   async getOwnedAllDomains(owner: PublicKey): Promise<string[]> {
-    return this.agentKit.getOwnedAllDomains(owner);
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getOwnedAllDomains(owner);
   }
 
   async getOwnedDomainsForTLD(tld: string): Promise<string[]> {
-    return this.agentKit.getOwnedDomainsForTLD(tld);
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getOwnedDomainsForTLD(tld);
   }
 
   async getAllDomainsTLDs(): Promise<string[]> {
-    return this.agentKit.getAllDomainsTLDs();
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getAllDomainsTLDs();
   }
 
   async getAllRegisteredAllDomains(): Promise<string[]> {
-    return this.agentKit.getAllRegisteredAllDomains();
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getAllRegisteredAllDomains();
   }
 
   async getMainAllDomainsDomain(owner: PublicKey): Promise<string | null> {
-    return this.agentKit.getMainAllDomainsDomain(owner);
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getMainAllDomainsDomain(owner);
+  }
+
+  async getPrimaryDomain(account: PublicKey): Promise<DomainResponse> {
+    const agentKit = await this.getOrCreateAgentKit();
+    const domain = await agentKit.getPrimaryDomain(account);
+    return {
+      success: true,
+      domain,
+      owner: account,
+      timestamp: new Date().toISOString()
+    };
   }
 
   async createGibworkTask(
@@ -797,12 +877,14 @@ class TradeExecutionService {
     tags: string[],
     tokenMintAddress: string,
     tokenAmount: number,
-    payer?: string
+    payer?: string,
+    wallet?: Wallet
   ): Promise<GibworkCreateTaskReponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
     return {
       success: true,
       taskId: 'task_' + Date.now(),
-      creator: new PublicKey(this.agentKit.wallet_address),
+      creator: new PublicKey(agentKit.wallet_address),
       bounty: {
         mint: tokenMintAddress,
         amount: tokenAmount
@@ -812,7 +894,7 @@ class TradeExecutionService {
     };
   }
 
-  // Add WebSocket cleanup method
+  // WebSocket cleanup method
   public disconnect() {
     if (this.ws) {
       this.ws.close();
@@ -821,7 +903,7 @@ class TradeExecutionService {
     }
   }
 
-  // Add reconnect method
+  // Reconnect method
   public reconnect() {
     this.disconnect();
     this.reconnectAttempts = 0;
@@ -829,7 +911,7 @@ class TradeExecutionService {
     this.connectWebSocket();
   }
 
-  // Add method to check connection status
+  // Method to check connection status
   public isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
