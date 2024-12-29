@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Link } from "next-view-transitions";
 import React from "react";
 import { Magnetic } from "./components/common/MagButton";
-import { ArrowRight, Icon, LucideIcon, MessageCircleMore } from 'lucide-react';
+import { ArrowRight, Icon, LucideIcon, MessageCircleMore, MessagesSquare } from 'lucide-react';
 import { AnimatePresence, motion } from "framer-motion";
+import Float from "@/components/float";
+import Image from "next/image";
 
 interface AnimatedLinkProps {
   href: string;
@@ -87,7 +89,7 @@ export default function Home({ href, icon: Icon, text }: AnimatedLinkProps): JSX
         transition={{ duration: 0.2 }}
       >
         <div className="relative space-y-6 left-1">
-          <MessageCircleMore 
+          <MessagesSquare 
             className="w-8 h-8 text-[#DDDDDD] absolute -top-1" 
             strokeWidth={2}
           />
@@ -111,8 +113,10 @@ export default function Home({ href, icon: Icon, text }: AnimatedLinkProps): JSX
     </Link>
   </div>
 </Magnetic>
+
                 
-                </div>
+</div>
+
     </div>
   );
 }
