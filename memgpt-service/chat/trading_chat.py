@@ -46,43 +46,58 @@ class TradingChat:
     Previous Trade Parameters: {json.dumps(self.last_trade) if self.last_trade else 'None'}
 
     Available commands:
-    - TRADE: For trade execution requests (e.g., "buy 100 SOL", "sell 50 USDC", "swap 0.01 SOL for BONK")
+    - TRADE: For trade execution requests
         Required parameters: 
-        - asset: The token to trade
-        - amount: The amount to trade
+        - asset: The exact token symbol/address from the message
+        - amount: The exact numerical amount from the message
         - side: 'buy' or 'sell'
     - CONFIRM: For confirming trades (maps to TRADE command)
         Should extract parameters from previous trade context:
         - asset: Same as previous trade
         - amount: Same as previous trade
         - side: Same as previous trade
-    - ANALYSIS: For market analysis requests (e.g., "analyze SOL price", "check market conditions")
+    - ANALYSIS: For market analysis requests
+        Examples: "analyze [token] price", "check market conditions"
+        Required parameters:
+        - asset: Token to analyze (if specified)
+        - timeframe: Time period (if specified)
     - SETTINGS: For system settings changes
+        Required parameters:
+        - setting: The setting to change
+        - value: New value
     - PORTFOLIO: For portfolio information requests
+        Examples: "show portfolio", "check balance"
     - SYSTEM: For system maintenance commands
+        Examples: "system status", "check performance"
 
-    For swap operations, map the parameters as follows:
-    - For "swap X tokenA for tokenB": 
-        asset = tokenB
-        amount = X
-        side = "buy"
-    - For "swap tokenA for X tokenB":
-        asset = tokenB
-        amount = X
-        side = "buy"
-
-    For confirmation messages, if user confirms (e.g., "yes", "confirm", "do it"):
+    Swap Operation Rules:
+    - For "swap X [tokenA] for [tokenB]": 
+        asset = tokenB    # Extract exact tokenB from message
+        amount = X        # Extract exact amount
+        side = "buy"      # User wants to receive tokenB
+    - For "swap for X [token]" or "buy X [token]":
+        asset = token     # Extract exact token from message
+        amount = X        # Extract exact amount
+        side = "buy"      # User wants to receive the token
+        
+    For confirmation messages (e.g., "yes", "confirm", "do it"):
         Use command_type = "TRADE" and include previous trade parameters
+
+    IMPORTANT:
+    1. Extract tokens EXACTLY as specified in the message - do not modify or assume tokens
+    2. Return ERROR if token or amount is not explicitly mentioned
+    3. For analysis commands, extract any mentioned timeframes or metrics
 
     Respond with only a JSON object containing:
     1. command_type: The type of command identified
     2. parameters: Relevant parameters extracted from the message
-    3. natural_response: A clear, concise response (do not include any technical details or JSON in this response)
+    3. natural_response: A clear, concise response (no technical details)
 
     Example responses:
-    {{"command_type": "TRADE", "parameters": {{"asset": "SOL", "amount": 100, "side": "buy"}}, "natural_response": "I understand you want to buy 100 SOL. Please confirm this trade."}}
-    {{"command_type": "TRADE", "parameters": {{"asset": "BONK", "amount": 0.01, "side": "buy"}}, "natural_response": "I understand you want to swap 0.01 SOL for BONK. Please confirm this trade."}}
-    {{"command_type": "TRADE", "parameters": {{"asset": "BONK", "amount": 0.01, "side": "buy"}}, "natural_response": "Executing the trade of 0.01 SOL for BONK."}}"""
+    {{"command_type": "TRADE", "parameters": {{"asset": "[exact token from message]", "amount": "[exact amount]", "side": "buy"}}, "natural_response": "I understand you want to buy [amount] [exact token]. Please confirm this trade."}}
+    {{"command_type": "ANALYSIS", "parameters": {{"asset": "[exact token]", "timeframe": "1h"}}, "natural_response": "Analyzing [token] price data for the last hour."}}
+    {{"command_type": "PORTFOLIO", "parameters": {{}}, "natural_response": "Here's your current portfolio overview."}}
+    {{"command_type": "ERROR", "parameters": {{}}, "natural_response": "I couldn't understand which token you want to trade. Please specify the token symbol or address."}}"""
 
             response = await self.dspy_service.predict_with_retry(prompt)
 
