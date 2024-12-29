@@ -263,41 +263,90 @@ class TradingChat:
 ) -> Dict[str, Any]:
         """Handle trade execution commands"""
         try:
+            logging.info(f"Starting trade execution with params: {params}")
+            
             # Validate required parameters
             required_params = ['asset', 'amount', 'side']
             missing_params = [p for p in required_params if not params.get(p)]
             if missing_params:
+                logging.error(f"Missing parameters: {missing_params}")
                 return {
                     "success": False,
                     "error": f"Missing required parameters: {', '.join(missing_params)}"
                 }
 
+            # For "swap X SOL for TOKEN" we need to adjust the amount calculation
+            input_amount = float(params['amount'])
+            if params['side'] == 'buy' and params.get('asset').upper() != 'SOL':
+                # If we're swapping SOL for another token, this is the SOL amount
+                input_amount = float(params['amount'])
+                logging.info(f"Using SOL input amount: {input_amount}")
+            else:
+                # If we're swapping token for SOL, we need price data
+                try:
+                    token_price = await self.solana_service.get_token_price(params['asset'])
+                    input_amount = float(params['amount']) * float(token_price)
+                    logging.info(f"Calculated amount in SOL: {input_amount}")
+                except Exception as e:
+                    logging.error(f"Error calculating token amount: {e}")
+                    input_amount = float(params['amount'])
+
             # Format trade parameters
             trade_params = {
-                "tokenIn": "So11111111111111111111111111111111111111112",  # SOL token address
-                "tokenOut": params['asset'],  # WIF token
-                "amountIn": float(params['amount']),
-                "side": params['side'].lower(),
-                "slippage": params.get('slippage', 1.0),  # 1% default
-                "useMev": params.get('useMev', True)
+                'asset': params['asset'],
+                'amount': input_amount,
+                'side': params['side'].lower(),
+                'slippage': params.get('slippage', 100),  # 1% default
+                'useMev': params.get('useMev', True),
+                'receive_asset': self.solana_service.token_addresses.get('SOL')
             }
+            
+            logging.info(f"Formatted trade parameters: {trade_params}")
 
             if is_admin:
-                # Execute through realtime monitor
-                result = await self.realtime_monitor.execute_solana_trade(trade_params)
-                
+                # Execute through realtime monitor with debugging
                 try:
-                    await self.trading_memory.store_trade_execution({
-                        "type": "trade_attempt",
-                        "data": trade_params,
-                        "result": result,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                except Exception as mem_error:
-                    logging.error(f"Error storing trade execution: {str(mem_error)}")
+                    logging.info("Executing admin trade through realtime monitor")
+                    result = await self.realtime_monitor.execute_solana_trade(trade_params)
+                    logging.info(f"Trade execution result: {result}")
+                    
+                    # Store execution data
+                    try:
+                        execution_data = {
+                            "type": "trade_attempt",
+                            "data": {
+                                **trade_params,
+                                "original_amount": params['amount']  # Store original amount for reference
+                            },
+                            "result": result,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        await self.trading_memory.store_trade_execution(execution_data)
+                        logging.info("Trade execution stored in memory")
+                    except Exception as mem_error:
+                        logging.error(f"Error storing trade execution: {str(mem_error)}")
 
-                return result
+                    # Format user-friendly response
+                    if result.get('success'):
+                        response = {
+                            **result,
+                            'formatted_amount': params['amount'],  # Original amount
+                            'token_symbol': params['asset'].upper(),
+                            'user_message': f"Successfully executed {params['side']} trade for {params['amount']} {params['asset'].upper()}"
+                        }
+                    else:
+                        response = {
+                            **result,
+                            'user_message': f"Trade failed: {result.get('error', 'Unknown error')}"
+                        }
+
+                    return response
+
+                except Exception as exec_error:
+                    logging.error(f"Trade execution error: {str(exec_error)}")
+                    raise
             else:
+                logging.info(f"Executing holder trade for address: {user_address}")
                 return await self.letta.execute_holder_trade(user_address, trade_params)
 
         except Exception as e:
@@ -305,9 +354,10 @@ class TradingChat:
             logging.error(error_msg)
             return {
                 "success": False,
-                "error": error_msg
+                "error": error_msg,
+                'user_message': f"Failed to execute trade: {str(e)}"
             }
-            
+                
     async def _handle_analysis_command(
         self,
         params: Dict[str, Any],
