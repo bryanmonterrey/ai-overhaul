@@ -14,6 +14,8 @@ import logging
 from .solana_service import SolanaService
 import aiohttp
 
+
+
 @dataclass
 class ConsciousnessMetrics:
     """Metrics for the consciousness system"""
