@@ -210,7 +210,7 @@ class MemGPTService:
             self.memory_processor = MemoryProcessor(self.agent)
 
             # Initialize DSPy service before trading chat
-            prompt_dir = Path('../app/core/prompts')  # Points to your Next.js prompts
+            prompt_dir = Path('./app/core/prompts')  # Points to your Next.js prompts
             self.dspy_service = DSPyService(
                 prompt_dir=prompt_dir,
                 model_config={
