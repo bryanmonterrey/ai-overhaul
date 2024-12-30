@@ -23,7 +23,7 @@ class SolanaService:
         self.token_addresses = {
             'SOL': 'So11111111111111111111111111111111111111112',
             'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
-            'WIF': 'EKLq75w7HHq8pSqGrHRNn6ow5QkxdQPWHNrg4RfnN7Nf',
+            'WIF': 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
             'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
         }
 
