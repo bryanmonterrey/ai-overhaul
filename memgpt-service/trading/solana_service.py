@@ -30,12 +30,29 @@ class SolanaService:
     async def _call_agent_kit(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Make call to agent-kit API"""
         try:
-            # Check if we need to convert symbol to address for certain actions
-            if action == 'getTokenData' and 'symbol' in params:
-                # Try to get address from hardcoded list first
-                address = self.token_addresses.get(params['symbol'].upper())
-                if address:
-                    params = {'mint': address}
+            # Handle token data lookup
+            if action == 'getTokenData':
+                # Try hardcoded tokens first
+                if 'symbol' in params:
+                    symbol = params['symbol'].upper()
+                    if symbol in self.token_addresses:
+                        return {
+                            'symbol': symbol,
+                            'address': self.token_addresses[symbol],
+                            'verified': True
+                        }
+                
+                # If we have a mint address, use it directly
+                if 'mint' in params:
+                    params = {'mint': params['mint']}
+                elif 'symbol' in params:
+                    # Try to find address for symbol
+                    address = self.token_addresses.get(params['symbol'].upper())
+                    if address:
+                        params = {'mint': address}
+                    else:
+                        # Could add Jupiter token list lookup here
+                        raise ValueError(f"Unknown token symbol: {params['symbol']}")
 
             logging.info(f"Making request to {self.agent_kit_url}")
             logging.info(f"Request payload: action={action}, params={params}")
@@ -55,40 +72,38 @@ class SolanaService:
                     logging.info(f"Response status: {response.status}")
                     logging.info(f"Response headers: {dict(response.headers)}")
                     
-                    if response.status != 200:
+                    content_type = response.headers.get('Content-Type', '')
+                    if response.status != 200 or 'application/json' not in content_type.lower():
                         error_text = await response.text()
                         logging.error(f"Error response: {error_text}")
-                        raise ValueError(f"API error: {error_text}")
+                        raise ValueError(f"API error: status={response.status}, content-type={content_type}, body={error_text}")
                     
                     data = await response.json()
                     logging.info(f"Response data: {data}")
                     return data
-                    
+                        
         except Exception as e:
             logging.error(f"Agent-kit API call error: {str(e)}")
             raise
-
         
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute swap through agent-kit"""
         try:
             # Get token address - try hardcoded first
-            token_address = self.token_addresses.get(params['asset'].upper())
+            symbol = params['asset'].upper()
+            token_address = self.token_addresses.get(symbol)
             
-            # If not hardcoded, try to get from API
+            # If not hardcoded, verify it's a valid address
             if not token_address:
-                try:
-                    token_data = await self._call_agent_kit('getTokenData', {'mint': params['asset']})
-                    token_address = token_data.get('address')
-                except Exception as e:
-                    logging.error(f"Error getting token data: {e}")
-                    # Continue with original address if API lookup fails
+                if len(params['asset']) == 44:  # Solana address length
                     token_address = params['asset']
+                else:
+                    raise ValueError(f"Unknown token: {params['asset']}. Please provide a valid token symbol or address.")
 
             validation_params = {
-                'inputMint': params.get('receive_asset', self.token_addresses['SOL']),
+                'inputMint': self.token_addresses['SOL'],  # For buying, input is SOL
                 'outputMint': token_address,
-                'amount': params['amount'],
+                'amount': float(params['amount']),  # Ensure amount is float
                 'slippage': params.get('slippage', 100),
                 'useMev': params.get('useMev', True)
             }
