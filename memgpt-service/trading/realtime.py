@@ -229,18 +229,24 @@ class RealTimeMonitor:
         try:
             # If we received full wallet info
             if wallet_info:
-                if wallet_info.get('publicKey'):
-                    from solana.keypair import Keypair
-                    class ReadOnlyWallet:
-                        def __init__(self, public_key):
-                            self.public_key = public_key
+                if isinstance(wallet_info, dict):
+                    if credentials := wallet_info.get('credentials'):
+                        # Handle credentials format from frontend
+                        from solana.keypair import Keypair
+                        class ReadOnlyWallet:
+                            def __init__(self, public_key):
+                                self.public_key = public_key
+                                self.connected = True
 
-                    # Create a read-only wallet with just the public key
-                    self.wallet = ReadOnlyWallet(wallet_info['publicKey'])
-                    return True
+                        # Create a read-only wallet with just the public key
+                        pub_key = credentials.get('publicKey')
+                        if pub_key:
+                            self.wallet = ReadOnlyWallet(pub_key)
+                            logging.info(f"Initialized read-only wallet with public key: {pub_key}")
+                            return True
 
             # If we have a private key, use that
-            elif private_key:
+            elif private_key and isinstance(private_key, str):
                 from solana.keypair import Keypair
                 try:
                     # Try to load as hex
@@ -264,8 +270,10 @@ class RealTimeMonitor:
             
             # Setup wallet from params if provided
             if wallet_info := params.get('wallet'):
-                await self.setup_wallet(wallet_info=wallet_info)
-                
+                success = await self.setup_wallet(wallet_info=wallet_info)
+                if not success:
+                    logging.error("Failed to setup wallet from provided info")
+                    
             if not self.wallet:
                 return {
                     'success': False,
@@ -277,59 +285,13 @@ class RealTimeMonitor:
             trade_params = {
                 **params,  # Keep existing params
                 'wallet': {
-                    'publicKey': str(self.wallet.public_key)
-                }
-            }
-
-            try:
-                # Execute the swap
-                swap_result = await self.solana_service.execute_swap(trade_params)
-                
-                return {
-                    'success': True,
-                    'trade_id': trade_id,
-                    'signature': swap_result.get('signature'),
-                    'params': params,
-                    'result': swap_result,
-                    'timestamp': datetime.now().isoformat()
-                }
-
-            except Exception as e:
-                error_msg = str(e)
-                await self._send_trade_error(trade_id, error_msg)
-                return {
-                    'success': False,
-                    'error': error_msg
-                }
-
-        except Exception as e:
-            error_msg = f"Trade execution error: {str(e)}"
-            logging.error(error_msg)
-            return {
-                'success': False,
-                'error': error_msg
-            }
-
-    async def execute_solana_trade(self, params: dict) -> dict:
-        try:
-            trade_id = str(uuid.uuid4())
-            
-            if not self.wallet:
-                return {
-                    'success': False,
-                    'error': 'Wallet not initialized'
-                }
-
-            # Add wallet info to params
-            trade_params = {
-                **params,  # Keep existing params
-                'wallet': {
                     'publicKey': str(self.wallet.public_key),
-                    'privateKey': self.wallet.secret_key.hex()
+                    'connected': True
                 }
             }
 
             try:
+                logging.info(f"Executing swap with params: {trade_params}")
                 # Execute the swap
                 swap_result = await self.solana_service.execute_swap(trade_params)
                 
@@ -347,7 +309,8 @@ class RealTimeMonitor:
                 await self._send_trade_error(trade_id, error_msg)
                 return {
                     'success': False,
-                    'error': error_msg
+                    'error': error_msg,
+                    'user_message': f"Trade failed: {error_msg}"
                 }
 
         except Exception as e:
@@ -355,8 +318,10 @@ class RealTimeMonitor:
             logging.error(error_msg)
             return {
                 'success': False,
-                'error': error_msg
+                'error': error_msg,
+                'user_message': 'Failed to execute trade due to an internal error.'
             }
+
 
     async def store_trade_execution(self, data: dict) -> None:
         """Store trade execution data"""
