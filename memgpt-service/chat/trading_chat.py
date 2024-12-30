@@ -146,7 +146,7 @@ class TradingChat:
                 "natural_response": "I apologize, I'm having trouble processing your request. Could you try again?"
             }
     
-    async def process_admin_message(self, message: str) -> Dict[str, Any]:
+    async def process_admin_message(self, message: str, wallet_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Process admin chat messages"""
         print("Starting process_admin_message with:", message)
         try:
@@ -181,6 +181,10 @@ class TradingChat:
                     "response": analysis.get("natural_response", "I don't understand that command. Could you try rephrasing it?"),
                     "error": "Invalid command type"
                 }
+            
+            # Add wallet info to parameters if provided
+            if wallet_info:
+                analysis["parameters"]["wallet"] = wallet_info
 
             # Execute command with admin privileges
             print("Executing handler with parameters:", analysis["parameters"])

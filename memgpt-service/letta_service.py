@@ -1254,8 +1254,14 @@ async def admin_chat_endpoint(request: Request):
             
         last_message = messages[-1].get('content', '')
         print("Processing message:", last_message)
+
+        # Pass wallet info to process_admin_message
+        wallet_info = data.get('wallet', {})
         
-        result = await app.state.memgpt_service.trading_chat.process_admin_message(last_message)
+        result = await app.state.memgpt_service.trading_chat.process_admin_message(
+            message=last_message,
+            wallet_info=wallet_info  # Add this
+        )
         print("Generated result:", result)
 
         async def event_stream():
