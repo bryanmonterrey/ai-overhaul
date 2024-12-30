@@ -6,7 +6,7 @@ export default function TradingLayout({
   }) {
     return (
       <div className="min-h-screen bg-[#11111A] text-white">
-        {children}
+        {children} 
       </div>
     );
   }
