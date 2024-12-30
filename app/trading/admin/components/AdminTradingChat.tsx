@@ -98,14 +98,16 @@ export function AdminTradingChat() {
     isLoading,
     error
   }: UseChatHelpers = useChat({
-      api: '/api/trading/admin/chat',
-      streamProtocol: 'text',
-      id: 'admin-trading-chat',
-      body: {
-        walletInfo: publicKey ? {
-          publicKey: publicKey.toString()
-        } : undefined
-      },
+    api: '/api/trading/admin/chat',
+    streamProtocol: 'text',
+    id: 'admin-trading-chat',
+    body: { 
+      walletCredentials: publicKey ? {
+        publicKey: publicKey.toString(),
+        signTransaction,
+        signAllTransactions,
+      } : undefined
+    },
       onResponse: (response) => {
         console.log('Raw response:', response);
         if (!response.ok) {
@@ -292,7 +294,13 @@ export function AdminTradingChat() {
   
     if (input.trim()) {
       try {
-        await handleSubmit(e);
+        const message = {
+          content: input.trim(),
+          walletInfo: publicKey ? {
+            publicKey: publicKey.toString()
+          } : undefined
+        };
+        await handleSubmit(e, { data: message });
       } catch (error) {
         console.error('Form submission error:', error);
         toast({

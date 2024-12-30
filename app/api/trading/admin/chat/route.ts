@@ -63,7 +63,10 @@ export async function POST(req: NextRequest) {
         type: 'trading_chat',
         role: 'admin',
         userId: session.user.id,
-        wallet: messages[0]?.walletInfo, // Using the new wallet info structure
+        wallet: { // Add the wallet info properly
+          publicKey: messages[0]?.walletInfo?.publicKey,
+          credentials: body?.walletCredentials
+        },
         context: {
           isAdmin: true,
           sessionId: session.user.id,
