@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { useChat, Message } from 'ai/react';
+import { useChat, Message, UseChatHelpers } from 'ai/react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -15,7 +15,6 @@ import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { PublicKey } from '@solana/web3.js';
 import { SignerWalletAdapterProps } from '@solana/wallet-adapter-base';
-import { TradingMessage } from '../../../../types/chat';
 
 
 declare global {
@@ -33,6 +32,12 @@ interface TradeExecutionData {
   side: 'buy' | 'sell';
   amount: number;
   price?: number;
+}
+
+interface TradingMessage extends Message {
+  walletInfo?: {
+    publicKey?: string;
+  };
 }
 
 interface EnhancedTradeExecutionData extends TradeExecutionData {
@@ -85,34 +90,41 @@ export function AdminTradingChat() {
     }
   }, [connected, setVisible]);
   
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat<TradingMessage>({
-    api: '/api/trading/admin/chat',
-    streamProtocol: 'text',
-    id: 'admin-trading-chat',
-    body: {
-      walletInfo: publicKey ? {
-        publicKey: publicKey.toString()
-      } : undefined
-    },
-    onResponse: (response) => {
-      console.log('Raw response:', response);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    error
+  }: UseChatHelpers = useChat({
+      api: '/api/trading/admin/chat',
+      streamProtocol: 'text',
+      id: 'admin-trading-chat',
+      body: {
+        walletInfo: publicKey ? {
+          publicKey: publicKey.toString()
+        } : undefined
+      },
+      onResponse: (response) => {
+        console.log('Raw response:', response);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      },
+      onFinish: (message: TradingMessage) => {
+        console.log('Chat completed:', message);
+        scrollToBottom();
+      },
+      onError: (error) => {
+        console.error('Chat error:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to process message",
+          variant: "destructive",
+        });
       }
-    },
-    onFinish: (message) => {
-      console.log('Chat completed:', message);
-      scrollToBottom();
-    },
-    onError: (error) => {
-      console.error('Chat error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to process message",
-        variant: "destructive",
-      });
-    }
-});
+  });
 
   // Scroll helper function
   const scrollToBottom = () => {
@@ -292,32 +304,33 @@ export function AdminTradingChat() {
     }
   };
 
-  const formattedMessages = messages
-  .filter(msg => {
-    if (!msg.content) return false;
-    if (msg.content === '[DONE]') return false;
-    return true;
-  })
-  .map((msg, index) => {
-    let text = msg.content;
-    
-    if (text.startsWith('data: ')) {
-      try {
-        const jsonPart = text.split('\n')[0].slice(6);
-        const parsed = JSON.parse(jsonPart);
-        text = parsed.content;
-      } catch {
-        text = msg.content;
+  const formattedMessages = (messages as TradingMessage[])
+    .filter(msg => {
+      if (!msg.content) return false;
+      if (msg.content === '[DONE]') return false;
+      return true;
+    })
+    .map((msg: TradingMessage, index) => {
+      let text = msg.content;
+      
+      if (text.startsWith('data: ')) {
+        try {
+          const jsonPart = text.split('\n')[0].slice(6);
+          const parsed = JSON.parse(jsonPart);
+          text = parsed.content;
+        } catch {
+          text = msg.content;
+        }
       }
-    }
 
-    return {
-      id: index,
-      text: text,
-      role: msg.role === 'system' || msg.role === 'data' ? 'assistant' : msg.role,
-      data: msg.data
-    };
-  });
+      return {
+        id: index,
+        text: text,
+        role: msg.role === 'system' || msg.role === 'data' ? 'assistant' : msg.role,
+        data: msg.data,
+        walletInfo: msg.walletInfo  // Include wallet info in formatted messages
+      };
+    });
 
   return (
     <Card className="w-full h-[600px] flex flex-col">
