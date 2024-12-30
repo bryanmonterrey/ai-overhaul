@@ -224,69 +224,91 @@ class RealTimeMonitor:
             except Exception as e:
                 logging.error(f"Error notifying subscriber: {str(e)}")
 
-    async def setup_wallet(self, private_key: str = None):
+    async def setup_wallet(self, private_key: str = None, wallet_info: Dict = None):
         """Initialize wallet for trading"""
         try:
-            if not private_key:
-                return False
-                
-            from solana.keypair import Keypair
-            try:
-                # Try to load as hex
-                key_bytes = bytes.fromhex(private_key.strip())
-            except ValueError:
-                # Try to load as base58
-                from base58 import b58decode
-                key_bytes = b58decode(private_key)
-                
-            self.wallet = Keypair.from_secret_key(key_bytes)
-            return True
+            # If we received full wallet info
+            if wallet_info:
+                if wallet_info.get('publicKey'):
+                    from solana.keypair import Keypair
+                    class ReadOnlyWallet:
+                        def __init__(self, public_key):
+                            self.public_key = public_key
+
+                    # Create a read-only wallet with just the public key
+                    self.wallet = ReadOnlyWallet(wallet_info['publicKey'])
+                    return True
+
+            # If we have a private key, use that
+            elif private_key:
+                from solana.keypair import Keypair
+                try:
+                    # Try to load as hex
+                    key_bytes = bytes.fromhex(private_key.strip())
+                except ValueError:
+                    # Try to load as base58
+                    from base58 import b58decode
+                    key_bytes = b58decode(private_key)
+                    
+                self.wallet = Keypair.from_secret_key(key_bytes)
+                return True
+
+            return False
         except Exception as e:
             logging.error(f"Wallet setup error: {str(e)}")
             return False
 
-    async def broadcast_trading_update(self, update_type: str, data: Dict[str, Any], channel: str):
-        """Broadcast trading updates to WebSocket clients"""
+    async def execute_solana_trade(self, params: dict) -> dict:
         try:
-            if not self.ws_handler:
-                logging.error("WebSocket handler not initialized")
-                return
-
-            formatted_update = {
-                "type": update_type,
-                "data": data,
-                "timestamp": datetime.now().isoformat(),
-                "source": "trading_system"
-            }
+            trade_id = str(uuid.uuid4())
             
-            # Add additional metadata for specific update types
-            if update_type == "metrics_update":
-                formatted_update["interval"] = "5s"
-                formatted_update["version"] = "2.0"
-            elif update_type == "risk_alert":
-                formatted_update["priority"] = data.get("level", "medium")
-                formatted_update["requires_action"] = data.get("requires_action", False)
-
-            # Broadcast via WebSocket handler
-            await self.ws_handler.broadcast_update(channel, formatted_update)
-
-            # Also broadcast to Supabase if available
-            if self.supabase:
-                try:
-                    supabase_channel = self.supabase.channel(channel)
-                    supabase_channel.subscribe()
-                    await supabase_channel.send({
-                        "type": "broadcast",
-                        "event": "trading_update",
-                        "payload": formatted_update
-                    })
-                except Exception as se:
-                    logging.error(f"Supabase broadcast error: {str(se)}")
-                    # Continue execution even if Supabase broadcast fails
-                    pass
+            # Setup wallet from params if provided
+            if wallet_info := params.get('wallet'):
+                await self.setup_wallet(wallet_info=wallet_info)
                 
+            if not self.wallet:
+                return {
+                    'success': False,
+                    'error': 'Wallet not initialized',
+                    'user_message': 'Please connect your wallet before trading.'
+                }
+
+            # Add wallet info to params
+            trade_params = {
+                **params,  # Keep existing params
+                'wallet': {
+                    'publicKey': str(self.wallet.public_key)
+                }
+            }
+
+            try:
+                # Execute the swap
+                swap_result = await self.solana_service.execute_swap(trade_params)
+                
+                return {
+                    'success': True,
+                    'trade_id': trade_id,
+                    'signature': swap_result.get('signature'),
+                    'params': params,
+                    'result': swap_result,
+                    'timestamp': datetime.now().isoformat()
+                }
+
+            except Exception as e:
+                error_msg = str(e)
+                await self._send_trade_error(trade_id, error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg
+                }
+
         except Exception as e:
-            logging.error(f"Error broadcasting update: {str(e)}")
+            error_msg = f"Trade execution error: {str(e)}"
+            logging.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg
+            }
 
     async def execute_solana_trade(self, params: dict) -> dict:
         try:
