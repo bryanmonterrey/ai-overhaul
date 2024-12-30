@@ -89,34 +89,43 @@ class SolanaService:
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute swap through agent-kit"""
         try:
-            # Get token address - try hardcoded first
-            symbol = params['asset'].upper()
-            token_address = self.token_addresses.get(symbol)
-            
-            # If not hardcoded, verify it's a valid address
-            if not token_address:
-                if len(params['asset']) == 44:  # Solana address length
-                    token_address = params['asset']
-                else:
-                    raise ValueError(f"Unknown token: {params['asset']}. Please provide a valid token symbol or address.")
+            # Get token data from params or lookup
+            token_data = params.get('token_data')
+            if not token_data:
+                # If no token_data provided, try to get it from asset
+                symbol = params['asset'].upper()
+                address = self.token_addresses.get(symbol)
+                if not address and len(params['asset']) == 44:
+                    address = params['asset']
+                if not address:
+                    raise ValueError(f"Unknown token: {params['asset']}")
+                token_data = {
+                    'symbol': symbol,
+                    'address': address,
+                    'verified': True
+                }
 
-            validation_params = {
-                'inputMint': self.token_addresses['SOL'],  # For buying, input is SOL
-                'outputMint': token_address,
-                'amount': float(params['amount']),  # Ensure amount is float
-                'slippage': params.get('slippage', 100),
-                'useMev': params.get('useMev', True)
+            # Format parameters for agent-kit
+            side = params.get('side', 'buy')
+            swap_params = {
+                'action': 'trade',
+                'params': {
+                    'outputMint': token_data['address'] if side == 'buy' else self.token_addresses['SOL'],
+                    'inputAmount': float(params['amount']),
+                    'inputMint': self.token_addresses['SOL'] if side == 'buy' else token_data['address'],
+                    'slippageBps': params.get('slippage', 100)
+                }
             }
 
             # Execute the trade
-            result = await self._call_agent_kit('trade', validation_params)
+            result = await self._call_agent_kit('trade', swap_params['params'])
             
             return {
                 'success': True,
                 'signature': result.get('signature'),
                 'params': params,
                 'result': result,
-                'token_address': token_address,
+                'token_data': token_data,
                 'timestamp': datetime.now().isoformat()
             }
 
