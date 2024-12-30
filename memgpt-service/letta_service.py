@@ -26,9 +26,20 @@ from trading.memory.trading_memory import TradingMemory
 from chat.trading_chat import TradingChat
 import logging
 from dataclasses import asdict
+import psutil
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse
 from trading.solana_service import SolanaService
 load_dotenv()
+
+# At the top after imports:
+required_env_vars = {
+    "PORT": os.getenv('PORT')
+}
+
+missing_vars = [key for key, value in required_env_vars.items() if not value]
+if missing_vars:
+    raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -134,22 +145,29 @@ class AgentState:
 
 class MemGPTService:
     def __init__(self):
+        # Validate environment variables first
         if not SUPABASE_URL or not SUPABASE_KEY:
             raise ValueError("Missing Supabase credentials in environment variables")
         if not OPENAI_API_KEY and not ANTHROPIC_API_KEY:
             raise ValueError("Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided")
 
         try:
-            # Initialize Supabase
-            self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            # Initialize Supabase with proper options
+            self.supabase: Client = create_client(
+                SUPABASE_URL, 
+                SUPABASE_KEY
+            )
+            print("Supabase client initialized successfully")
 
             # Initialize WebSocket event handler early
             self.ws_handler = WebSocketEventHandler()
+            print("WebSocket handler initialized")
 
             # Initialize SolanaService first
             self.solana_service = SolanaService() 
-            
-            # Initialize RealTimeMonitor first
+            print("Solana service initialized")
+                
+            # Initialize RealTimeMonitor with configuration
             self.realtime_monitor = RealTimeMonitor({
                 "risk_thresholds": {
                     "max_drawdown": 0.15,
@@ -165,13 +183,15 @@ class MemGPTService:
                     "var_window": 30
                 }
             })
+            print("RealTime monitor initialized")
+
+            # Set up RealTimeMonitor dependencies
             self.realtime_monitor.set_supabase_client(self.supabase)
-
             self.realtime_monitor.solana_service = self.solana_service
-
             self.realtime_monitor.set_ws_handler(self.ws_handler)
+            print("RealTime monitor dependencies configured")
 
-            # Create LLM config with all necessary settings
+            # Create LLM config
             llm_config = LLMConfig(
                 model="anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
                 model_endpoint_type="anthropic" if ANTHROPIC_API_KEY else "openai",
@@ -181,14 +201,13 @@ class MemGPTService:
                 embedding_endpoint="https://api.openai.com/v1",
                 embedding_model="text-embedding-ada-002"
             )
-            
-            # Create interface
+            print("LLM config created")
+                
+            # Initialize core components
             self.interface = CLIInterface()
-            
-            # Create memory instance
             memory = Memory(blocks=[])
-            
-            # Create agent state
+                
+            # Create and configure agent state
             agent_state = AgentState(
                 persona=DEFAULT_PERSONA,
                 human=DEFAULT_HUMAN,
@@ -196,13 +215,14 @@ class MemGPTService:
                 memory=memory
             )
             agent_state.llm_config = llm_config
-            
+                
+            # Create default user
             user = {
                 "id": "default_user",
                 "name": "User",
                 "preferences": {}
             }
-            
+                
             # Initialize Letta agent
             self.agent = Agent(
                 agent_state=agent_state,
@@ -210,39 +230,55 @@ class MemGPTService:
                 interface=self.interface
             )
             self.agent.service = self
-            
+            print("Letta agent initialized")
+                
             # Initialize memory processor
             self.memory_processor = MemoryProcessor(self.agent)
+            print("Memory processor initialized")
 
-            # Initialize DSPy service before trading chat
-            prompt_dir = Path('../app/core/prompts')  # Points to your Next.js prompts
-            self.dspy_service = DSPyService(
-                prompt_dir=prompt_dir,
-                model_config={
-                    'model': "anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
-                    'llm_config': llm_config,
-                    'api_key': ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY
-                }
-            )
+            # Initialize DSPy service
+            try:
+                prompt_dir = Path('../app/core/prompts')
+                if not prompt_dir.exists():
+                    print(f"Warning: Prompt directory not found at {prompt_dir}")
+                    prompt_dir = Path('./app/core/prompts')  # Fallback path
+                    
+                self.dspy_service = DSPyService(
+                    prompt_dir=prompt_dir,
+                    model_config={
+                        'model': "anthropic/claude-2" if ANTHROPIC_API_KEY else "gpt-4",
+                        'llm_config': llm_config,
+                        'api_key': ANTHROPIC_API_KEY if ANTHROPIC_API_KEY else OPENAI_API_KEY
+                    }
+                )
+                print("DSPy service initialized")
+            except Exception as dspy_error:
+                print(f"Warning: DSPy service initialization error: {str(dspy_error)}")
+                raise
 
-            # Initialize trading memory before trading chat
+            # Initialize trading components
             self.trading_memory = TradingMemory(self.memory_processor)
             self.trading_memory.set_realtime_monitor(self.realtime_monitor)
+            print("Trading memory initialized")
 
-            # Initialize trading chat after DSPy service and trading memory
+            # Initialize trading chat
             self.trading_chat = TradingChat(
                 self,
                 self.memory_processor,
                 self.dspy_service
             )
+            print("Trading chat initialized")
 
             # Initialize consciousness connection
             self._init_consciousness_connection()
+            print("Consciousness connection initialized")
 
-            
-            
+            print("MemGPTService initialization completed successfully")
+                
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize MemGPTService: {str(e)}")
+            error_msg = f"Failed to initialize MemGPTService: {str(e)}"
+            print(error_msg)
+            raise RuntimeError(error_msg)
         
     async def _memory_maintenance_loop(self):
         """Background task for periodic memory maintenance"""
@@ -1087,16 +1123,31 @@ class MemGPTService:
             }
 
 # FastAPI setup
-app = FastAPI()
+from contextlib import asynccontextmanager
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("Starting MemGPT Service...")
     app.state.memgpt_service = MemGPTService()
     await app.state.memgpt_service.ws_handler.start()
+    yield
+    # Cleanup on shutdown
+    if hasattr(app.state, 'memgpt_service'):
+        await app.state.memgpt_service.ws_handler.cleanup()
+
+# Create FastAPI app only once
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://terminal.goatse.app"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://terminal.goatse.app",
+        "*"  # Add this for development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1106,10 +1157,41 @@ class AnalyzeRequest(BaseModel):
     content: str = Field(..., description="Content to analyze")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
 
+class AIRequest(BaseModel):
+    messages: List[Dict[str, str]]
+    wallet: Optional[Dict[str, Any]] = None
+    context: Optional[Dict[str, Any]] = None
+
 @app.get("/")
 def root():
     return {"status": "ok"}
 
+@app.on_event("startup")
+async def startup_event():
+    app.state.memgpt_service = MemGPTService()
+    # Add health check status
+    app.state.healthy = True
+
+@app.post("/api/ai")
+async def handle_ai_request(request: AIRequest):
+    try:
+        if not request.messages:
+            raise HTTPException(status_code=400, detail="No messages provided")
+            
+        # Process through trading chat
+        result = await app.state.memgpt_service.trading_chat.process_admin_message(
+            request.messages[-1]['content'],
+            wallet_info=request.wallet,
+            context=request.context
+        )
+        
+        return {
+            "success": True,
+            "data": result
+        }
+    except Exception as e:
+        logging.error(f"AI request error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze")
 async def analyze_content(request: AnalyzeRequest):
@@ -1136,25 +1218,28 @@ async def query_content(request: QueryRequest):
     try:
         print(f"Received query request: {request}")  
         
-        if not request.query:
-            raise HTTPException(status_code=400, detail="Query is required")
-
-
-        if request.type == 'analysis':
-            result = await app.state.memgpt_service.process_memory_content(
-                content=request.query,
-                context=request.context
-            )
-            return {"success": True, "data": result}
-        else:
-            # Properly await the memory query
-            result = await app.state.memgpt_service.query_memories(
-                memory_type=request.type,
-                query={"content": request.query, "context": request.context}
-            )
-            return result
+        # Add request timeout
+        timeout = 30  # seconds
+        try:
+            async with asyncio.timeout(timeout):
+                if request.type == 'analysis':
+                    result = await app.state.memgpt_service.process_memory_content(
+                        content=request.query,
+                        context=request.context
+                    )
+                    return {"success": True, "data": result}
+                else:
+                    result = await app.state.memgpt_service.query_memories(
+                        memory_type=request.type,
+                        query={"content": request.query, "context": request.context}
+                    )
+                    return result
+        except asyncio.TimeoutError:
+            print(f"Request timed out after {timeout} seconds")
+            raise HTTPException(status_code=504, detail="Request timed out")
             
     except ValidationError as e:
+        print(f"Validation error: {str(e)}")
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         print(f"Error processing query: {str(e)}")
@@ -1245,46 +1330,66 @@ async def cluster_memories(config: ClusterConfig):
 @app.post("/trading/admin/chat")
 async def admin_chat_endpoint(request: Request):
     try:
-        data = await request.json()
-        print("Received request data:", data)
-        
-        messages = data.get('messages', [])
-        if not messages:
-            raise HTTPException(status_code=400, detail="No messages provided")
+        # Add timeout for initial request processing
+        async with asyncio.timeout(30):  # 30 second timeout
+            data = await request.json()
+            print("Received request data:", data)
             
-        last_message = messages[-1].get('content', '')
-        print("Processing message:", last_message)
+            messages = data.get('messages', [])
+            if not messages:
+                raise HTTPException(status_code=400, detail="No messages provided")
+                
+            last_message = messages[-1].get('content', '')
+            print("Processing message:", last_message)
 
-        # Pass wallet info to process_admin_message
-        wallet_info = data.get('wallet', {})
-        
-        result = await app.state.memgpt_service.trading_chat.process_admin_message(
-            message=last_message,
-            wallet_info=wallet_info  # Add this
-        )
-        print("Generated result:", result)
+            # Pass wallet info to process_admin_message
+            wallet_info = data.get('wallet', {})
+            
+            result = await app.state.memgpt_service.trading_chat.process_admin_message(
+                message=last_message,
+                wallet_info=wallet_info
+            )
+            print("Generated result:", result)
 
-        async def event_stream():
-            try:
-                # Send minimal required structure for InputMorphMessage
-                if result.get("response"):
-                    message = {
+            async def event_stream():
+                try:
+                    # Send minimal required structure for InputMorphMessage
+                    if result.get("response"):
+                        # Add keep-alive ping before sending message
+                        yield ": ping\n\n"
+                        message = {
+                            "role": "assistant",
+                            "content": result["response"]
+                        }
+                        yield f"data: {json.dumps(message)}\n\n"
+                    yield "data: [DONE]\n\n"
+
+                except Exception as e:
+                    error_message = {
                         "role": "assistant",
-                        "content": result["response"]
+                        "content": f"Error: {str(e)}"
                     }
-                    yield f"data: {json.dumps(message)}\n\n"
-                yield "data: [DONE]\n\n"
+                    yield f"data: {json.dumps(error_message)}\n\n"
+                    yield "data: [DONE]\n\n"
 
-            except Exception as e:
-                error_message = {
-                    "role": "assistant",
-                    "content": f"Error: {str(e)}"
+            return StreamingResponse(
+                event_stream(),
+                media_type="text/event-stream",
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'Content-Type': 'text/event-stream',
+                    'X-Accel-Buffering': 'no'  # Prevent proxy buffering
                 }
-                yield f"data: {json.dumps(error_message)}\n\n"
-                yield "data: [DONE]\n\n"
-
+            )
+        
+    except asyncio.TimeoutError:
+        print("Request timed out")
         return StreamingResponse(
-            event_stream(),
+            iter([
+                f"data: {json.dumps({'role': 'assistant', 'content': 'Request timed out'})}\n\n",
+                "data: [DONE]\n\n"
+            ]),
             media_type="text/event-stream",
             headers={
                 'Cache-Control': 'no-cache',
@@ -1292,10 +1397,27 @@ async def admin_chat_endpoint(request: Request):
                 'Content-Type': 'text/event-stream',
             }
         )
-        
     except Exception as e:
         print("Endpoint error:", str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return error as streaming response instead of raising HTTP exception
+        return StreamingResponse(
+            iter([
+                f"data: {json.dumps({'role': 'assistant', 'content': f'Error: {str(e)}'})}\n\n",
+                "data: [DONE]\n\n"
+            ]),
+            media_type="text/event-stream",
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Content-Type': 'text/event-stream',
+            }
+        )
+
+@app.get("/health")
+async def health_check():
+    if not app.state.healthy:
+        raise HTTPException(status_code=503, detail="Service unhealthy")
+    return {"status": "healthy"}
     
 @app.post("/trading/holders/chat")
 async def holder_chat_endpoint(request: Request):
@@ -1340,6 +1462,16 @@ async def track_memory_evolution(concept: str):
         raise HTTPException(status_code=500, detail=result["error"])
     return result
 
+@app.get("/metrics")
+async def get_metrics():
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    return {
+        "memory_used_mb": memory_info.rss / 1024 / 1024,
+        "cpu_percent": process.cpu_percent(),
+        "num_threads": process.num_threads()
+    }
+
 @app.get("/summary")
 async def get_memory_summary(timeframe: str = 'recent', limit: int = 5):
     result = await app.state.memgpt_service.summarize_memories(timeframe, limit)
@@ -1355,12 +1487,15 @@ if __name__ == "__main__":
             # Create service with maintenance loop
             service = MemGPTService()
             
-            # Run FastAPI with uvicorn
+            # Update these settings
             config = uvicorn.Config(
                 app,
                 host="0.0.0.0",
                 port=3001,
-                log_level="info"
+                log_level="info",
+                timeout_keep_alive=65,  # Increase keep-alive timeout
+                workers=4,              # Add multiple workers
+                loop="uvloop"           # Use uvloop for better performance
             )
             server = uvicorn.Server(config)
             await server.serve()

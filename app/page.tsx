@@ -31,6 +31,7 @@ export default function Home({ href, icon: Icon, text }: AnimatedLinkProps): JSX
   springOptions={springOptions}
   actionArea='global'
   range={200}
+  
 >
   <div 
     className="border-zinc-900 w-[300px] h-[200px] font-medium hover:cursor-pointer border-2 bg-[#0D0E15] hover:border-[#00FFA2] transition-colors ease-in-out duration-300 rounded-lg p-12 text-white relative"
