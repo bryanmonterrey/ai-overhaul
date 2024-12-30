@@ -282,21 +282,18 @@ class TradingChat:
         try:
             logging.info(f"Starting trade execution with params: {params}")
             
-            # Setup wallet if provided
-            if params.get('wallet'):
-                wallet_info = params['wallet']
-                if not self.realtime_monitor.wallet:
-                    # Try to setup wallet from either keypair or public key
-                    if wallet_info.get('keypair'):
-                        await self.realtime_monitor.setup_wallet(wallet_info['keypair'])
-                    elif wallet_info.get('publicKey'):
-                        # For read-only operations
-                        self.realtime_monitor.wallet = wallet_info['publicKey']
-                
-                # Add wallet info to trade params for downstream use
-                params['wallet'] = {
-                    'publicKey': str(self.realtime_monitor.wallet.public_key if hasattr(self.realtime_monitor.wallet, 'public_key') else self.realtime_monitor.wallet)
-                }
+            # Setup wallet from request context first
+            wallet_info = params.get('wallet') or {}
+            if not self.realtime_monitor.wallet:
+                # Try setup from credentials first
+                if wallet_credentials := wallet_info.get('credentials'):
+                    await self.realtime_monitor.setup_wallet(wallet_credentials)
+                # Then try keypair
+                elif wallet_info.get('keypair'):
+                    await self.realtime_monitor.setup_wallet(wallet_info['keypair'])
+                # Finally try public key for read-only
+                elif wallet_public_key := (wallet_info.get('publicKey') or wallet_info.get('public_key')):
+                    self.realtime_monitor.wallet = wallet_public_key
 
             if not self.realtime_monitor.wallet:
                 return {
@@ -305,7 +302,12 @@ class TradingChat:
                     'user_message': 'Please connect your wallet before trading.'
                 }
 
-            # Validate required parameters
+            # Add wallet info to trade params for downstream use
+            params['wallet'] = {
+                'publicKey': str(self.realtime_monitor.wallet.public_key if hasattr(self.realtime_monitor.wallet, 'public_key') else self.realtime_monitor.wallet)
+            }
+
+            # Rest of your existing parameter validation
             required_params = ['asset', 'amount', 'side']
             missing_params = [p for p in required_params if not params.get(p)]
             if missing_params:
@@ -315,7 +317,7 @@ class TradingChat:
                     "error": f"Missing required parameters: {', '.join(missing_params)}"
                 }
 
-            # Get token info first - handles both symbol and contract address
+            # Your existing token info handling
             try:
                 token_data = await self.solana_service._call_agent_kit('getTokenData', {
                     'symbol': params['asset'],
@@ -329,7 +331,6 @@ class TradingChat:
                         'user_message': f"I couldn't verify the token {params['asset']}. Please check the symbol/address and try again."
                     }
 
-                # Store token info for the trade
                 params['token_data'] = token_data
                 params['asset'] = token_data['symbol']  # Use verified symbol
 
@@ -337,7 +338,7 @@ class TradingChat:
                 logging.error(f"Error verifying token: {str(token_error)}")
                 logging.info("Proceeding with unverified token")
 
-            # For "swap X SOL for TOKEN" we need to adjust the amount calculation
+            # Your existing amount calculation logic
             input_amount = float(params['amount'])
             if params['side'] == 'buy' and params.get('asset').upper() != 'SOL':
                 input_amount = float(params['amount'])
@@ -351,7 +352,7 @@ class TradingChat:
                     logging.error(f"Error calculating token amount: {e}")
                     input_amount = float(params['amount'])
 
-            # Format trade parameters
+            # Your existing trade parameter formatting
             trade_params = {
                 'asset': params['asset'],
                 'amount': input_amount,
@@ -360,18 +361,18 @@ class TradingChat:
                 'useMev': params.get('useMev', True),
                 'receive_asset': self.solana_service.token_addresses.get('SOL'),
                 'token_data': params.get('token_data'),
-                'wallet': params.get('wallet')  # Include wallet info from earlier
+                'wallet': params.get('wallet')
             }
             
             logging.info(f"Formatted trade parameters: {trade_params}")
 
+            # Your existing trade execution logic
             if is_admin:
                 try:
                     logging.info("Executing admin trade through realtime monitor")
                     result = await self.realtime_monitor.execute_solana_trade(trade_params)
                     logging.info(f"Trade execution result: {result}")
                     
-                    # Store execution data
                     try:
                         execution_data = {
                             "type": "trade_attempt",
@@ -388,7 +389,6 @@ class TradingChat:
                     except Exception as mem_error:
                         logging.error(f"Error storing trade execution: {str(mem_error)}")
 
-                    # Format user-friendly response
                     if result.get('success'):
                         response = {
                             **result,
