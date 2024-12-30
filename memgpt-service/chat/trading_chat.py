@@ -282,6 +282,29 @@ class TradingChat:
         try:
             logging.info(f"Starting trade execution with params: {params}")
             
+            # Setup wallet if provided
+            if params.get('wallet'):
+                wallet_info = params['wallet']
+                if not self.realtime_monitor.wallet:
+                    # Try to setup wallet from either keypair or public key
+                    if wallet_info.get('keypair'):
+                        await self.realtime_monitor.setup_wallet(wallet_info['keypair'])
+                    elif wallet_info.get('publicKey'):
+                        # For read-only operations
+                        self.realtime_monitor.wallet = wallet_info['publicKey']
+                
+                # Add wallet info to trade params for downstream use
+                params['wallet'] = {
+                    'publicKey': str(self.realtime_monitor.wallet.public_key if hasattr(self.realtime_monitor.wallet, 'public_key') else self.realtime_monitor.wallet)
+                }
+
+            if not self.realtime_monitor.wallet:
+                return {
+                    'success': False,
+                    'error': 'Wallet not initialized',
+                    'user_message': 'Please connect your wallet before trading.'
+                }
+
             # Validate required parameters
             required_params = ['asset', 'amount', 'side']
             missing_params = [p for p in required_params if not params.get(p)]
@@ -312,17 +335,14 @@ class TradingChat:
 
             except Exception as token_error:
                 logging.error(f"Error verifying token: {str(token_error)}")
-                # Continue with original asset if token verification fails
                 logging.info("Proceeding with unverified token")
 
             # For "swap X SOL for TOKEN" we need to adjust the amount calculation
             input_amount = float(params['amount'])
             if params['side'] == 'buy' and params.get('asset').upper() != 'SOL':
-                # If we're swapping SOL for another token, this is the SOL amount
                 input_amount = float(params['amount'])
                 logging.info(f"Using SOL input amount: {input_amount}")
             else:
-                # If we're swapping token for SOL, we need price data
                 try:
                     token_price = await self.solana_service.get_token_price(params['asset'])
                     input_amount = float(params['amount']) * float(token_price)
@@ -336,16 +356,16 @@ class TradingChat:
                 'asset': params['asset'],
                 'amount': input_amount,
                 'side': params['side'].lower(),
-                'slippage': params.get('slippage', 100),  # 1% default
+                'slippage': params.get('slippage', 100),
                 'useMev': params.get('useMev', True),
                 'receive_asset': self.solana_service.token_addresses.get('SOL'),
-                'token_data': params.get('token_data')  # Include token data if available
+                'token_data': params.get('token_data'),
+                'wallet': params.get('wallet')  # Include wallet info from earlier
             }
             
             logging.info(f"Formatted trade parameters: {trade_params}")
 
             if is_admin:
-                # Execute through realtime monitor with debugging
                 try:
                     logging.info("Executing admin trade through realtime monitor")
                     result = await self.realtime_monitor.execute_solana_trade(trade_params)
@@ -357,7 +377,8 @@ class TradingChat:
                             "type": "trade_attempt",
                             "data": {
                                 **trade_params,
-                                "original_amount": params['amount']  # Store original amount for reference
+                                "original_amount": params['amount'],
+                                "wallet_address": params.get('wallet', {}).get('publicKey')
                             },
                             "result": result,
                             "timestamp": datetime.now().isoformat()
@@ -371,13 +392,13 @@ class TradingChat:
                     if result.get('success'):
                         response = {
                             **result,
-                            'formatted_amount': params['amount'],  # Original amount
+                            'formatted_amount': params['amount'],
                             'token_symbol': params['asset'].upper(),
-                            'token_data': params.get('token_data'),  # Include token data
+                            'token_data': params.get('token_data'),
+                            'wallet_address': params.get('wallet', {}).get('publicKey'),
                             'user_message': f"Successfully executed {params['side']} trade for {params['amount']} {params['asset'].upper()}"
                         }
                         
-                        # Add warnings for unverified tokens
                         if params.get('token_data') and not params['token_data'].get('verified'):
                             response['warnings'] = ["This token is not verified. Please verify the contract address."]
                     else:
