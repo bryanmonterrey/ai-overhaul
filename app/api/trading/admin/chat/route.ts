@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       return new Response('Unauthorized: Not an admin', { status: 401 });
     }
 
-    const { messages }: { messages: TradingMessage[] } = await req.json();
+    const { messages, body }: { messages: TradingMessage[], body: any } = await req.json();
     
     if (!messages?.length) {
       return new Response('No messages provided', { status: 400 });
@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         wallet: { // Add the wallet info properly
           publicKey: messages[0]?.walletInfo?.publicKey,
-          credentials: body?.walletCredentials
+          // Don't use body variable here since we're already using messages
+          credentials: messages[0]?.walletInfo
         },
         context: {
           isAdmin: true,

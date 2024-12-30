@@ -294,13 +294,17 @@ export function AdminTradingChat() {
   
     if (input.trim()) {
       try {
-        const message = {
+        const messageData = {
           content: input.trim(),
           walletInfo: publicKey ? {
             publicKey: publicKey.toString()
-          } : undefined
+          } : null  // Use null instead of undefined
         };
-        await handleSubmit(e, { data: message });
+        
+        // Cast as JSONValue to satisfy type
+        await handleSubmit(e, { 
+          data: messageData as { [key: string]: any } 
+        });
       } catch (error) {
         console.error('Form submission error:', error);
         toast({
