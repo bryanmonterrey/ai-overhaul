@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     method: req.method,
     headers: Object.fromEntries(req.headers),
   });
-  
+
   try {
     const body = await req.json();
     console.log('Request body:', body);
