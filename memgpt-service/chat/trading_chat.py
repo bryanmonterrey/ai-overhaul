@@ -147,6 +147,90 @@ class TradingChat:
                 },
                 "natural_response": "I apologize, I'm having trouble processing your request. Could you try again?"
             }
+        
+    async def process_admin_message(self, message: str, wallet_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Process admin chat messages"""
+        print("Starting process_admin_message with:", message)
+        try:
+            # Use Claude to analyze the message
+            analysis = await self.analyze_message_with_claude(message, "admin")
+            print("Claude analysis result:", analysis)
+
+            # Get command type and convert to lowercase for comparison
+            command_type = analysis["command_type"].lower() if analysis.get("command_type") else "system"
+
+            # For system messages, return natural response
+            if command_type == "system":
+                return {
+                    "response": analysis.get("natural_response", "I'm here to help. What would you like to do?")
+                }
+
+            # Handle confirmation - use last trade parameters
+            if command_type == "confirm" and self.last_trade:
+                analysis["parameters"] = {
+                    **self.last_trade,
+                    "wallet": wallet_info  # Add wallet info to confirmation
+                }
+                command_type = "trade"
+            else:
+                # Add wallet info to parameters if provided
+                if wallet_info:
+                    print("Adding wallet info to parameters:", wallet_info)
+                    analysis["parameters"] = {
+                        **(analysis.get("parameters", {})),
+                        "wallet": wallet_info
+                    }
+
+            # Store trade parameters for future confirmation
+            if command_type == "trade" and not command_type == "confirm":
+                self.last_trade = {
+                    k: v for k, v in analysis["parameters"].items() 
+                    if k != "wallet"  # Don't store wallet info in last_trade
+                }
+
+            # Get command handler using lowercase command type
+            handler = self.command_handlers.get(command_type)
+            print("Found handler:", handler)
+
+            if not handler:
+                return {
+                    "response": analysis.get("natural_response", "I don't understand that command. Could you try rephrasing it?"),
+                    "error": "Invalid command type"
+                }
+
+            # Execute command with admin privileges
+            print("Executing handler with parameters:", analysis["parameters"])
+            result = await handler(
+                analysis["parameters"],
+                is_admin=True
+            )
+            print("Handler result:", result)
+
+            # Store interaction in memory
+            await self.memory.store_interaction(
+                content=message,
+                response=result,
+                metadata={
+                    "type": "admin_trading_chat",
+                    "command": analysis["command_type"],
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+            
+            # Combine the natural response with the result
+            final_response = {
+                "response": analysis.get("natural_response", str(result)),
+                "data": result
+            }
+            
+            return final_response
+
+        except Exception as e:
+            print("Error in process_admin_message:", str(e))
+            return {
+                "response": f"I encountered an error: {str(e)}. Could you try again?",
+                "error": str(e)
+            }
     
     async def _handle_trade_command(
     self,
