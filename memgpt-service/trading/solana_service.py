@@ -103,7 +103,7 @@ class SolanaService:
                 'outputMint': token_address,
                 'inputAmount': float(params['amount']),
                 'inputMint': self.token_addresses['SOL'],
-                'slippageBps': params.get('slippage', 100),
+                'slippageBps': params.get('slippage', 100)
             }
             
             # Add wallet info if available

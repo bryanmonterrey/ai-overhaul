@@ -225,31 +225,39 @@ class RealTimeMonitor:
     async def setup_wallet(self, private_key: str = None, wallet_info: Dict = None):
         """Initialize wallet for trading"""
         try:
-            # If we received full wallet info
+            class ReadOnlyWallet:
+                def __init__(self, public_key, credentials=None):
+                    self.public_key = public_key
+                    self.connected = True
+                    if credentials:
+                        self.credentials = credentials
+                    else:
+                        self.credentials = {
+                            'publicKey': public_key,
+                            'signTransaction': True,
+                            'signAllTransactions': True,
+                            'connected': True
+                        }
+
+            # Check for wallet_info first
             if wallet_info:
-                if isinstance(wallet_info, dict):
-                    from solana.keypair import Keypair
-                    class ReadOnlyWallet:
-                        def __init__(self, public_key):
-                            self.public_key = public_key
-                            self.connected = True
-                            self.credentials = {
-                                'publicKey': public_key,
-                                'signTransaction': True,
-                                'signAllTransactions': True,
-                                'connected': True
-                            }
-
-                    # Get public key directly or from credentials
-                    pub_key = wallet_info.get('publicKey') or \
-                            (wallet_info.get('credentials', {}) or {}).get('publicKey')
-                    
+                # If we have credentials in wallet_info
+                if credentials := wallet_info.get('credentials'):
+                    pub_key = credentials.get('publicKey')
                     if pub_key:
-                        self.wallet = ReadOnlyWallet(pub_key)
-                        logging.info(f"Initialized read-only wallet with public key: {pub_key}")
+                        self.wallet = ReadOnlyWallet(pub_key, credentials)
+                        logging.info(f"Initialized read-only wallet with public key: {pub_key} and credentials")
                         return True
+                # If we have direct publicKey
+                elif pub_key := wallet_info.get('publicKey'):
+                    self.wallet = ReadOnlyWallet(pub_key)
+                    logging.info(f"Initialized read-only wallet with public key: {pub_key}")
+                    return True
+                
+                logging.error(f"Invalid wallet info structure: {wallet_info}")
+                return False
 
-            # If we have a private key, use that
+            # Handle private key if provided
             elif private_key and isinstance(private_key, str):
                 from solana.keypair import Keypair
                 try:
@@ -290,7 +298,7 @@ class RealTimeMonitor:
                     'user_message': 'Please connect your wallet before trading.'
                 }
 
-            # Add wallet info to params
+            # Add wallet info to trade params
             trade_params = {
                 **params,  # Keep existing params
                 'wallet': {
