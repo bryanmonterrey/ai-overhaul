@@ -14,8 +14,6 @@ import logging
 from .solana_service import SolanaService
 import aiohttp
 
-
-
 @dataclass
 class ConsciousnessMetrics:
     """Metrics for the consciousness system"""
@@ -230,20 +228,26 @@ class RealTimeMonitor:
             # If we received full wallet info
             if wallet_info:
                 if isinstance(wallet_info, dict):
-                    if credentials := wallet_info.get('credentials'):
-                        # Handle credentials format from frontend
-                        from solana.keypair import Keypair
-                        class ReadOnlyWallet:
-                            def __init__(self, public_key):
-                                self.public_key = public_key
-                                self.connected = True
+                    from solana.keypair import Keypair
+                    class ReadOnlyWallet:
+                        def __init__(self, public_key):
+                            self.public_key = public_key
+                            self.connected = True
+                            self.credentials = {
+                                'publicKey': public_key,
+                                'signTransaction': True,
+                                'signAllTransactions': True,
+                                'connected': True
+                            }
 
-                        # Create a read-only wallet with just the public key
-                        pub_key = credentials.get('publicKey')
-                        if pub_key:
-                            self.wallet = ReadOnlyWallet(pub_key)
-                            logging.info(f"Initialized read-only wallet with public key: {pub_key}")
-                            return True
+                    # Get public key directly or from credentials
+                    pub_key = wallet_info.get('publicKey') or \
+                            (wallet_info.get('credentials', {}) or {}).get('publicKey')
+                    
+                    if pub_key:
+                        self.wallet = ReadOnlyWallet(pub_key)
+                        logging.info(f"Initialized read-only wallet with public key: {pub_key}")
+                        return True
 
             # If we have a private key, use that
             elif private_key and isinstance(private_key, str):
@@ -273,6 +277,11 @@ class RealTimeMonitor:
                 success = await self.setup_wallet(wallet_info=wallet_info)
                 if not success:
                     logging.error("Failed to setup wallet from provided info")
+                    return {
+                        'success': False,
+                        'error': 'Failed to initialize wallet',
+                        'user_message': 'Could not connect to your wallet. Please try again.'
+                    }
                     
             if not self.wallet:
                 return {
@@ -286,7 +295,12 @@ class RealTimeMonitor:
                 **params,  # Keep existing params
                 'wallet': {
                     'publicKey': str(self.wallet.public_key),
-                    'connected': True
+                    'credentials': getattr(self.wallet, 'credentials', {
+                        'publicKey': str(self.wallet.public_key),
+                        'signTransaction': True,
+                        'signAllTransactions': True,
+                        'connected': True
+                    })
                 }
             }
 
@@ -321,7 +335,6 @@ class RealTimeMonitor:
                 'error': error_msg,
                 'user_message': 'Failed to execute trade due to an internal error.'
             }
-
 
     async def store_trade_execution(self, data: dict) -> None:
         """Store trade execution data"""

@@ -100,18 +100,18 @@ class SolanaService:
 
             # Format parameters for agent-kit trade
             swap_params = {
-                'action': 'trade',
-                'params': {
-                    'outputMint': token_address,
-                    'inputAmount': float(params['amount']),
-                    'inputMint': self.token_addresses['SOL'],
-                    'slippageBps': params.get('slippage', 100),
-                    'wallet': params.get('wallet')  # Add wallet info here
-                }
+                'outputMint': token_address,
+                'inputAmount': float(params['amount']),
+                'inputMint': self.token_addresses['SOL'],
+                'slippageBps': params.get('slippage', 100),
             }
             
-            # Execute the trade
-            result = await self._call_agent_kit('trade', swap_params['params'])
+            # Add wallet info if available
+            if wallet_info := params.get('wallet'):
+                swap_params['wallet'] = wallet_info
+                
+            logging.info(f"Executing trade with params: {swap_params}")
+            result = await self._call_agent_kit('trade', swap_params)
             
             return {
                 'success': True,
