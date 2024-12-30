@@ -78,6 +78,10 @@ class RealTimeMonitor:
         """Set WebSocket handler"""
         self.ws_handler = ws_handler
 
+    def set_supabase_client(self, supabase_client):
+        """Set Supabase client for database operations and realtime updates"""
+        self.supabase = supabase_client
+
     async def setup_wallet(self, private_key: str):
         """Initialize wallet for trading"""
         from solana.keypair import Keypair

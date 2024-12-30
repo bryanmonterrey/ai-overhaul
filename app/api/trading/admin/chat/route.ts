@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/supabase/functions/supabase.types';
 import { Message } from 'ai';
+import { TradingMessage } from '@/types/chat';
 
 const API_URL = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:3001';
 
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       return new Response('Unauthorized: Not an admin', { status: 401 });
     }
 
-    const { messages }: { messages: Message[] } = await req.json();
+    const { messages }: { messages: TradingMessage[] } = await req.json();
     
     if (!messages?.length) {
       return new Response('No messages provided', { status: 400 });
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest) {
         type: 'trading_chat',
         role: 'admin',
         userId: session.user.id,
+        wallet: messages[0]?.walletInfo, // Using the new wallet info structure
         context: {
           isAdmin: true,
           sessionId: session.user.id,

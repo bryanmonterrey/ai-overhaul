@@ -15,6 +15,7 @@ import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { PublicKey } from '@solana/web3.js';
 import { SignerWalletAdapterProps } from '@solana/wallet-adapter-base';
+import { TradingMessage } from '../../../../types/chat';
 
 
 declare global {
@@ -63,8 +64,9 @@ function isPortfolioUpdate(data: any): data is PortfolioUpdateData {
 export function AdminTradingChat() {
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { publicKey, signTransaction, signAllTransactions, connected, select } = useWallet() as WalletContextState;
+  const { publicKey, signTransaction, signAllTransactions, connected } = useWallet();
   const { setVisible } = useWalletModal();
+  
 
   useEffect(() => {
     if (publicKey) {
@@ -83,10 +85,15 @@ export function AdminTradingChat() {
     }
   }, [connected, setVisible]);
   
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat<TradingMessage>({
     api: '/api/trading/admin/chat',
     streamProtocol: 'text',
     id: 'admin-trading-chat',
+    body: {
+      walletInfo: publicKey ? {
+        publicKey: publicKey.toString()
+      } : undefined
+    },
     onResponse: (response) => {
       console.log('Raw response:', response);
       if (!response.ok) {
@@ -105,7 +112,7 @@ export function AdminTradingChat() {
         variant: "destructive",
       });
     }
-  });
+});
 
   // Scroll helper function
   const scrollToBottom = () => {
