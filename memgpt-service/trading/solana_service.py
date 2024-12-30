@@ -87,36 +87,29 @@ class SolanaService:
             raise
         
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute swap through agent-kit"""
         try:
             # Get token data from params or lookup
-            token_data = params.get('token_data')
-            if not token_data:
-                # If no token_data provided, try to get it from asset
-                symbol = params['asset'].upper()
-                address = self.token_addresses.get(symbol)
-                if not address and len(params['asset']) == 44:
-                    address = params['asset']
-                if not address:
+            symbol = params['asset'].upper()
+            token_address = self.token_addresses.get(symbol)
+                
+            if not token_address:
+                if len(params['asset']) == 44:
+                    token_address = params['asset']
+                else:
                     raise ValueError(f"Unknown token: {params['asset']}")
-                token_data = {
-                    'symbol': symbol,
-                    'address': address,
-                    'verified': True
-                }
 
-            # Format parameters for agent-kit
-            side = params.get('side', 'buy')
+            # Format parameters for agent-kit trade
             swap_params = {
                 'action': 'trade',
                 'params': {
-                    'outputMint': token_data['address'] if side == 'buy' else self.token_addresses['SOL'],
+                    'outputMint': token_address,
                     'inputAmount': float(params['amount']),
-                    'inputMint': self.token_addresses['SOL'] if side == 'buy' else token_data['address'],
-                    'slippageBps': params.get('slippage', 100)
+                    'inputMint': self.token_addresses['SOL'],
+                    'slippageBps': params.get('slippage', 100),
+                    'wallet': params.get('wallet')  # Add wallet info here
                 }
             }
-
+            
             # Execute the trade
             result = await self._call_agent_kit('trade', swap_params['params'])
             
@@ -125,7 +118,7 @@ class SolanaService:
                 'signature': result.get('signature'),
                 'params': params,
                 'result': result,
-                'token_data': token_data,
+                'token_address': token_address,
                 'timestamp': datetime.now().isoformat()
             }
 

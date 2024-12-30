@@ -285,58 +285,31 @@ class RealTimeMonitor:
             logging.error(f"Error broadcasting update: {str(e)}")
 
     async def execute_solana_trade(self, params: dict) -> dict:
-        """Execute trade through Solana Agent Kit"""
         try:
             trade_id = str(uuid.uuid4())
             
-            # Send initial status
-            await self.broadcast_trading_update(
-                update_type="trade_status",
-                data={
-                    "trade_id": trade_id,
-                    "status": "initiated",
-                    "params": params,
-                    "timestamp": datetime.now().isoformat()
-                },
-                channel="trading_updates"
-            )
-
-            # Validate parameters
-            required_fields = ['asset', 'amount', 'side']
-            missing_fields = [field for field in required_fields if field not in params]
-            if missing_fields:
-                await self._send_trade_error(trade_id, f"Missing fields: {missing_fields}")
+            if not self.wallet:
                 return {
-                    "success": False,
-                    "error": f"Missing required fields: {', '.join(missing_fields)}"
+                    'success': False,
+                    'error': 'Wallet not initialized'
                 }
+
+            # Add wallet info to params
+            trade_params = {
+                **params,  # Keep existing params
+                'wallet': {
+                    'publicKey': str(self.wallet.public_key),
+                    'privateKey': self.wallet.secret_key.hex()
+                }
+            }
 
             try:
                 # Execute the swap
-                swap_result = await self.solana_service.execute_swap(params)
+                swap_result = await self.solana_service.execute_swap(trade_params)
                 
-                if not swap_result['success']:
-                    await self._send_trade_error(trade_id, swap_result.get('error', 'Unknown error'))
-                    return swap_result
-
-                # Broadcast success
-                await self.broadcast_trading_update(
-                    update_type="trade_status",
-                    data={
-                        "trade_id": trade_id,
-                        "status": "executed",
-                        "signature": swap_result.get('signature'),
-                        "params": params,
-                        "result": swap_result,
-                        "timestamp": datetime.now().isoformat()
-                    },
-                    channel="trading_updates"
-                )
-
                 return {
                     'success': True,
                     'trade_id': trade_id,
-                    'status': 'executed',
                     'signature': swap_result.get('signature'),
                     'params': params,
                     'result': swap_result,
@@ -358,10 +331,6 @@ class RealTimeMonitor:
                 'success': False,
                 'error': error_msg
             }
-
-    def set_supabase_client(self, supabase_client):
-        """Set Supabase client for realtime updates"""
-        self.supabase = supabase_client
 
     async def store_trade_execution(self, data: dict) -> None:
         """Store trade execution data"""
