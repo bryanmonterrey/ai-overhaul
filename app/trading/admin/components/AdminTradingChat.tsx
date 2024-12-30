@@ -80,6 +80,13 @@ export function AdminTradingChat() {
   }, [publicKey]);
 
   useEffect(() => {
+    if (!connected && publicKey) {
+      // Auto-initialize wallet if we have public key but not connected
+      solanaService.updateWalletConnection(publicKey);
+    }
+  }, [connected, publicKey]);
+
+  useEffect(() => {
     if (!connected) {
       toast({
         title: "Wallet Required",
@@ -101,12 +108,16 @@ export function AdminTradingChat() {
     api: '/api/trading/admin/chat',
     streamProtocol: 'text',
     id: 'admin-trading-chat',
-    body: { 
-      walletCredentials: publicKey ? {
+    body: {
+      walletInfo: publicKey ? {
         publicKey: publicKey.toString(),
-        signTransaction,
-        signAllTransactions,
-      } : undefined
+        credentials: {
+          publicKey: publicKey.toString(),
+          signTransaction: !!signTransaction,
+          signAllTransactions: !!signAllTransactions,
+          connected
+        }
+      } : null
     },
       onResponse: (response) => {
         console.log('Raw response:', response);
@@ -297,11 +308,16 @@ export function AdminTradingChat() {
         const messageData = {
           content: input.trim(),
           walletInfo: publicKey ? {
-            publicKey: publicKey.toString()
-          } : null  // Use null instead of undefined
+            publicKey: publicKey.toString(),
+            credentials: {
+              publicKey: publicKey.toString(),
+              signTransaction: !!signTransaction,
+              signAllTransactions: !!signAllTransactions,
+              connected
+            }
+          } : null
         };
-        
-        // Cast as JSONValue to satisfy type
+  
         await handleSubmit(e, { 
           data: messageData as { [key: string]: any } 
         });
