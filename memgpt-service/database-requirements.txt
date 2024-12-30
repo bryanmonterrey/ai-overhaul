@@ -1,1 +1,1 @@
-database-requirements.txt
+supabase
