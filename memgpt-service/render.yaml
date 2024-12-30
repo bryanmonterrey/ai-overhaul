@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ai-overhaul
+    env: python
+    region: ohio
+    plan: starter
+    rootDirectory: memgpt-service
+    buildCommand: python -m pip install --upgrade pip && pip install -r base-requirements.txt && pip install -r database-requirements.txt && pip install -r ai-requirements.txt && pip install -r blockchain-requirements.txt
+    startCommand: gunicorn letta_service:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-3001}
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.12
+      - key: MAX_WORKERS
+        value: "4"
+      - key: WEB_CONCURRENCY
+        value: "4"
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+      targetMemoryPercent: 75
+      targetCPUPercent: 75
