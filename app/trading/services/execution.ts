@@ -82,18 +82,18 @@ class TradeExecutionService {
     if (!wallet) {
       if (!this.agentKit) {
         this.agentKit = new SolanaAgentKit(
-          'readonly',
-          process.env.NEXT_PUBLIC_RPC_URL!,
-          process.env.OPENAI_API_KEY!
+          'readonly',  // private key or 'readonly'
+          process.env.NEXT_PUBLIC_RPC_URL!,  // RPC URL
+          process.env.OPENAI_API_KEY!  // OpenAI API key
         );
       }
       return this.agentKit;
     }
 
     return new SolanaAgentKit(
-      process.env.NEXT_PUBLIC_RPC_URL!,
-      process.env.OPENAI_API_KEY!,
-      wallet.publicKey.toString()
+      wallet.publicKey.toString(),  // private key
+      process.env.NEXT_PUBLIC_RPC_URL!,  // RPC URL
+      process.env.OPENAI_API_KEY!  // OpenAI API key
     );
   }
 
