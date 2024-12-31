@@ -1,7 +1,10 @@
 // app/api/agent-kit/route.ts
+
 import { NextResponse } from 'next/server';
 import { tradeExecution } from '../../trading/services/execution';
 import { PublicKey } from '@solana/web3.js';
+import { TradingSessionManager } from '@/lib/trading/session-manager';
+import { verifySession } from '@/lib/trading/session-verification';
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
@@ -27,6 +30,52 @@ export async function POST(req: Request) {
     }
 
     console.log('Processing action:', action, 'with params:', params);
+
+    // Verify trading session for actions that require authentication
+    if (['trade', 'validateTransaction'].includes(action)) {
+      const sessionSignature = req.headers.get('X-Trading-Session');
+      
+      if (!sessionSignature) {
+        return NextResponse.json({ 
+          error: 'No trading session found',
+          code: 'SESSION_REQUIRED'
+        }, { 
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
+      if (!params?.wallet?.publicKey) {
+        return NextResponse.json({ 
+          error: 'Wallet public key required',
+          code: 'INVALID_WALLET'
+        }, { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
+      const isValidSession = await verifySession(
+        params.wallet.publicKey,
+        sessionSignature
+      );
+
+      if (!isValidSession) {
+        return NextResponse.json({ 
+          error: 'Invalid or expired session',
+          code: 'SESSION_EXPIRED'
+        }, { 
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    }
 
     switch(action) {
       case 'trade':
@@ -119,12 +168,37 @@ export async function POST(req: Request) {
             'Content-Type': 'application/json'
           }
         });
+
+      case 'validateSession':
+        // New endpoint to validate trading sessions
+        if (!params?.sessionSignature || !params?.publicKey) {
+          return NextResponse.json({ 
+            error: 'Session signature and public key required'
+          }, { 
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+        }
+        const sessionValid = await verifySession(
+          params.publicKey,
+          params.sessionSignature
+        );
+        return NextResponse.json({ 
+          valid: sessionValid,
+          timestamp: new Date().toISOString()
+        }, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
         
       default:
         return NextResponse.json({ 
           error: 'Invalid action',
           action: action,
-          supported: ['trade', 'getTokenData', 'getPrice', 'getRoutes', 'validateTransaction']
+          supported: ['trade', 'getTokenData', 'getPrice', 'getRoutes', 'validateTransaction', 'validateSession']
         }, { 
           status: 400,
           headers: {
