@@ -80,17 +80,6 @@ class RealTimeMonitor:
         """Set Supabase client for database operations and realtime updates"""
         self.supabase = supabase_client
 
-    async def setup_wallet(self, private_key: str):
-        """Initialize wallet for trading"""
-        from solana.keypair import Keypair
-        try:
-            keypair = Keypair.from_secret_key(bytes.fromhex(private_key))
-            self.wallet = keypair
-            return True
-        except Exception as e:
-            logging.error(f"Wallet setup error: {str(e)}")
-            return False
-
     async def start_monitoring(self):
         """Start the monitoring loop"""
         while True:
@@ -302,13 +291,8 @@ class RealTimeMonitor:
             trade_params = {
                 **params,  # Keep existing params
                 'wallet': {
-                    'publicKey': str(self.wallet.public_key),
-                    'credentials': getattr(self.wallet, 'credentials', {
-                        'publicKey': str(self.wallet.public_key),
-                        'signTransaction': True,
-                        'signAllTransactions': True,
-                        'connected': True
-                    })
+                    'publicKey': self.wallet.credentials['publicKey'],  # Use credentials directly
+                    'credentials': self.wallet.credentials  # Pass full credentials
                 }
             }
 
