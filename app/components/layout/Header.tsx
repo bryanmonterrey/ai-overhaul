@@ -140,19 +140,19 @@ export default function Header() {
           <div className="sm:hidden border-t border-[#DDDDDD] py-2">
             <nav className="flex flex-col space-y-2">
               <Link href="/chat" className="font-ia text-[#DDDDDD] px-4 py-2 hover:bg-[#DDDDDD]/10">
-                [CHAT]
+                chat
               </Link>
               <Link href="/conversations" className="font-ia text-[#DDDDDD] px-4 py-2 hover:bg-[#DDDDDD]/10">
-                [CONVERSATIONS]
+                conversations
               </Link>
               <Link href="/twitter" className="font-ia text-[#DDDDDD] px-4 py-2 hover:bg-[#DDDDDD]/10">
-                [TWITTER]
+                twitter
               </Link>
               <Link href="/telegram" className="font-ia text-[#DDDDDD] px-4 py-2 hover:bg-[#DDDDDD]/10">
-                [TELEGRAM]
+                telegram
               </Link>
               <Link href="/admin" className="font-ia text-[#DDDDDD] px-4 py-2 hover:bg-[#DDDDDD]/10">
-                [ADMIN]
+                admin
               </Link>
               <div className="px-4 py-2">
                 <span className="text-xs text-[#DDDDDD]">STATUS: ONLINE</span>

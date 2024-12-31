@@ -170,6 +170,30 @@ class WebSocketEventHandler:
                 logging.error(f"Error in cleanup task: {str(e)}")
                 await asyncio.sleep(60)
 
+    async def cleanup(self):
+        """Cleanup WebSocket connections"""
+        try:
+            # Close all websocket connections
+            for client_id, websocket in self.websockets.items():
+                try:
+                    await websocket.close()
+                except Exception as e:
+                    logging.error(f"Error closing websocket for client {client_id}: {str(e)}")
+            
+            # Clear dictionaries
+            self.websockets.clear()
+            self.clients.clear()
+            self.channels = {
+                'monitoring': set(),
+                'trades': set(),
+                'alerts': set(),
+                'admin': set(),
+                'holder': set(),
+                'trading_updates': set()
+            }
+        except Exception as e:
+            logging.error(f"Error during WebSocket cleanup: {str(e)}")
+
     async def _send_to_user(self, user_address: str, message: Dict[str, Any]):
         """Send message to all clients of a specific user"""
         try:

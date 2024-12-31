@@ -106,6 +106,8 @@ class SolanaService:
                 'outputMint': token_address,
                 'inputAmount': float(params['amount']),
                 'inputMint': self.token_addresses['SOL'],
+                'tokenIn': self.token_addresses['SOL'],  # Add this
+                'tokenOut': token_address,  # Add this
                 'slippageBps': params.get('slippage', 100)
             }
             
