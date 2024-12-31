@@ -6,7 +6,7 @@ services:
     plan: starter
     rootDirectory: memgpt-service
     buildCommand: python -m pip install --upgrade pip && pip install -r base-requirements.txt && pip install -r database-requirements.txt && pip install -r ai-requirements.txt && pip install -r blockchain-requirements.txt
-    startCommand: gunicorn letta_service:app -w 2 -k uvicorn.workers.UvicornWorker --max-requests 1000 --max-requests-jitter 50 --timeout 300 --graceful-timeout 120 --keep-alive 5 -b 0.0.0.0:${PORT:-3001}
+    startCommand: gunicorn letta_service:app -w 2 -k uvicorn.workers.UvicornWorker --max-requests 1000 --max-requests-jitter 50 --timeout 120 --graceful-timeout 60 --keep-alive 5 -b 0.0.0.0:${PORT:-3001}
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
@@ -18,10 +18,11 @@ services:
       - key: WORKER_CLASS
         value: uvicorn.workers.UvicornWorker
       - key: WORKER_TIMEOUT
-        value: "30000"  # Increased from 120
+        value: "120"
       - key: PORT
         value: "3001"
     scaling:
       minInstances: 1
       maxInstances: 1
       targetMemoryPercent: 75
+      targetCPUPercent: 75
