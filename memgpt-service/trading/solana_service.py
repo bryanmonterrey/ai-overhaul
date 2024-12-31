@@ -93,26 +93,67 @@ class SolanaService:
         except Exception as e:
             logging.error(f"Agent-kit API call error: {str(e)}")
             raise
+
+    async def get_token_info(self, symbol_or_address: str) -> Dict[str, Any]:
+        """Dynamically get token info from Jupiter API or on-chain"""
+        try:
+            # Check if it's a known token first
+            if symbol := symbol_or_address.upper():
+                if address := self.token_addresses.get(symbol):
+                    return {
+                        'symbol': symbol,
+                        'address': address,
+                        'verified': True
+                    }
+
+            # Try Jupiter token list
+            jupiter_url = "https://token.jup.ag/all"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(jupiter_url) as response:
+                    if response.ok:
+                        token_list = await response.json()
+                        # Look for exact matches first
+                        token = next((t for t in token_list 
+                            if t['symbol'].upper() == symbol_or_address.upper() or 
+                            t['address'] == symbol_or_address), None)
+                        
+                        if token:
+                            return {
+                                'symbol': token['symbol'],
+                                'address': token['address'],
+                                'verified': True,
+                                'decimals': token.get('decimals', 9)
+                            }
+
+            # If it looks like an address, treat as unverified token
+            if len(symbol_or_address) == 44:
+                return {
+                    'symbol': symbol_or_address[:8],  # Short version of address
+                    'address': symbol_or_address,
+                    'verified': False,
+                    'decimals': 9
+                }
+
+            raise ValueError(f"Could not find token info for: {symbol_or_address}")
+
+        except Exception as e:
+            logging.error(f"Error getting token info: {str(e)}")
+            raise
         
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # Get token data from params or lookup
-            symbol = params['asset'].upper()
-            token_address = self.token_addresses.get(symbol)
-                
-            if not token_address:
-                if len(params['asset']) == 44:
-                    token_address = params['asset']
-                else:
-                    raise ValueError(f"Unknown token: {params['asset']}")
+            # Get token info
+            token_info = await self.get_token_info(params['asset'])
+            if not token_info:
+                raise ValueError(f"Could not find token info for: {params['asset']}")
 
             # Format parameters for agent-kit trade
             swap_params = {
-                'outputMint': token_address,
+                'outputMint': token_info['address'],
                 'inputAmount': float(params['amount']),
                 'inputMint': self.token_addresses['SOL'],
-                'tokenIn': self.token_addresses['SOL'],  # Add this
-                'tokenOut': token_address,  # Add this
+                'tokenIn': self.token_addresses['SOL'],
+                'tokenOut': token_info['address'],
                 'slippageBps': params.get('slippage', 100),
                 'readonly': True
             }
@@ -126,7 +167,7 @@ class SolanaService:
                         'signTransaction': wallet_info['credentials']['signTransaction'],
                         'signAllTransactions': wallet_info['credentials']['signAllTransactions'],
                         'connected': True,
-                        'readonly': True  # Add this flag
+                        'readonly': True
                     }
                 }
                 
@@ -138,7 +179,7 @@ class SolanaService:
                 'signature': result.get('signature'),
                 'params': params,
                 'result': result,
-                'token_address': token_address,
+                'token_info': token_info,  # Include full token info
                 'timestamp': datetime.now().isoformat()
             }
 
