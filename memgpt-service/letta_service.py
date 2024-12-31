@@ -153,35 +153,12 @@ class MemGPTService:
             raise ValueError("Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided")
 
         try:
-            from supabase._sync.client import Client as SupabaseClient
-    
-            print("Starting Supabase initialization...")
-            max_retries = 3
-            retry_count = 0
-            last_error = None
-            
-            while retry_count < max_retries:
-                try:
-                    print(f"Supabase initialization attempt {retry_count + 1}")
-                    # Initialize directly with SupabaseClient
-                    self.supabase = SupabaseClient(
-                        supabase_url=SUPABASE_URL,
-                        supabase_key=SUPABASE_KEY
-                    )
-                    # Test connection
-                    test_query = self.supabase.table('memories').select('*').limit(1).execute()
-                    print("Supabase client initialized and tested successfully")
-                    break
-                except Exception as e:
-                    last_error = e
-                    retry_count += 1
-                    if retry_count < max_retries:
-                        print(f"Attempt {retry_count} failed: {str(e)}")
-                        time.sleep(2)
-                    else:
-                        raise RuntimeError(f"Failed to initialize Supabase after {max_retries} attempts: {str(last_error)}")
-
+            self.supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
             print("Supabase client initialized successfully")
+
+            # Test connection
+            test = self.supabase.table('memories').select('*').limit(1).execute()
+            print("Supabase connection tested successfully")
 
             # Initialize WebSocket event handler early
             self.ws_handler = WebSocketEventHandler()

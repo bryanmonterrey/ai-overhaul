@@ -1,4 +1,7 @@
 supabase==1.0.3
-postgrest>=0.10.0
-realtime>=1.0.0,<1.0.6  # Pin to an earlier version that works with websockets 10.4
-websockets>=10.4,<11.0.0  # Pin to version that works in your environment
+postgrest==0.10.0
+websockets==10.4
+realtime==1.0.0
+gotrue==1.0.0
+storage3==0.5.2
+httpx>=0.23.0,<1.0.0
