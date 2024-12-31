@@ -26,6 +26,7 @@ from trading.memory.trading_memory import TradingMemory
 from chat.trading_chat import TradingChat
 import logging
 from dataclasses import asdict
+import gc
 import psutil
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse
@@ -231,6 +232,7 @@ class MemGPTService:
             )
             self.agent.service = self
             print("Letta agent initialized")
+
                 
             # Initialize memory processor
             self.memory_processor = MemoryProcessor(self.agent)
@@ -1263,6 +1265,23 @@ async def get_memory(key: str, type: Optional[MemoryType] = None):
         )
     return result
 
+
+@app.on_event("startup")
+async def startup_event():
+    app.state.memgpt_service = MemGPTService()
+    await app.state.memgpt_service.ws_handler.start()
+    # Enable garbage collection
+    gc.enable()
+    # Set garbage collection threshold
+    gc.set_threshold(700, 10, 5)
+
+@app.middleware("http")
+async def cleanup_middleware(request: Request, call_next):
+    response = await call_next(request)
+    # Force garbage collection after each request
+    gc.collect()
+    return response
+
 @app.websocket("/ws/trading") 
 async def websocket_endpoint(websocket: WebSocket):
     client_id = websocket.query_params.get("clientId", str(uuid.uuid4()))
@@ -1326,6 +1345,29 @@ async def cluster_memories(config: ClusterConfig):
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
+
+@app.get("/metrics")
+async def get_metrics():
+    import psutil
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    return {
+        "memory_used_mb": memory_info.rss / 1024 / 1024,
+        "cpu_percent": process.cpu_percent(),
+        "num_threads": process.num_threads()
+    }
+
+def cleanup_memory():
+    gc.collect()
+    import psutil
+    process = psutil.Process()
+    if process.memory_info().rss > 500 * 1024 * 1024:  # 500MB
+        print("Memory threshold exceeded, performing cleanup")
+        # Force garbage collection
+        gc.collect()
+        # Clear any caches
+        if hasattr(app.state.memgpt_service, 'memory_processor'):
+            app.state.memgpt_service.memory_processor.clear_caches()
 
 @app.post("/trading/admin/chat")
 async def admin_chat_endpoint(request: Request):
