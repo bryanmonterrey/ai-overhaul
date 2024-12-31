@@ -192,6 +192,7 @@ export const config = {
     '/api/token-validation',
     '/api/chat/:path*',
     '/api/ai/:path*',
+    '/api/agent-kit/:path*',
     '/api/trading/admin/chat',  // Changed to exact match
     '/twitter/:path*',
     '/telegram/:path*',
