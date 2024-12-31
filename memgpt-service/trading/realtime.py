@@ -360,8 +360,10 @@ class RealTimeMonitor:
             logging.error(f"Error broadcasting trading update: {str(e)}")
 
     async def store_trade_execution(self, data: dict) -> None:
-        """Store trade execution data"""
         try:
+            if isinstance(data, str):
+                data = json.loads(data)  # Convert string to dict if needed
+                
             execution_data = {
                 **data,
                 'timestamp': datetime.now().isoformat()

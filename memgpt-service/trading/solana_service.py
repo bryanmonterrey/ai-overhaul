@@ -9,11 +9,16 @@ import os
 class SolanaService:
     """Solana utilities that coordinate with frontend agent-kit"""
     def __init__(self):
-        # Check if we're in production or development
+        # Ensure RPC URL is properly formatted
+        default_rpc = 'https://api.mainnet-beta.solana.com'
+        rpc_url = os.getenv('NEXT_PUBLIC_RPC_URL', default_rpc)
+        if not rpc_url.startswith(('http://', 'https://')):
+            rpc_url = 'https://' + rpc_url
+        self.rpc_url = rpc_url
+
+        # Rest of initialization
         is_production = os.getenv('NODE_ENV') == 'production'
         default_url = 'https://terminal.goatse.app' if is_production else 'http://localhost:3000'
-        
-        # Get frontend URL with appropriate default
         frontend_url = os.getenv('NEXT_PUBLIC_FRONTEND_URL', default_url).rstrip('/')
         if not frontend_url.startswith(('http://', 'https://')):
             frontend_url = 'https://' + frontend_url
