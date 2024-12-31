@@ -36,32 +36,7 @@ class SolanaService:
         }
 
     async def _call_agent_kit(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Make call to agent-kit API"""
         try:
-            # Handle token data lookup
-            if action == 'getTokenData':
-                # Try hardcoded tokens first
-                if 'symbol' in params:
-                    symbol = params['symbol'].upper()
-                    if symbol in self.token_addresses:
-                        return {
-                            'symbol': symbol,
-                            'address': self.token_addresses[symbol],
-                            'verified': True
-                        }
-                
-                # If we have a mint address, use it directly
-                if 'mint' in params:
-                    params = {'mint': params['mint']}
-                elif 'symbol' in params:
-                    # Try to find address for symbol
-                    address = self.token_addresses.get(params['symbol'].upper())
-                    if address:
-                        params = {'mint': address}
-                    else:
-                        # Could add Jupiter token list lookup here
-                        raise ValueError(f"Unknown token symbol: {params['symbol']}")
-
             logging.info(f"Making request to {self.agent_kit_url}")
             logging.info(f"Request payload: action={action}, params={params}")
             
@@ -93,6 +68,7 @@ class SolanaService:
         except Exception as e:
             logging.error(f"Agent-kit API call error: {str(e)}")
             raise
+
 
     async def get_token_info(self, symbol_or_address: str) -> Dict[str, Any]:
         """Dynamically get token info from Jupiter API or on-chain"""
@@ -142,35 +118,30 @@ class SolanaService:
         
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # Get token info
-            token_info = await self.get_token_info(params['asset'])
-            if not token_info:
-                raise ValueError(f"Could not find token info for: {params['asset']}")
+            # Get token data from params or lookup
+            symbol = params['asset'].upper()
+            token_address = self.token_addresses.get(symbol)
+                
+            if not token_address:
+                if len(params['asset']) == 44:
+                    token_address = params['asset']
+                else:
+                    raise ValueError(f"Unknown token: {params['asset']}")
 
             # Format parameters for agent-kit trade
             swap_params = {
-                'outputMint': token_info['address'],
+                'outputMint': token_address,
                 'inputAmount': float(params['amount']),
                 'inputMint': self.token_addresses['SOL'],
                 'tokenIn': self.token_addresses['SOL'],
-                'tokenOut': token_info['address'],
-                'slippageBps': params.get('slippage', 100),
-                'readonly': True
+                'tokenOut': token_address,
+                'slippageBps': params.get('slippage', 100)
             }
             
-            # Add wallet info if available
+            # Pass through wallet info without modification
             if wallet_info := params.get('wallet'):
-                swap_params['wallet'] = {
-                    'publicKey': wallet_info['publicKey'],
-                    'credentials': {
-                        'publicKey': wallet_info['credentials']['publicKey'],
-                        'signTransaction': wallet_info['credentials']['signTransaction'],
-                        'signAllTransactions': wallet_info['credentials']['signAllTransactions'],
-                        'connected': True,
-                        'readonly': True
-                    }
-                }
-                
+                swap_params['wallet'] = wallet_info
+
             logging.info(f"Executing trade with params: {swap_params}")
             result = await self._call_agent_kit('trade', swap_params)
             
@@ -179,7 +150,7 @@ class SolanaService:
                 'signature': result.get('signature'),
                 'params': params,
                 'result': result,
-                'token_info': token_info,  # Include full token info
+                'token_address': token_address,
                 'timestamp': datetime.now().isoformat()
             }
 
