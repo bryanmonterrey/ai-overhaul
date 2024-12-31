@@ -3,8 +3,8 @@
 import { NextResponse } from 'next/server';
 import { tradeExecution } from '../../trading/services/execution';
 import { PublicKey } from '@solana/web3.js';
-import { TradingSessionManager } from '@/lib/trading/session-manager';
-import { verifySession } from '@/lib/trading/session-verification';
+import { TradingSessionManager } from '../../lib/trading/session-manager';
+import { verifySession } from '../../lib/trading/session-verification';
 import { SolanaAgentKit } from 'solana-agent-kit';
 
 // Store active agent-kit instances

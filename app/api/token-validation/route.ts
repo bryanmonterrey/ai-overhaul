@@ -4,9 +4,28 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { TokenChecker } from '../../lib/blockchain/token-checker';
 import { Database } from '@/supabase/functions/supabase.types';
+import { tokenValidationRateLimiter } from '../../lib/middleware/rate-limiter';
 
 export async function POST(req: Request) {
   try {
+    // Rate limiting check
+    const ip = req.headers.get("x-forwarded-for") ?? "127.0.0.1"
+    const { success, limit, reset, remaining } = await tokenValidationRateLimiter.limit(ip)
+    
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too Many Requests' },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': limit.toString(),
+            'X-RateLimit-Remaining': remaining.toString(),
+            'X-RateLimit-Reset': reset.toString()
+          }
+        }
+      );
+    }
+
     // Parse request body
     const { walletAddress } = await req.json();
     console.log('1. Request received for wallet:', walletAddress);
