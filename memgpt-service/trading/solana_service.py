@@ -113,12 +113,22 @@ class SolanaService:
                 'inputMint': self.token_addresses['SOL'],
                 'tokenIn': self.token_addresses['SOL'],  # Add this
                 'tokenOut': token_address,  # Add this
-                'slippageBps': params.get('slippage', 100)
+                'slippageBps': params.get('slippage', 100),
+                'readonly': True
             }
             
             # Add wallet info if available
             if wallet_info := params.get('wallet'):
-                swap_params['wallet'] = wallet_info
+                swap_params['wallet'] = {
+                    'publicKey': wallet_info['publicKey'],
+                    'credentials': {
+                        'publicKey': wallet_info['credentials']['publicKey'],
+                        'signTransaction': wallet_info['credentials']['signTransaction'],
+                        'signAllTransactions': wallet_info['credentials']['signAllTransactions'],
+                        'connected': True,
+                        'readonly': True  # Add this flag
+                    }
+                }
                 
             logging.info(f"Executing trade with params: {swap_params}")
             result = await self._call_agent_kit('trade', swap_params)
