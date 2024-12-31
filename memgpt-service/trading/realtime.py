@@ -445,3 +445,11 @@ class RealTimeMonitor:
         """Get largest position details"""
         # Implementation needed
         pass
+
+    def __del__(self):
+    # Ensure clean shutdown
+        if hasattr(self, 'ws_handler') and self.ws_handler:
+            try:
+                self.ws_handler.close()
+            except:
+                pass
