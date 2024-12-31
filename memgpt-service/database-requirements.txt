@@ -1,3 +1,2 @@
-supabase
 supabase-py
 postgrest
