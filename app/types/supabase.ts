@@ -65,7 +65,35 @@ export type Database = {
         Insert: Omit<TrainingDataRow, 'id' | 'created_at'>;
         Update: Partial<TrainingDataRow>;
       };
-      // Add other tables as needed
+      trading_sessions: {
+        Row: {
+          id: string;
+          public_key: string;
+          signature: string;
+          timestamp: number;
+          expires_at: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          public_key: string;
+          signature: string;
+          timestamp: number;
+          expires_at: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          public_key?: string;
+          signature?: string;
+          timestamp?: number;
+          expires_at?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };   
     };
   };
 };

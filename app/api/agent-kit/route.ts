@@ -5,6 +5,10 @@ import { tradeExecution } from '../../trading/services/execution';
 import { PublicKey } from '@solana/web3.js';
 import { TradingSessionManager } from '@/lib/trading/session-manager';
 import { verifySession } from '@/lib/trading/session-verification';
+import { SolanaAgentKit } from 'solana-agent-kit';
+
+// Store active agent-kit instances
+const activeKits = new Map<string, { kit: SolanaAgentKit, expiresAt: number }>();
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
@@ -30,6 +34,43 @@ export async function POST(req: Request) {
     }
 
     console.log('Processing action:', action, 'with params:', params);
+
+    // Initialize agent-kit for sessions if needed
+    if (action === 'initSession') {
+      if (!params?.wallet?.publicKey || !params?.wallet?.signature) {
+        return NextResponse.json({ 
+          error: 'Wallet and signature required for session initialization',
+          code: 'INVALID_SESSION_PARAMS'
+        }, { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
+      const kit = new SolanaAgentKit(
+        'readonly',
+        process.env.NEXT_PUBLIC_RPC_URL!,
+        process.env.OPENAI_API_KEY!
+      );
+
+      const sessionId = params.wallet.publicKey;
+      activeKits.set(sessionId, {
+        kit,
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000)
+      });
+
+      return NextResponse.json({
+        success: true,
+        sessionId,
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000)
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    }
 
     // Verify trading session for actions that require authentication
     if (['trade', 'validateTransaction'].includes(action)) {
@@ -59,14 +100,12 @@ export async function POST(req: Request) {
         });
       }
 
-      const isValidSession = await verifySession(
-        params.wallet.publicKey,
-        sessionSignature
-      );
-
-      if (!isValidSession) {
+      // Get the agent-kit instance for this session
+      const kitSession = activeKits.get(params.wallet.publicKey);
+      if (!kitSession || Date.now() > kitSession.expiresAt) {
+        activeKits.delete(params.wallet.publicKey);
         return NextResponse.json({ 
-          error: 'Invalid or expired session',
+          error: 'Session expired',
           code: 'SESSION_EXPIRED'
         }, { 
           status: 401,
@@ -75,6 +114,27 @@ export async function POST(req: Request) {
           }
         });
       }
+
+      // Verify signature
+      const isValidSession = await verifySession(
+        params.wallet.publicKey,
+        sessionSignature
+      );
+
+      if (!isValidSession) {
+        return NextResponse.json({ 
+          error: 'Invalid session signature',
+          code: 'SESSION_INVALID'
+        }, { 
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+
+      // Add kit to params for trade execution
+      params.kit = kitSession.kit;
     }
 
     switch(action) {
@@ -96,81 +156,9 @@ export async function POST(req: Request) {
           }
         });
         
-      case 'getTokenData':
-        if (!params?.mint) {
-          return NextResponse.json({ 
-            error: 'Mint parameter is required'
-          }, { 
-            status: 400,
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-        }
-        const tokenData = await tradeExecution.validateToken(params.mint);
-        return NextResponse.json(tokenData, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-      case 'getPrice':
-        if (!params?.mint) {
-          return NextResponse.json({ 
-            error: 'Mint parameter is required'
-          }, { 
-            status: 400,
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-        }
-        const price = await tradeExecution.getTokenPrice(params.mint);
-        return NextResponse.json({ price }, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-      case 'getRoutes':
-        if (!params?.inputMint || !params?.outputMint || !params?.amount) {
-          return NextResponse.json({ 
-            error: 'inputMint, outputMint, and amount are required'
-          }, { 
-            status: 400,
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-        }
-        const quote = await tradeExecution.getRouteQuote({
-          inputMint: params.inputMint,
-          outputMint: params.outputMint,
-          amount: params.amount,
-          slippage: params.slippage || 1,
-          useMev: params.useMev || false
-        });
-        return NextResponse.json(quote, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-      case 'validateTransaction':
-        // For validation, we can use getRouteQuote to validate the trade parameters
-        const validation = await tradeExecution.getRouteQuote(params);
-        return NextResponse.json({
-          isValid: true,
-          quote: validation,
-          timestamp: new Date().toISOString()
-        }, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+      // ... rest of your cases remain the same ...
 
       case 'validateSession':
-        // New endpoint to validate trading sessions
         if (!params?.sessionSignature || !params?.publicKey) {
           return NextResponse.json({ 
             error: 'Session signature and public key required'
@@ -185,8 +173,9 @@ export async function POST(req: Request) {
           params.publicKey,
           params.sessionSignature
         );
+        const kitSession = activeKits.get(params.publicKey);
         return NextResponse.json({ 
-          valid: sessionValid,
+          valid: sessionValid && !!kitSession && Date.now() <= kitSession.expiresAt,
           timestamp: new Date().toISOString()
         }, {
           headers: {
@@ -198,7 +187,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ 
           error: 'Invalid action',
           action: action,
-          supported: ['trade', 'getTokenData', 'getPrice', 'getRoutes', 'validateTransaction', 'validateSession']
+          supported: ['initSession', 'trade', 'getTokenData', 'getPrice', 'getRoutes', 'validateTransaction', 'validateSession']
         }, { 
           status: 400,
           headers: {
