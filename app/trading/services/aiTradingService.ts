@@ -146,7 +146,11 @@ class AITradingService {
         body: JSON.stringify({
           ...trade,
           priceData,
-          tokenData
+          tokenData,
+          asset: trade.token,  // Add this
+          amount: trade.amount, // Add this
+          side: trade.side,
+          wallet: trade.wallet
         })
       });
   

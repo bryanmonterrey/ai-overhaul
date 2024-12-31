@@ -67,6 +67,11 @@ export async function POST(req: NextRequest) {
           publicKey: data?.walletInfo?.publicKey,
           credentials: data?.walletInfo?.credentials
         },
+        trade: {  // Add this
+          asset: data?.asset,
+          amount: data?.amount,
+          side: data?.side
+        },
         context: {
           isAdmin: true,
           sessionId: session.user.id,
