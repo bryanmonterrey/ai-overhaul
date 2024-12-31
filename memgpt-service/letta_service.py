@@ -156,7 +156,14 @@ class MemGPTService:
             # Initialize Supabase with proper options
             self.supabase: Client = create_client(
                 SUPABASE_URL, 
-                SUPABASE_KEY
+                SUPABASE_KEY,
+                {
+                    # Remove any proxy or additional options
+                    'schema': 'public',
+                    'headers': {
+                        'Content-Type': 'application/json'
+                    }
+                }
             )
             print("Supabase client initialized successfully")
 
