@@ -37,6 +37,46 @@ export async function middleware(req: NextRequest) {
 
   const pathname = req.nextUrl.pathname;
 
+  // Specific check for trading chat endpoint
+  if (pathname === '/api/trading/admin/chat') {
+    if (!session) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { 
+          status: 401, 
+          headers: { 
+            'content-type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          } 
+        }
+      );
+    }
+    // If session exists, verify admin role
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (roleData?.role !== 'admin') {
+      return new NextResponse(
+        JSON.stringify({ error: 'Unauthorized: Admin access required' }),
+        { 
+          status: 403, 
+          headers: { 
+            'content-type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          } 
+        }
+      );
+    }
+    return res;
+  }
+
   // Allow access to login pages
   if (pathname === '/admin/login' || pathname === '/login' || pathname === '/insufficient-tokens') {
     return res;
@@ -47,10 +87,10 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/admin') ||
     pathname.startsWith('/twitter') || 
     pathname.startsWith('/telegram') ||
-    pathname.startsWith('/trading/admin')) {  // Add this line
-  if (!session) {
-    return NextResponse.redirect(new URL('/admin/login', req.url));
-  }
+    pathname.startsWith('/trading/admin')) {  
+    if (!session) {
+      return NextResponse.redirect(new URL('/admin/login', req.url));
+    }
 
     // Check if user is admin
     const { data: roleData } = await supabase
@@ -65,12 +105,12 @@ export async function middleware(req: NextRequest) {
   }
 
   // Protected chat routes
-    if (pathname.startsWith('/chat') || 
+  if (pathname.startsWith('/chat') || 
     pathname.startsWith('/conversation') || 
     pathname.startsWith('/conversations') ||
-    pathname.startsWith('/trading/holders')) {  // Add this line
+    pathname.startsWith('/trading/holders')) {
     if (!session) {
-    return NextResponse.redirect(new URL('/login', req.url));
+      return NextResponse.redirect(new URL('/login', req.url));
     }
 
     try {
@@ -151,8 +191,8 @@ export const config = {
     '/conversations/:path*',
     '/api/token-validation',
     '/api/chat/:path*',
-    '/api/ai/:path*',  // Added AI endpoint
-    '/api/trading/admin/chat/:path*',
+    '/api/ai/:path*',
+    '/api/trading/admin/chat',  // Changed to exact match
     '/twitter/:path*',
     '/telegram/:path*',
     '/trading/admin/:path*',
