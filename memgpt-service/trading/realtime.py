@@ -343,6 +343,21 @@ class RealTimeMonitor:
                 'error': error_msg,
                 'user_message': 'Failed to execute trade due to an internal error.'
             }
+        
+    async def broadcast_trading_update(self, update_type: str, data: Dict[str, Any], channel: str):
+        """Broadcast trading update via WebSocket"""
+        try:
+            if self.ws_handler:
+                await self.ws_handler.broadcast_update(
+                    channel=channel,
+                    data={
+                        "type": update_type,
+                        "data": data,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+        except Exception as e:
+            logging.error(f"Error broadcasting trading update: {str(e)}")
 
     async def store_trade_execution(self, data: dict) -> None:
         """Store trade execution data"""
