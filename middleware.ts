@@ -152,6 +152,7 @@ export const config = {
     '/api/token-validation',
     '/api/chat/:path*',
     '/api/ai/:path*',  // Added AI endpoint
+    '/api/trading/admin/chat/:path*',
     '/twitter/:path*',
     '/telegram/:path*',
     '/trading/admin/:path*',
