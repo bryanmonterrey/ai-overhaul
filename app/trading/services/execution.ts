@@ -198,27 +198,28 @@ class TradeExecutionService {
 
   private async submitToBlockEngine(signedTransaction: Transaction) {
     try {
-      const response = await fetch(`${this.blockEngineUrl}/bundle`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transactions: [signedTransaction.serialize()],
-        }),
-      });
+        const blockEngineUrl = 'https://frankfurt.jito.wtf';  // Ensure URL has protocol
+        const response = await fetch(`${blockEngineUrl}/bundle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                transactions: [signedTransaction.serialize()],
+            }),
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit to block engine');
-      }
+        if (!response.ok) {
+            throw new Error('Failed to submit to block engine');
+        }
 
-      const result = await response.json();
-      return result.bundleId;
+        const result = await response.json();
+        return result.bundleId;
     } catch (error) {
-      console.error('Block engine submission error:', error);
-      throw error;
+        console.error('Block engine submission error:', error);
+        throw error;
     }
-  }
+}
 
   async getTokenInfo(symbolOrAddress: string) {
     try {
