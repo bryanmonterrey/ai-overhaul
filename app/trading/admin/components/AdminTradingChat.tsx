@@ -305,6 +305,14 @@ export function AdminTradingChat() {
   
     if (input.trim()) {
       try {
+
+        const inputParts = input.trim().toLowerCase().split(' ');
+        const tradeParams = {
+          side: inputParts[0] as 'buy' | 'sell',
+          amount: parseFloat(inputParts[1]),
+          asset: inputParts[2]
+        };
+
         const messageData = {
           content: input.trim(),
           walletInfo: publicKey ? {
@@ -315,7 +323,14 @@ export function AdminTradingChat() {
               signAllTransactions: !!signAllTransactions,
               connected
             }
-          } : null
+          } : null,
+
+          trade: {
+            asset: tradeParams.asset,
+            amount: tradeParams.amount,
+            side: tradeParams.side
+          }
+          
         };
   
         await handleSubmit(e, { 
