@@ -1,5 +1,6 @@
 // app/trading/types/agent-kit.ts
 
+import Decimal from 'decimal.js';
 import { PublicKey } from "@solana/web3.js";
 import { RouteInfo } from "@jup-ag/core";
 import { BN } from "@coral-xyz/anchor";
@@ -282,7 +283,68 @@ export interface TradeStatusUpdate {
   };
 }
 
+// Add this interface for the kit's methods
+// First, update the SolanaAgentKit interface definition in agent-kit.ts:
+export interface SolanaAgentKit {
+  // Session management
+  initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse>;
+  validateSession(sessionId: string): Promise<boolean>;
+  
+  // Token operations
+  getTokenDataByAddress(mint: string): Promise<TokenInfo>;
+  fetchTokenPrice(mint: string): Promise<string>;
+  getTPS(): Promise<number>;
+  trade(outputMint: PublicKey, amount: number, inputMint: PublicKey, slippageBps: number): Promise<string>;
+  transfer(to: PublicKey, amount: number, mint?: PublicKey): Promise<string>;
+  getBalance(tokenAddress?: PublicKey): Promise<number>;
+  deployToken(name: string, uri: string, symbol: string, decimals?: number, initialSupply?: number): Promise<TokenDeploymentResponse>;
+  
+  // NFT operations
+  mintNFT(collectionMint: PublicKey, metadata: any, recipient?: PublicKey): Promise<NFTMintResponse>;
+  
+  // DeFi operations
+  lendAssets(amount: number): Promise<string>;
+  stake(amount: number): Promise<string>;
+  pythFetchPrice(priceFeedID: string): Promise<number>;
+  
+  // Domain operations
+  resolveAllDomains(domain: string): Promise<PublicKey | undefined>;
+  getOwnedAllDomains(owner: PublicKey): Promise<string[]>;
+  getOwnedDomainsForTLD(tld: string): Promise<string[]>;
+  getAllDomainsTLDs(): Promise<string[]>;
+  getAllRegisteredAllDomains(): Promise<string[]>;
+  getMainAllDomainsDomain(owner: PublicKey): Promise<string | null>;
+  getPrimaryDomain(account: PublicKey): Promise<string>;
+  registerDomain(name: string, spaceKB?: number): Promise<string>;
+  resolveSolDomain(domain: string): Promise<PublicKey>;
+  
+  // AMM operations
+  createOrcaSingleSidedWhirlpool(
+    depositTokenAmount: BN,
+    depositTokenMint: PublicKey,
+    otherTokenMint: PublicKey,
+    initialPrice: Decimal,
+    maxPrice: Decimal,
+    feeTier: 0.01 | 0.02 | 0.04 | 0.05 | 0.16 | 0.3 | 0.65
+  ): Promise<string>;
+  
+  // Properties
+  wallet_address: string;
+}
 
+// Add the session response interface
+export interface SessionResponse extends BaseResponse {
+  sessionId?: string;
+  session_message?: string;
+  error?: string;
+}
+
+// Add response type for sessions
+export interface SessionResponse extends BaseResponse {
+  sessionId?: string;
+  session_message?: string;
+  error?: string;
+}
 
 export interface NetworkStatusUpdate {
   type: 'network';

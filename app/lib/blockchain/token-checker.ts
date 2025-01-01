@@ -1,5 +1,6 @@
 // app/lib/blockchain/token-checker.ts
 import { Connection, PublicKey } from '@solana/web3.js';
+import Decimal from 'decimal.js';
 import { Redis } from '@upstash/redis';
 import { getRedisClient } from '../redis/client';
 

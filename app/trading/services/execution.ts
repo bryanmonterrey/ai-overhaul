@@ -1,12 +1,10 @@
-// app/trading/services/execution.ts - Part 1: Imports and Interfaces
-
+// Part 1: Imports and Basic Interfaces
 import { Connection, PublicKey, TransactionInstruction, Transaction } from '@solana/web3.js';
 import { Jupiter, RouteInfo, TOKEN_LIST_URL } from '@jup-ag/core';
-import { Wallet } from '@coral-xyz/anchor';
-import JSBI from 'jsbi';
-import { SolanaAgentKit } from 'solana-agent-kit';
+import { WalletAdapter } from '../types/wallet';
 import { BN } from '@coral-xyz/anchor';
 import Decimal from 'decimal.js';
+import { SolanaAgentKit } from 'solana-agent-kit';
 import type { PumpFunTokenOptions } from 'solana-agent-kit';
 import { 
   TradeParams,
@@ -31,10 +29,11 @@ import {
   TokenBalanceResponse,
   TokenTransferResponse,
   DomainResolutionResponse,
-  LendingResponse
+  LendingResponse,
+  SessionResponse
 } from '../types/agent-kit';
 
-// New interfaces for session management
+// Interface Definitions
 interface TradingSession {
   publicKey: string;
   signature: string;
@@ -78,13 +77,12 @@ interface WebSocketSessionStatus {
   expiresAt?: number;
 }
 
-// app/trading/services/execution.ts - Part 2: Class Definition and Core Methods
-
+// Part 2: Class Definition and Core Methods
 class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
-  private agentKit?: SolanaAgentKit;
+  private agentKit: SolanaAgentKit;  // Removed optional
   private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
@@ -97,31 +95,79 @@ class TradeExecutionService {
   constructor() {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
     this.blockEngineUrl = 'https://frankfurt.jito.wtf/';
+    
+    // Initialize agentKit immediately
+    this.agentKit = new SolanaAgentKit(
+      'readonly',
+      process.env.NEXT_PUBLIC_RPC_URL!,
+      process.env.OPENAI_API_KEY!
+    );
+    
     this.initializeJupiter();
     this.connectWebSocket();
     this.startSessionCleanup();
   }
 
-  private async getOrCreateAgentKit(wallet?: Wallet, session?: TradingSession): Promise<SolanaAgentKit> {
+  private async getOrCreateAgentKit(wallet?: WalletAdapter, session?: TradingSession): Promise<SolanaAgentKit> {
     if (!wallet) {
-      if (!this.agentKit) {
-        this.agentKit = new SolanaAgentKit(
-          'readonly',
-          process.env.NEXT_PUBLIC_RPC_URL!,
-          process.env.OPENAI_API_KEY!
-        );
-      }
       return this.agentKit;
     }
 
-    // Use session signature if available
+    // Create new instance with session if available
     const credentials = session ? session.signature : wallet.publicKey.toString();
-
+    
     return new SolanaAgentKit(
       credentials,
       process.env.NEXT_PUBLIC_RPC_URL!,
       process.env.OPENAI_API_KEY!
     );
+  }
+
+  async initializeSession(wallet: WalletAdapter): Promise<string> {
+    try {
+      if (!this.agentKit) {
+        throw new Error('AgentKit not initialized');
+      }
+
+      // Try with existing session
+      const sessionResult = await this.agentKit.initSession({
+        wallet: {
+          publicKey: wallet.publicKey.toString(),
+        }
+      });
+  
+      // Handle session signature requirement
+      if (sessionResult?.error === 'session_signature_required') {
+        const message = new TextEncoder().encode(sessionResult.session_message || 'Initialize trading session');
+        const signatureBytes = await wallet.signMessage(message);
+        const signature = Buffer.from(signatureBytes).toString('base58');
+  
+        // Retry with signed message
+        const signedResult = await this.agentKit.initSession({
+          wallet: {
+            publicKey: wallet.publicKey.toString(),
+            sessionProof: signature
+          }
+        });
+  
+        if (signedResult?.success) {
+          // Store session
+          await this.createTradingSession(wallet, signedResult.sessionId);
+          return signedResult.sessionId;
+        }
+        throw new Error(signedResult?.error || 'Session initialization failed');
+      }
+  
+      if (sessionResult?.success) {
+        // Store session
+        await this.createTradingSession(wallet, sessionResult.sessionId);
+        return sessionResult.sessionId;
+      }
+      throw new Error(sessionResult?.error || 'Session initialization failed');
+    } catch (error) {
+      console.error('Session initialization error:', error);
+      throw error;
+    }
   }
 
   private startSessionCleanup() {
@@ -140,14 +186,14 @@ class TradeExecutionService {
     }, 60000); // Check every minute
   }
 
-  async createTradingSession(wallet: Wallet, signature: string): Promise<TradingSession> {
+  async createTradingSession(wallet: WalletAdapter, signature: string): Promise<TradingSession> {
     const session: TradingSession = {
       publicKey: wallet.publicKey.toString(),
       signature,
       timestamp: Date.now(),
       expiresAt: Date.now() + this.SESSION_DURATION,
       wallet: {
-        name: 'unknown', // You can update this if needed
+        name: 'unknown',
         connected: true
       }
     };
@@ -160,6 +206,13 @@ class TradeExecutionService {
     });
 
     return session;
+  }
+
+  private async initializeJupiter() {
+    this.jupiter = await Jupiter.load({
+      connection: this.connection,
+      cluster: 'mainnet-beta'
+    });
   }
 
   async validateSession(publicKey: string): Promise<boolean> {
@@ -300,7 +353,6 @@ class TradeExecutionService {
         this.clearSession(data.publicKey);
         break;
       case 'active':
-        // Optionally refresh session if close to expiry
         if (data.expiresAt && data.expiresAt - Date.now() < 3600000) { // 1 hour
           this.refreshSession(data.publicKey);
         }
@@ -325,16 +377,26 @@ class TradeExecutionService {
     }
   }
 
-  private async initializeJupiter() {
-    this.jupiter = await Jupiter.load({
-      connection: this.connection,
-      cluster: 'mainnet-beta'
-    });
+  // Utility methods for connection management
+  public disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+      this.listeners = {};
+      this.activeSessions.clear();
+    }
   }
 
-  // ... Continue with trade execution methods
+  public reconnect() {
+    this.disconnect();
+    this.reconnectAttempts = 0;
+    this.reconnectDelay = 1000;
+    this.connectWebSocket();
+  }
 
-  // app/trading/services/execution.ts - Part 4: Trade Execution with Session Validation
+  public isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
 
   private async submitToBlockEngine(signedTransaction: Transaction) {
     try {
@@ -360,7 +422,7 @@ class TradeExecutionService {
     }
   }
 
-  async executeTradeWithMEV(params: TradeParams, wallet: Wallet): Promise<TradeExecutionResponse> {
+  async executeTradeWithMEV(params: TradeParams, wallet: WalletAdapter): Promise<TradeExecutionResponse> {
     try {
       // Validate trading session
       const session = this.activeSessions.get(wallet.publicKey.toString());
@@ -426,7 +488,13 @@ class TradeExecutionService {
 
           if (swapTransaction instanceof Transaction) {
             swapTransaction.instructions.unshift(priorityFeeInstruction);
-            swapTransaction.sign(wallet.payer);
+
+            // Update to use WalletAdapter
+            if (typeof wallet.signTransaction === 'function') {
+              await wallet.signTransaction(swapTransaction);
+            } else {
+              throw new Error('Wallet does not support transaction signing');
+            }
 
             const bundleId = await this.submitToBlockEngine(swapTransaction);
             console.log('Bundle submitted:', bundleId);
@@ -484,6 +552,7 @@ class TradeExecutionService {
             error: error instanceof Error ? error.message : 'Unknown error'
           });
           
+          // Fallback to regular trade
           const signature = await agentKit.trade(
             new PublicKey(params.outputMint),
             params.amount,
@@ -493,8 +562,14 @@ class TradeExecutionService {
           signatures.push(signature);
         }
       } else {
-        const signature = await this.connection.sendTransaction(swapTransaction as Transaction, [wallet.payer]);
-        signatures.push(signature);
+        // For non-MEV trades
+        if (typeof wallet.signTransaction === 'function' && swapTransaction instanceof Transaction) {
+          await wallet.signTransaction(swapTransaction);
+          const signature = await this.connection.sendTransaction(swapTransaction);
+          signatures.push(signature);
+        } else {
+          throw new Error('Invalid transaction or wallet');
+        }
       }
 
       // Refresh session after successful trade
@@ -572,14 +647,13 @@ class TradeExecutionService {
     }
   }
 
-  // Session-aware token deployment
   async deployToken(
     name: string,
     uri: string,
     symbol: string,
     decimals: number = 9,
     initialSupply?: number,
-    wallet?: Wallet
+    wallet?: WalletAdapter
   ): Promise<TokenDeploymentResponse> {
     if (wallet) {
       const hasValidSession = await this.validateSession(wallet.publicKey.toString());
@@ -602,76 +676,260 @@ class TradeExecutionService {
     };
   }
 
-  // Utility methods for session and connection management
-  public disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-      this.listeners = {};
-      this.activeSessions.clear();
+  async getTokenInfo(symbolOrAddress: string): Promise<TokenInfo | null> {
+    try {
+      // Try Jupiter token list first
+      const jupiterTokenList = await (await fetch(TOKEN_LIST_URL['mainnet-beta'])).json();
+      
+      // Look for exact matches first
+      let token = jupiterTokenList.find((t: any) => 
+        t.symbol.toUpperCase() === symbolOrAddress.toUpperCase() || 
+        t.address === symbolOrAddress
+      );
+
+      if (token) {
+        return {
+          symbol: token.symbol,
+          address: token.address,
+          name: token.name,
+          decimals: token.decimals,
+          logoURI: token.logoURI
+        };
+      }
+
+      // If not found and it looks like an address, try token metadata
+      if (symbolOrAddress.length === 44 || symbolOrAddress.startsWith('0x')) {
+        const mint = new PublicKey(symbolOrAddress);
+        return {
+          symbol: symbolOrAddress.slice(0, 8),
+          address: symbolOrAddress,
+          name: `Token ${symbolOrAddress.slice(0, 8)}`,
+          decimals: 9
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error getting token info:', error);
+      return null;
     }
   }
 
-  public reconnect() {
-    this.disconnect();
-    this.reconnectAttempts = 0;
-    this.reconnectDelay = 1000;
-    this.connectWebSocket();
-  }
-
-  public isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
-
-  public async getSessionStatus(publicKey: string): Promise<WebSocketSessionStatus> {
-    const session = this.activeSessions.get(publicKey);
-    if (!session) {
-      return {
-        status: 'invalid',
-        publicKey
-      };
-    }
-
-    if (Date.now() > session.expiresAt) {
-      this.clearSession(publicKey);
-      return {
-        status: 'expired',
-        publicKey,
-        expiresAt: session.expiresAt
-      };
-    }
-
+  async getBalance(tokenAddress?: PublicKey, wallet?: WalletAdapter): Promise<TokenBalanceResponse> {
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const balance = await agentKit.getBalance(tokenAddress);
+    
     return {
-      status: 'active',
-      publicKey,
-      expiresAt: session.expiresAt
+      success: true,
+      balance,
+      decimals: 9,
+      uiBalance: balance.toString(),
+      timestamp: new Date().toISOString()
     };
   }
 
-  // Helper method to check and refresh sessions if needed
-  private async ensureValidSession(publicKey: string): Promise<boolean> {
-    const session = this.activeSessions.get(publicKey);
-    if (!session) return false;
-
-    // If session is close to expiry (within 5 minutes), refresh it
-    if (session.expiresAt - Date.now() < 300000) {
-      const refreshed = await this.refreshSession(publicKey);
-      return !!refreshed;
+  async transfer(
+    to: PublicKey,
+    amount: number,
+    mint?: PublicKey,
+    wallet?: WalletAdapter
+  ): Promise<TokenTransferResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for transfer');
+      }
     }
 
-    return Date.now() <= session.expiresAt;
-  }
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.transfer(to, amount, mint);
 
-  // Method to get active session data
-  public getActiveSession(publicKey: string): TradingSession | null {
-    const session = this.activeSessions.get(publicKey);
-    if (!session || Date.now() > session.expiresAt) {
-      return null;
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
     }
-    return session;
+
+    return {
+      success: true,
+      signature,
+      source: agentKit.wallet_address,
+      destination: to,
+      amount,
+      timestamp: new Date().toISOString()
+    };
   }
 
-  // app/trading/services/execution.ts - Part 6: Additional Operations and Methods
+  async lendAssets(amount: number, wallet?: WalletAdapter): Promise<LendingResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for lending');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const txid = await agentKit.lendAssets(amount);
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      signature: txid,
+      amount,
+      apy: 0,  // You might want to get this from your DeFi provider
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async stake(amount: number, wallet?: WalletAdapter): Promise<StakingResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for staking');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const txid = await agentKit.stake(amount);
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      signature: txid,
+      amount,
+      apy: 0,  // You might want to get this from your staking provider
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async mintNFT(
+    collectionMint: PublicKey,
+    metadata: any,
+    recipient?: PublicKey,
+    wallet?: WalletAdapter
+  ): Promise<NFTMintResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for NFT minting');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const result = await agentKit.mintNFT(collectionMint, metadata, recipient);
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      mint: result.mint,
+      metadata: result.metadata,
+      edition: result.mint,
+      signature: 'pending',
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async sendCompressedAirdrop(
+    mintAddress: string,
+    amount: number,
+    decimals: number,
+    recipients: string[],
+    priorityFeeInLamports: number,
+    shouldLog: boolean,
+    wallet?: WalletAdapter
+  ): Promise<CompressedAirdropResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for airdrop');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signatures = await agentKit.sendCompressedAirdrop(
+      mintAddress,
+      amount,
+      decimals,
+      recipients,
+      priorityFeeInLamports,
+      shouldLog
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      signatures,
+      successCount: signatures.length,
+      totalAmount: amount * recipients.length,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async createGibworkTask(
+    title: string,
+    content: string,
+    requirements: string,
+    tags: string[],
+    tokenMintAddress: string,
+    tokenAmount: number,
+    payer?: string,
+    wallet?: WalletAdapter
+  ): Promise<GibworkCreateTaskReponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for task creation');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const result = await agentKit.createGibworkTask(
+      title,
+      content,
+      requirements,
+      tags,
+      tokenMintAddress,
+      tokenAmount,
+      payer
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      taskId: result.taskId,
+      creator: new PublicKey(agentKit.wallet_address),
+      bounty: {
+        mint: tokenMintAddress,
+        amount: tokenAmount
+      },
+      status: 'created',
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async pythFetchPrice(priceFeedID: string): Promise<PythPriceResponse> {
+    const agentKit = await this.getOrCreateAgentKit();
+    const price = await agentKit.pythFetchPrice(priceFeedID);
+    return {
+      success: true,
+      price: Number(price),
+      confidence: 1,
+      timestamp: Date.now()
+    };
+  }
 
   async getMarketData(tokenMint: string): Promise<MarketDataResponse> {
     try {
@@ -711,587 +969,376 @@ class TradeExecutionService {
     }
   }
 
+  async resolveAllDomains(domain: string): Promise<PublicKey | undefined> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.resolveAllDomains(domain);
+  }
+
+  async getOwnedAllDomains(owner: PublicKey): Promise<string[]> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getOwnedAllDomains(owner);
+  }
+
+  async getOwnedDomainsForTLD(tld: string): Promise<string[]> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getOwnedDomainsForTLD(tld);
+  }
+
+  async getAllDomainsTLDs(): Promise<string[]> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getAllDomainsTLDs();
+  }
+
+  async getAllRegisteredAllDomains(): Promise<string[]> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getAllRegisteredAllDomains();
+  }
+
+  async getMainAllDomainsDomain(owner: PublicKey): Promise<string | null> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getMainAllDomainsDomain(owner);
+  }
+
+  async getPrimaryDomain(account: PublicKey): Promise<DomainResponse> {
+    const agentKit = await this.getOrCreateAgentKit();
+    const domain = await agentKit.getPrimaryDomain(account);
+    return {
+      success: true,
+      domain,
+      owner: account,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async registerDomain(name: string, spaceKB?: number, wallet?: WalletAdapter): Promise<DomainResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for domain registration');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const domain = await agentKit.registerDomain(name, spaceKB);
+    
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      domain,
+      owner: agentKit.wallet_address,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async resolveSolDomain(domain: string): Promise<DomainResolutionResponse> {
+    const agentKit = await this.getOrCreateAgentKit();
+    const address = await agentKit.resolveSolDomain(domain);
+    return {
+      success: true,
+      address,
+      domain,
+      owner: address,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // AMM/DEX Creation Methods
+  async createOrcaSingleSidedWhirlpool(
+    depositTokenAmount: BN,
+    depositTokenMint: PublicKey,
+    otherTokenMint: PublicKey,
+    initialPrice: Decimal,
+    maxPrice: Decimal,
+    feeTier: 0.01 | 0.02 | 0.04 | 0.05 | 0.16 | 0.3 | 0.65,
+    wallet?: WalletAdapter
+  ): Promise<WhirlpoolCreationResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for whirlpool creation');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.createOrcaSingleSidedWhirlpool(
+      depositTokenAmount,
+      depositTokenMint,
+      otherTokenMint,
+      initialPrice,
+      maxPrice,
+      feeTier as 0.01 | 0.02 | 0.04 | 0.05 | 0.16 | 0.3 | 0.65
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      poolAddress: depositTokenMint,
+      signature,
+      tokenAVault: depositTokenMint,
+      tokenBVault: otherTokenMint,
+      initialPrice: initialPrice.toString(),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async raydiumCreateAmmV4(
+    marketId: PublicKey,
+    baseAmount: BN,
+    quoteAmount: BN,
+    startTime: BN,
+    wallet?: WalletAdapter
+  ): Promise<RaydiumAMMResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for AMM creation');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.raydiumCreateAmmV4(
+      marketId,
+      baseAmount,
+      quoteAmount,
+      startTime
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      signature,
+      poolId: marketId,
+      marketId: marketId,
+      baseVault: marketId,
+      quoteVault: marketId,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async raydiumCreateClmm(
+    mint1: PublicKey,
+    mint2: PublicKey,
+    configId: PublicKey,
+    initialPrice: Decimal,
+    startTime: BN,
+    wallet?: WalletAdapter
+  ): Promise<RaydiumAMMResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for CLMM creation');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.raydiumCreateClmm(
+      mint1,
+      mint2,
+      configId,
+      initialPrice,
+      startTime
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      signature,
+      poolId: mint1,
+      marketId: configId,
+      baseVault: mint1,
+      quoteVault: mint2,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async raydiumCreateCpmm(
+    mint1: PublicKey,
+    mint2: PublicKey,
+    configId: PublicKey,
+    mintAAmount: BN,
+    mintBAmount: BN,
+    startTime: BN,
+    wallet?: WalletAdapter
+  ): Promise<RaydiumAMMResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for CPMM creation');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signature = await agentKit.raydiumCreateCpmm(
+      mint1,
+      mint2,
+      configId,
+      mintAAmount,
+      mintBAmount,
+      startTime
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      signature,
+      poolId: mint1,
+      marketId: configId,
+      baseVault: mint1,
+      quoteVault: mint2,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async openbookCreateMarket(
+    baseMint: PublicKey,
+    quoteMint: PublicKey,
+    lotSize: number = 1,
+    tickSize: number = 0.01,
+    wallet?: WalletAdapter
+  ): Promise<OpenbookMarketResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for market creation');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const signatures = await agentKit.openbookCreateMarket(
+      baseMint,
+      quoteMint,
+      lotSize,
+      tickSize
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      market: new PublicKey(signatures[0]),
+      baseVault: new PublicKey(signatures[1]),
+      quoteVault: new PublicKey(signatures[2]),
+      signatures,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async launchPumpFunToken(
+    tokenName: string,
+    tokenTicker: string,
+    description: string,
+    imageUrl: string,
+    options?: PumpFunTokenOptions,
+    wallet?: WalletAdapter
+  ): Promise<PumpfunLaunchResponse> {
+    if (wallet) {
+      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
+      if (!hasValidSession) {
+        throw new Error('Valid trading session required for token launch');
+      }
+    }
+
+    const agentKit = await this.getOrCreateAgentKit(wallet);
+    const result = await agentKit.launchPumpFunToken(
+      tokenName,
+      tokenTicker,
+      description,
+      imageUrl,
+      options
+    );
+
+    if (wallet) {
+      await this.refreshSession(wallet.publicKey.toString());
+    }
+
+    return {
+      success: true,
+      tokenMint: new PublicKey(result.mint),
+      ...result,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // Utility Methods
   async validateToken(mint: string): Promise<TokenInfo | null> {
     const agentKit = await this.getOrCreateAgentKit();
     const tokenData = await agentKit.getTokenDataByAddress(mint);
     return tokenData ? tokenData as TokenInfo : null;
   }
 
-  async lendAssets(amount: number, wallet?: Wallet): Promise<LendingResponse> {
-    if (wallet) {
-      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-      if (!hasValidSession) {
-        throw new Error('Valid trading session required for lending');
-      }
-    }
-
-    const agentKit = await this.getOrCreateAgentKit(wallet);
-    const txid = await agentKit.lendAssets(amount);
-
-    if (wallet) {
-      await this.refreshSession(wallet.publicKey.toString());
-    }
-
-    return {
-      success: true,
-      signature: txid,
-      amount,
-      apy: 0,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async stake(amount: number, wallet?: Wallet): Promise<StakingResponse> {
-    if (wallet) {
-      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-      if (!hasValidSession) {
-        throw new Error('Valid trading session required for staking');
-      }
-    }
-
-    const agentKit = await this.getOrCreateAgentKit(wallet);
-    const txid = await agentKit.stake(amount);
-
-    if (wallet) {
-      await this.refreshSession(wallet.publicKey.toString());
-    }
-
-    return {
-      success: true,
-      signature: txid,
-      amount,
-      apy: 0,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async sendCompressedAirdrop(
-    mintAddress: string,
-    amount: number,
-    decimals: number,
-    recipients: string[],
-    priorityFeeInLamports: number,
-    shouldLog: boolean,
-    wallet?: Wallet
-  ): Promise<CompressedAirdropResponse> {
-    if (wallet) {
-      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-      if (!hasValidSession) {
-        throw new Error('Valid trading session required for airdrop');
-      }
-    }
-
-    const agentKit = await this.getOrCreateAgentKit(wallet);
-    const signatures = await agentKit.sendCompressedAirdrop(
-      mintAddress,
-      amount,
-      decimals,
-      recipients,
-      priorityFeeInLamports,
-      shouldLog
-    );
-
-    if (wallet) {
-      await this.refreshSession(wallet.publicKey.toString());
-    }
-
-    return {
-      success: true,
-      signatures,
-      successCount: signatures.length,
-      totalAmount: amount * recipients.length,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async mintNFT(
-    collectionMint: PublicKey,
-    metadata: any,
-    recipient?: PublicKey,
-    wallet?: Wallet
-  ): Promise<NFTMintResponse> {
-    if (wallet) {
-      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-      if (!hasValidSession) {
-        throw new Error('Valid trading session required for NFT minting');
-      }
-    }
-
-    const agentKit = await this.getOrCreateAgentKit(wallet);
-    const result = await agentKit.mintNFT(collectionMint, metadata, recipient);
-
-    if (wallet) {
-      await this.refreshSession(wallet.publicKey.toString());
-    }
-
-    return {
-      success: true,
-      mint: result.mint,
-      metadata: result.metadata,
-      edition: result.mint,
-      signature: 'pending',
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async pythFetchPrice(priceFeedID: string): Promise<PythPriceResponse> {
+  async getTokenPrice(mint: string): Promise<string | null> {
     const agentKit = await this.getOrCreateAgentKit();
-    const price = await agentKit.pythFetchPrice(priceFeedID);
-    return {
-      success: true,
-      price: Number(price),
-      confidence: 1,
-      timestamp: Date.now()
-    };
+    return agentKit.fetchTokenPrice(mint);
   }
 
-  async createGibworkTask(
-    title: string,
-    content: string,
-    requirements: string,
-    tags: string[],
-    tokenMintAddress: string,
-    tokenAmount: number,
-    payer?: string,
-    wallet?: Wallet
-  ): Promise<GibworkCreateTaskReponse> {
-    if (wallet) {
-      const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-      if (!hasValidSession) {
-        throw new Error('Valid trading session required for task creation');
-      }
-    }
-
-    const agentKit = await this.getOrCreateAgentKit(wallet);
-    const result = await agentKit.createGibworkTask(
-      title,
-      content,
-      requirements,
-      tags,
-      tokenMintAddress,
-      tokenAmount,
-      payer
-    );
-
-    if (wallet) {
-      await this.refreshSession(wallet.publicKey.toString());
-    }
-
-    return {
-      success: true,
-      taskId: result.taskId,
-      creator: new PublicKey(agentKit.wallet_address),
-      bounty: {
-        mint: tokenMintAddress,
-        amount: tokenAmount
-      },
-      status: 'created',
-      timestamp: new Date().toISOString()
-    };
+  async getCurrentTPS(): Promise<number> {
+    const agentKit = await this.getOrCreateAgentKit();
+    return agentKit.getTPS();
   }
 
-  // Domain Name Service Methods
-async resolveAllDomains(domain: string): Promise<PublicKey | undefined> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.resolveAllDomains(domain);
-}
-
-async getOwnedAllDomains(owner: PublicKey): Promise<string[]> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.getOwnedAllDomains(owner);
-}
-
-async getOwnedDomainsForTLD(tld: string): Promise<string[]> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.getOwnedDomainsForTLD(tld);
-}
-
-async getAllDomainsTLDs(): Promise<string[]> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.getAllDomainsTLDs();
-}
-
-async getAllRegisteredAllDomains(): Promise<string[]> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.getAllRegisteredAllDomains();
-}
-
-async getMainAllDomainsDomain(owner: PublicKey): Promise<string | null> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.getMainAllDomainsDomain(owner);
-}
-
-async getPrimaryDomain(account: PublicKey): Promise<DomainResponse> {
-  const agentKit = await this.getOrCreateAgentKit();
-  const domain = await agentKit.getPrimaryDomain(account);
-  return {
-    success: true,
-    domain,
-    owner: account,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async registerDomain(name: string, spaceKB?: number, wallet?: Wallet): Promise<DomainResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for domain registration');
-    }
-  }
-
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const domain = await agentKit.registerDomain(name, spaceKB);
-  
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    domain,
-    owner: agentKit.wallet_address,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async resolveSolDomain(domain: string): Promise<DomainResolutionResponse> {
-  const agentKit = await this.getOrCreateAgentKit();
-  const address = await agentKit.resolveSolDomain(domain);
-  return {
-    success: true,
-    address,
-    domain,
-    owner: address,
-    timestamp: new Date().toISOString()
-  };
-}
-
-// AMM/DEX Creation Methods
-async createOrcaSingleSidedWhirlpool(
-  depositTokenAmount: BN,
-  depositTokenMint: PublicKey,
-  otherTokenMint: PublicKey,
-  initialPrice: Decimal,
-  maxPrice: Decimal,
-  feeTier: 0.01 | 0.02 | 0.04 | 0.05 | 0.16 | 0.3 | 0.65,
-  wallet?: Wallet
-): Promise<WhirlpoolCreationResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for whirlpool creation');
-    }
-  }
-
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const signature = await agentKit.createOrcaSingleSidedWhirlpool(
-    depositTokenAmount,
-    depositTokenMint,
-    otherTokenMint,
-    initialPrice,
-    maxPrice,
-    feeTier as 0.01 | 0.02 | 0.04 | 0.05 | 0.16 | 0.3 | 0.65
-  );
-
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    poolAddress: depositTokenMint,
-    signature,
-    tokenAVault: depositTokenMint,
-    tokenBVault: otherTokenMint,
-    initialPrice: initialPrice.toString(),
-    timestamp: new Date().toISOString()
-  };
-}
-
-async raydiumCreateAmmV4(
-  marketId: PublicKey,
-  baseAmount: BN,
-  quoteAmount: BN,
-  startTime: BN,
-  wallet?: Wallet
-): Promise<RaydiumAMMResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for AMM creation');
-    }
-  }
-
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const signature = await agentKit.raydiumCreateAmmV4(
-    marketId,
-    baseAmount,
-    quoteAmount,
-    startTime
-  );
-
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    signature,
-    poolId: marketId,
-    marketId: marketId,
-    baseVault: marketId,
-    quoteVault: marketId,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async raydiumCreateClmm(
-  mint1: PublicKey,
-  mint2: PublicKey,
-  configId: PublicKey,
-  initialPrice: Decimal,
-  startTime: BN,
-  wallet?: Wallet
-): Promise<RaydiumAMMResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for CLMM creation');
-    }
-  }
-
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const signature = await agentKit.raydiumCreateClmm(
-    mint1,
-    mint2,
-    configId,
-    initialPrice,
-    startTime
-  );
-
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    signature,
-    poolId: mint1,
-    marketId: configId,
-    baseVault: mint1,
-    quoteVault: mint2,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async raydiumCreateCpmm(
-  mint1: PublicKey,
-  mint2: PublicKey,
-  configId: PublicKey,
-  mintAAmount: BN,
-  mintBAmount: BN,
-  startTime: BN,
-  wallet?: Wallet
-): Promise<RaydiumAMMResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for CPMM creation');
-    }
-  }
-
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const signature = await agentKit.raydiumCreateCpmm(
-    mint1,
-    mint2,
-    configId,
-    mintAAmount,
-    mintBAmount,
-    startTime
-  );
-
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    signature,
-    poolId: mint1,
-    marketId: configId,
-    baseVault: mint1,
-    quoteVault: mint2,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async openbookCreateMarket(
-  baseMint: PublicKey,
-  quoteMint: PublicKey,
-  lotSize: number = 1,
-  tickSize: number = 0.01,
-  wallet?: Wallet
-): Promise<OpenbookMarketResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for market creation');
-    }
-  }
-
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const signatures = await agentKit.openbookCreateMarket(
-    baseMint,
-    quoteMint,
-    lotSize,
-    tickSize
-  );
-
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    market: new PublicKey(signatures[0]),
-    baseVault: new PublicKey(signatures[1]),
-    quoteVault: new PublicKey(signatures[2]),
-    signatures,
-    timestamp: new Date().toISOString()
-  };
-}
-
-// Token Operations and Info Methods
-async getTokenInfo(symbolOrAddress: string): Promise<TokenInfo | null> {
-  try {
-    // Try Jupiter token list first
-    const jupiterTokenList = await (await fetch(TOKEN_LIST_URL['mainnet-beta'])).json();
-    
-    // Look for exact matches first
-    let token = jupiterTokenList.find((t: any) => 
-      t.symbol.toUpperCase() === symbolOrAddress.toUpperCase() || 
-      t.address === symbolOrAddress
-    );
-
-    if (token) {
+  public async getSessionStatus(publicKey: string): Promise<WebSocketSessionStatus> {
+    const session = this.activeSessions.get(publicKey);
+    if (!session) {
       return {
-        symbol: token.symbol,
-        address: token.address,
-        name: token.name,
-        decimals: token.decimals,
-        logoURI: token.logoURI
+        status: 'invalid',
+        publicKey
       };
     }
 
-    // If not found and it looks like an address, try token metadata
-    if (symbolOrAddress.length === 44 || symbolOrAddress.startsWith('0x')) {
-      const mint = new PublicKey(symbolOrAddress);
+    if (Date.now() > session.expiresAt) {
+      this.clearSession(publicKey);
       return {
-        symbol: symbolOrAddress.slice(0, 8),
-        address: symbolOrAddress,
-        name: `Token ${symbolOrAddress.slice(0, 8)}`,
-        decimals: 9
+        status: 'expired',
+        publicKey,
+        expiresAt: session.expiresAt
       };
     }
 
-    return null;
-  } catch (error) {
-    console.error('Error getting token info:', error);
-    return null;
+    return {
+      status: 'active',
+      publicKey,
+      expiresAt: session.expiresAt
+    };
   }
-}
 
-async getBalance(tokenAddress?: PublicKey, wallet?: Wallet): Promise<TokenBalanceResponse> {
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const balance = await agentKit.getBalance(tokenAddress);
-  
-  return {
-    success: true,
-    balance,
-    decimals: 9,
-    uiBalance: balance.toString(),
-    timestamp: new Date().toISOString()
-  };
-}
-
-async transfer(
-  to: PublicKey,
-  amount: number,
-  mint?: PublicKey,
-  wallet?: Wallet
-): Promise<TokenTransferResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for transfer');
+  public getActiveSession(publicKey: string): TradingSession | null {
+    const session = this.activeSessions.get(publicKey);
+    if (!session || Date.now() > session.expiresAt) {
+      return null;
     }
+    return session;
   }
 
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const signature = await agentKit.transfer(to, amount, mint);
+  private async ensureValidSession(publicKey: string): Promise<boolean> {
+    const session = this.activeSessions.get(publicKey);
+    if (!session) return false;
 
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    signature,
-    source: agentKit.wallet_address,
-    destination: to,
-    amount,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async launchPumpFunToken(
-  tokenName: string,
-  tokenTicker: string,
-  description: string,
-  imageUrl: string,
-  options?: PumpFunTokenOptions,
-  wallet?: Wallet
-): Promise<PumpfunLaunchResponse> {
-  if (wallet) {
-    const hasValidSession = await this.validateSession(wallet.publicKey.toString());
-    if (!hasValidSession) {
-      throw new Error('Valid trading session required for token launch');
+    // If session is close to expiry (within 5 minutes), refresh it
+    if (session.expiresAt - Date.now() < 300000) {
+      const refreshed = await this.refreshSession(publicKey);
+      return !!refreshed;
     }
+
+    return Date.now() <= session.expiresAt;
   }
-
-  const agentKit = await this.getOrCreateAgentKit(wallet);
-  const result = await agentKit.launchPumpFunToken(
-    tokenName,
-    tokenTicker,
-    description,
-    imageUrl,
-    options
-  );
-
-  if (wallet) {
-    await this.refreshSession(wallet.publicKey.toString());
-  }
-
-  return {
-    success: true,
-    tokenMint: new PublicKey(result.mint),
-    ...result,
-    timestamp: new Date().toISOString()
-  };
 }
 
-// Additional Methods
-async getTokenPrice(mint: string): Promise<string | null> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.fetchTokenPrice(mint);
-}
-
-async getCurrentTPS(): Promise<number> {
-  const agentKit = await this.getOrCreateAgentKit();
-  return agentKit.getTPS();
-}
-
-}
-
+// Export singleton instance
 export const tradeExecution = new TradeExecutionService();
