@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Magnetic } from '../common/MagButton';
 import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
+import { MobileNav } from '@/components/MobileNav';
 
 const CustomWalletButton = () => {
   return (
@@ -109,16 +110,19 @@ export default function Header() {
             {/* Status card - hidden on small screens */}
 
             {/* Menu button - shown only on small screens */}
-            <button 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="sm:hidden text-xs px-5 py-2 border bg-[#0D0E15] rounded-md border-zinc-900 text-[#DDDDDD] hover:text-greenish"
-            >
-              menu
-            </button>
+            <MobileNav 
+            trigger={
+              <button 
+                className="sm:hidden text-sm px-4 !py-1 border font-semibold bg-[#0D0E15] rounded-md border-zinc-900 text-[#DDDDDD] hover:text-greenish"
+              >
+                menu
+              </button>
+            } 
+          />
             
             {connected && publicKey ? (
               <div className="flex items-center space-x-4">
-                <button type='button' className="items-center rounded-md border border-zinc-900
+                <button type='button' className="items-center hidden md750:block rounded-md border border-zinc-900
          bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600">
                   <span className="text-xs font-ia">
@@ -142,7 +146,7 @@ export default function Header() {
 
         {/* Mobile menu */}
         {isMenuOpen && (
-          <div className="sm:hidden border-t border-[#DDDDDD] py-2">
+          <div className="sm:hidden border-t border-[#DDDDDD]  py-2">
             <nav className="flex flex-col space-y-2">
               <Link href="/chat" className="font-ia text-[#DDDDDD] px-4 py-2 hover:bg-[#DDDDDD]/10">
                 chat

@@ -4,6 +4,7 @@ import ClientLayout from './ClientLayout';
 import "./globals.css";
 import { metadata } from './metadata';
 import { Toaster } from "@/components/ui/toaster"
+import { ViewTransitions } from 'next-view-transitions'
 
 export { metadata };
 
@@ -13,6 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
+    <ViewTransitions>
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className="antialiased bg-[#11111A] text-white relative">
@@ -24,5 +26,6 @@ export default function RootLayout({
         </ClientProviders>
       </body>
     </html>
+    </ViewTransitions>
   );
 }

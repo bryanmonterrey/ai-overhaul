@@ -38,19 +38,23 @@ class SolanaService:
     async def init_trading_session(self, wallet_info: Dict[str, Any]) -> Dict[str, Any]:
         """Initialize a trading session with agent-kit"""
         try:
-            # First, get message to sign
+            from base58 import b58encode
+            import hashlib
+            
+            # Generate a session message
+            session_message = f"Initialize trading session for {wallet_info['publicKey']}"
+            message_bytes = session_message.encode('utf-8')
+            message_hash = hashlib.sha256(message_bytes).digest()
+            base58_signature = b58encode(message_hash).decode('utf-8')
+            
             init_params = {
                 'wallet': {
                     'publicKey': wallet_info['publicKey'],
-                    'signature': wallet_info.get('credentials', {}).get('sessionMessage', 'Authorize trading session'), 
-                    'sessionMessage': True
+                    'signature': base58_signature # Use base58 encoded hash as signature
                 }
             }
             
             result = await self._call_agent_kit('initSession', init_params)
-            if not result.get('success'):
-                raise ValueError(f"Failed to initialize session: {result.get('error')}")
-                
             logging.info("Session initialization response: %s", result)
             return result
             
@@ -152,22 +156,20 @@ class SolanaService:
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
             if wallet_info := params.get('wallet'):
-                logging.info("Starting session initialization")
                 try:
                     session_result = await self.init_trading_session(wallet_info)
-                    session_token = session_result.get('sessionId')
                     
-                    if not session_token:
-                        raise ValueError("No session token received")
+                    if not session_result.get('success', False):
+                        raise ValueError(f"Failed to initialize session: {session_result.get('error')}")
                         
                     # Update wallet credentials with session token
-                    if isinstance(wallet_info.get('credentials'), dict):
-                        wallet_info['credentials']['signature'] = session_token
-                        logging.info("Added session token to wallet credentials")
-                        
+                    if session_token := session_result.get('sessionId'):
+                        if isinstance(wallet_info.get('credentials'), dict):
+                            wallet_info['credentials']['signature'] = session_token
+                            logging.info("Added session token to wallet credentials")
                 except Exception as e:
                     logging.error(f"Failed to initialize session: {str(e)}")
-                    raise ValueError(f"Session initialization failed: {str(e)}")
+                    raise
 
             # Get token data from params or lookup
             symbol = params['asset'].upper()

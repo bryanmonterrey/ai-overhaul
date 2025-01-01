@@ -402,7 +402,7 @@ useEffect(() => {
       </div>
 
       {isAnalyticsVisible && (
-  <div className="w-80  p-4 space-y-4">
+  <div className="w-80  p-4 pt-0 space-y-4">
     <button
       onClick={() => setShowAnalytics(!showAnalytics)}
       className="w-full text-[#DDDDDD] border bg-navyy border-zinc-900 rounded-md p-2 font-ia text-sm"

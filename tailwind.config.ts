@@ -35,6 +35,9 @@ const config: Config = {
   			background: 'var(--background)',
   			foreground: 'var(--foreground)'
   		},
+		  screens: {
+			'md750': '750px',  // Add this custom breakpoint
+		  },
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',

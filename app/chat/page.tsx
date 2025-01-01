@@ -152,7 +152,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="grid grid-cols-[1fr_300px] gap-6 h-[calc(100vh-30rem)]">
+    <div className="grid grid-cols-[1fr_300px] gap-6 h-[calc(100vh-30rem)] w-full">
       <div className="flex flex-col">
         <Card variant="system" className="mb-4">
           <div className="text-xs space-y-1">
