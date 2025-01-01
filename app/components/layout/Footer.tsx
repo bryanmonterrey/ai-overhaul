@@ -31,7 +31,7 @@ export default function Footer() {
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-[#11111A] py-2 px-4">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <div className="font-ia md:inline-flex text-xs text-[#DDDDDD] space-x-2">
+        <div className="font-ia md:inline-flex sm:hidden text-xs text-[#DDDDDD] space-x-2">
           <div>
           <Badge>
           <span className="">runtime: {uptime.toFixed(2)}s</span>
@@ -44,7 +44,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="font-ia md:inline-flex text-xs text-[#DDDDDD] space-x-2">
+        <div className="font-ia md:inline-flex sm:hidden text-xs text-[#DDDDDD] space-x-2">
           <div>
           <Badge>
           <span className="">status: [BETA]</span>
