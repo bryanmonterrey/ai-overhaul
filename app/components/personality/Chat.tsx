@@ -333,7 +333,7 @@ useEffect(() => {
           </Alert>
         )}
         
-        <div id="chat-messages" className="flex-1 overflow-y-auto bg-navyy rounded-t-xl border-t border-l border-r border-zinc-900 p-4 space-y-4">
+        <div id="chat-messages" className="flex-1 overflow-y-auto bg-navyy rounded-t-3xl border-t border-l border-r border-zinc-900 p-4 space-y-4">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -376,7 +376,7 @@ useEffect(() => {
           ))}
         </div>
 
-        <div className="border-b border-r border-l bg-navyy border-zinc-900 rounded-b-xl p-4 pb-8 md:pb-4">
+        <div className="border-b border-r border-l bg-navyy border-zinc-900 rounded-b-3xl p-4 pb-8 md:pb-4">
           <div className="text-xs text-zinc-50 mb-2">
             TOKEN_COUNT: {tokenCount}
           </div>

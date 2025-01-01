@@ -34,7 +34,7 @@ export class TokenChecker {
   private lastCheckTime: Map<string, number> = new Map();
   private readonly MIN_CHECK_INTERVAL = 5000; // 5 seconds
 
-  private constructor() {
+  public constructor() {
     if (!process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
       throw new Error('HELIUS_API_KEY is not set in environment variables');
     }
