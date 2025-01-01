@@ -12,13 +12,15 @@ export interface TokenInfo {
   symbol: string;
   decimals: number;
   name: string;
-  logoURI: string;  // No longer optional to match JupiterTokenData
-  extensions?: Record<string, any>;
+  logoURI: string;  // Required to match JupiterTokenData
   tags: string[];
   daily_volume: number;
   freeze_authority: string | null;
   mint_authority: string | null;
   permanent_delegate: string | null;
+  extensions: {
+    coingeckoId?: string;  // Match JupiterTokenData exactly
+  };
 }
 
 // Separate base responses for different timestamp types
@@ -322,7 +324,7 @@ export interface ISolanaAgentKit {
   validateSession(sessionId: string): Promise<boolean>;
   
   // Token operations
-  getTokenDataByAddress(mint: string): Promise<JupiterTokenData | undefined>;
+  getTokenDataByAddress(mint: string): Promise<TokenInfo>;
   fetchTokenPrice(mint: string): Promise<string>;
   getTPS(): Promise<number>;
   trade(outputMint: PublicKey, amount: number, inputMint: PublicKey, slippageBps: number): Promise<string>;
