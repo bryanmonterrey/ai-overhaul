@@ -96,7 +96,7 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm font-normal hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600'>
                 admin
               </button>
