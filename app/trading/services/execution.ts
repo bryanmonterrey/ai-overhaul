@@ -1,11 +1,12 @@
 // Part 1: Imports and Basic Interfaces
 import { Connection, PublicKey, TransactionInstruction, Transaction } from '@solana/web3.js';
+import JSBI from 'jsbi';
 import { Jupiter, RouteInfo, TOKEN_LIST_URL } from '@jup-ag/core';
 import { WalletAdapter } from '../types/wallet';
 import { BN } from '@coral-xyz/anchor';
 import Decimal from 'decimal.js';
-import { ISolanaAgentKit } from '../types/agent-kit';
 import { SolanaAgentKit } from 'solana-agent-kit';
+import type { ISolanaAgentKit } from '../types/agent-kit';
 import type { PumpFunTokenOptions } from 'solana-agent-kit';
 import { 
   TradeParams,
@@ -33,6 +34,7 @@ import {
   LendingResponse,
   SessionResponse
 } from '../types/agent-kit';
+import bs58 from 'bs58';
 
 // Interface Definitions
 interface TradingSession {
@@ -83,7 +85,7 @@ class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
-  private agentKit: ISolanaAgentKit;  // Removed optional
+  private agentKit: ISolanaAgentKit & SolanaAgentKit;  // Removed optional
   private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
@@ -99,9 +101,9 @@ class TradeExecutionService {
     
     // Initialize agentKit immediately
     this.agentKit = new SolanaAgentKit(
-      'readonly',
-      process.env.NEXT_PUBLIC_RPC_URL!,
-      process.env.OPENAI_API_KEY!
+      'readonly',  // private key
+      process.env.NEXT_PUBLIC_RPC_URL!,  // rpc url
+      process.env.OPENAI_API_KEY!  // this is fine as it accepts string
     );
     
     this.initializeJupiter();
@@ -141,7 +143,7 @@ class TradeExecutionService {
       if (sessionResult?.error === 'session_signature_required') {
         const message = new TextEncoder().encode(sessionResult.session_message || 'Initialize trading session');
         const signatureBytes = await wallet.signMessage(message);
-        const signature = Buffer.from(signatureBytes).toString('base58');
+        const signature = bs58.encode(Buffer.from(signatureBytes));
   
         // Retry with signed message
         const signedResult = await this.agentKit.initSession({
