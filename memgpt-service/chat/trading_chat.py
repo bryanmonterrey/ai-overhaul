@@ -246,13 +246,14 @@ class TradingChat:
             wallet_info = params.get('wallet') or {}
             
             # Check for trading session signature
-            if not wallet_info.get('signature'):
-                # Try to get it from the session
+            if not wallet_info.get('credentials', {}).get('signature'):
                 session = getattr(self.realtime_monitor, 'current_session', None)
-                if session and session.signature:
-                    if not wallet_info.get('credentials'):
+                if session and hasattr(session, 'signature'):
+                    if not isinstance(wallet_info.get('credentials'), dict):
                         wallet_info['credentials'] = {}
                     wallet_info['credentials']['signature'] = session.signature
+                    params['wallet'] = wallet_info
+                    logging.info("Added session signature from realtime monitor")
             
             # Setup wallet from request context first
             wallet_info = params.get('wallet') or {}

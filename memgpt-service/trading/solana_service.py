@@ -46,8 +46,12 @@ class SolanaService:
                 'Accept': 'application/json'
             }
             
-            if params.get('wallet', {}).get('credentials', {}).get('signature'):
-                headers['X-Trading-Session'] = params['wallet']['credentials']['signature']
+            wallet_info = params.get('wallet', {})
+            if isinstance(wallet_info, dict):
+                credentials = wallet_info.get('credentials', {})
+                if isinstance(credentials, dict) and 'signature' in credentials:
+                    headers['X-Trading-Session'] = credentials['signature']
+                    logging.info("Added session signature to headers")
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(
