@@ -6,6 +6,23 @@ import asyncio
 from ..memory.trading_memory import TradingMemory
 from ..agents.trader_agent import TraderAgent
 from ..realtime import RealTimeMonitor
+from decimal import Decimal
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class TradeParams:
+    """Parameters for trade execution"""
+    input_token: str
+    output_token: str
+    amount: Decimal
+    slippage: float
+    priority_fee: float = 0.0025
+    use_jito: bool = True
+    auto_retry: bool = True
+    wallet: Optional[dict] = None
+
 
 class TradingHandlers:
     def __init__(
@@ -194,9 +211,10 @@ class TradingHandlers:
             "update_interval": 5,  # seconds
             "risk_thresholds": {
                 "max_drawdown": 0.15,
-                "position_concentration": 0.25,
+                "position_concentration": 0.25, 
                 "volatility_threshold": 0.50
-            }
+            },
+            "require_session": True  # Add this to enforce session validation
         }
     
     async def handle_chat_trade(self, message: Dict[str, Any]) -> Dict[str, Any]:
@@ -206,7 +224,18 @@ class TradingHandlers:
             command = await self.dspy_service.analyze_command(message)
             
             if command["type"] == "trade":
-                # Convert chat parameters to trade parameters
+                # Extract session signature if present
+                wallet_info = message.get('wallet', {})
+                if isinstance(wallet_info, dict):
+                    credentials = wallet_info.get('credentials', {})
+                    if not isinstance(credentials, dict) or 'signature' not in credentials:
+                        return {
+                            "success": False,
+                            "error": "Invalid trading session",
+                            "natural_response": "Please initialize a trading session first."
+                        }
+                
+                # Convert chat parameters to trade parameters 
                 trade_params = TradeParams(
                     input_token=command["params"]["tokenIn"],
                     output_token=command["params"]["tokenOut"],
@@ -214,27 +243,41 @@ class TradingHandlers:
                     slippage=float(command["params"].get("slippage", 0.01)),
                     priority_fee=float(command["params"].get("priorityFee", 0.0025)),
                     use_jito=command["params"].get("useMev", True),
-                    auto_retry=True
+                    auto_retry=True,
+                    wallet=wallet_info
                 )
                 
-                # Execute through trader agent
-                result = await self.trader_agent.execute_trade(
-                    trade_params,
-                    self.letta_service.wallet
-                )
+                # Execute through monitor's execute_solana_trade
+                result = await self.monitor.execute_solana_trade({
+                    "asset": trade_params.output_token,
+                    "amount": float(trade_params.amount),
+                    "slippage": trade_params.slippage * 100, # Convert to basis points
+                    "wallet": trade_params.wallet
+                })
                 
-                # Store in memory
-                await self.trading_memory.store_trade_execution(result)
-                
-                # Update monitoring
-                await self.monitor.process_trade(result)
-                
-                return {
-                    "success": True,
-                    "trade_result": result,
-                    "natural_response": f"Trade executed: {result.tx_hash}"
-                }
-                
+                if result["success"]:
+                    # Store trade info
+                    await self.monitor.store_trade_execution(result)
+                    
+                    # Broadcast update
+                    await self.monitor.broadcast_trading_update(
+                        update_type="trade_execution",
+                        data=result,
+                        channel="trading_updates"
+                    )
+                    
+                    return {
+                        "success": True,
+                        "trade_result": result,
+                        "natural_response": f"Trade executed: {result.get('signature')}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": result.get("error"),
+                        "natural_response": result.get("user_message", "Trade failed")
+                    }
+                    
         except Exception as e:
             return {
                 "success": False,
