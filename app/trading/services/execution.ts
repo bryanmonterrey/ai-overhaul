@@ -35,6 +35,7 @@ import {
   SessionResponse
 } from '../types/agent-kit';
 import bs58 from 'bs58';
+import { ExtendedSolanaAgentKit } from './extended-agent-kit';
 
 // Interface Definitions
 interface TradingSession {
@@ -85,7 +86,7 @@ class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
-  private agentKit: SolanaAgentKit;  // Removed optional
+  private agentKit: ExtendedSolanaAgentKit;  // Removed optional
   private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
@@ -99,8 +100,7 @@ class TradeExecutionService {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
     this.blockEngineUrl = 'https://frankfurt.jito.wtf/';
     
-    // Initialize agentKit with Config object
-    this.agentKit = new SolanaAgentKit(
+    this.agentKit = new ExtendedSolanaAgentKit(
       'readonly',
       process.env.NEXT_PUBLIC_RPC_URL!,
       { 
@@ -128,21 +128,6 @@ class TradeExecutionService {
     );
   }
 
-  class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAgentKit {
-    async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {
-      // Implementation for session initialization
-      return {
-        success: true,
-        sessionId: Math.random().toString(),
-        timestamp: new Date().toISOString()
-      };
-    }
-  
-    async validateSession(sessionId: string): Promise<boolean> {
-      // Implementation for session validation
-      return true;
-    }
-  }
 
   async initializeSession(wallet: WalletAdapter): Promise<string> {
     try {

@@ -4,6 +4,7 @@ import Decimal from 'decimal.js';
 import { PublicKey } from "@solana/web3.js";
 import { RouteInfo } from "@jup-ag/core";
 import { BN } from "@coral-xyz/anchor";
+import type { JupiterTokenData } from 'solana-agent-kit';
 
 // Base Types
 export interface TokenInfo {
@@ -11,8 +12,13 @@ export interface TokenInfo {
   symbol: string;
   decimals: number;
   name: string;
-  logoURI?: string;
+  logoURI: string;  // No longer optional to match JupiterTokenData
   extensions?: Record<string, any>;
+  tags: string[];
+  daily_volume: number;
+  freeze_authority: string | null;
+  mint_authority: string | null;
+  permanent_delegate: string | null;
 }
 
 // Separate base responses for different timestamp types
@@ -316,7 +322,7 @@ export interface ISolanaAgentKit {
   validateSession(sessionId: string): Promise<boolean>;
   
   // Token operations
-  getTokenDataByAddress(mint: string): Promise<TokenInfo>;
+  getTokenDataByAddress(mint: string): Promise<JupiterTokenData | undefined>;
   fetchTokenPrice(mint: string): Promise<string>;
   getTPS(): Promise<number>;
   trade(outputMint: PublicKey, amount: number, inputMint: PublicKey, slippageBps: number): Promise<string>;
@@ -354,7 +360,7 @@ export interface ISolanaAgentKit {
   ): Promise<string>;
   
   // Properties
-  wallet_address: string;
+  wallet_address: PublicKey;
 }
 
 export interface Config {
