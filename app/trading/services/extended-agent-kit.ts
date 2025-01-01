@@ -12,75 +12,80 @@ import {
 } from '../types/agent-kit';
 
 export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAgentKit {
-  // Session management
-  async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {
-    return {
-      success: true,
-      sessionId: Math.random().toString(),
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async validateSession(sessionId: string): Promise<boolean> {
-    return true;
-  }
-  
-  // Token operations
-  async getTokenDataByAddress(mint: string): Promise<TokenInfo> {
-    const result = await super.getTokenDataByAddress(mint);
-    if (!result) {
-      throw new Error('Token not found');
+    // Session management
+    async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {
+      return {
+        success: true,
+        sessionId: Math.random().toString(),
+        timestamp: new Date().toISOString()
+      };
     }
-    return {
-      address: result.address,
-      symbol: result.symbol,
-      decimals: result.decimals,
-      name: result.name,
-      logoURI: result.logoURI ?? '',
-      extensions: result.extensions || {},
-      tags: result.tags,
-      daily_volume: result.daily_volume,
-      freeze_authority: result.freeze_authority,
-      mint_authority: result.mint_authority,
-      permanent_delegate: result.permanent_delegate
-    };
-  }
+  
+    async validateSession(sessionId: string): Promise<boolean> {
+      return true;
+    }
+    
+    // Token operations
+    async getTokenDataByAddress(mint: string): Promise<TokenInfo> {
+      const result = await super.getTokenDataByAddress(mint);
+      if (!result) {
+        throw new Error('Token not found');
+      }
+  
+      // Ensure all required properties are present with proper defaults
+      return {
+        address: result.address,
+        symbol: result.symbol,
+        decimals: result.decimals,
+        name: result.name,
+        logoURI: result.logoURI ?? '',
+        tags: result.tags ?? [],
+        daily_volume: result.daily_volume ?? 0,
+        freeze_authority: result.freeze_authority ?? null,
+        mint_authority: result.mint_authority ?? null,
+        permanent_delegate: result.permanent_delegate ?? null,
+        extensions: {
+          coingeckoId: result.extensions?.coingeckoId
+        }
+      };
+    }
 
-  async deployToken(
-    name: string,
-    uri: string,
-    symbol: string,
-    decimals?: number,
-    initialSupply?: number
-  ): Promise<TokenDeploymentResponse> {
-    const result = await super.deployToken(name, uri, symbol, decimals, initialSupply);
-    return {
-      success: true,
-      mint: result.mint,
-      timestamp: new Date().toISOString()
-    };
-  }
+    async deployToken(
+        name: string,
+        uri: string,
+        symbol: string,
+        decimals?: number,
+        initialSupply?: number
+      ): Promise<TokenDeploymentResponse> {
+        const result = await super.deployToken(name, uri, symbol, decimals, initialSupply);
+        return {
+          success: true,
+          mint: result.mint,
+          timestamp: new Date().toISOString()
+        };
+      }
+    
+      async mintNFT(
+        collectionMint: PublicKey,
+        metadata: any,
+        recipient?: PublicKey
+      ): Promise<NFTMintResponse> {
+        const result = await super.mintNFT(collectionMint, metadata, recipient);
+        return {
+          success: true,
+          mint: result.mint,
+          metadata: result.metadata,
+          edition: result.mint,
+          signature: 'pending', // Since base doesn't provide signature
+          timestamp: new Date().toISOString()
+        };
+      }
 
-  async mintNFT(
-    collectionMint: PublicKey,
-    metadata: any,
-    recipient?: PublicKey
-  ): Promise<NFTMintResponse> {
-    const result = await super.mintNFT(collectionMint, metadata, recipient);
-    return {
-      success: true,
-      mint: result.mint,
-      metadata: result.metadata,
-      edition: result.mint,
-      signature: result.signature,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async pythFetchPrice(priceFeedID: string): Promise<number> {
-    const result = await super.pythFetchPrice(priceFeedID);
-    return Number(result);
-  }
+      async pythFetchPrice(priceFeedID: string): Promise<number> {
+        const result = await super.pythFetchPrice(priceFeedID);
+        // Convert string to number since base returns string but interface expects number
+        return parseFloat(result);
+      }
 
   // Pass through methods
   async fetchTokenPrice(mint: string): Promise<string> {
