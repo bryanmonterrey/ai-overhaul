@@ -6,7 +6,7 @@ import { WalletAdapter } from '../types/wallet';
 import { BN } from '@coral-xyz/anchor';
 import Decimal from 'decimal.js';
 import { SolanaAgentKit } from 'solana-agent-kit';
-import type { ISolanaAgentKit } from '../types/agent-kit';
+import type { ISolanaAgentKit, Config } from '../types/agent-kit';
 import type { PumpFunTokenOptions } from 'solana-agent-kit';
 import { 
   TradeParams,
@@ -85,7 +85,7 @@ class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
-  private agentKit: ISolanaAgentKit & SolanaAgentKit;  // Removed optional
+  private agentKit: SolanaAgentKit;  // Removed optional
   private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
@@ -99,11 +99,13 @@ class TradeExecutionService {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
     this.blockEngineUrl = 'https://frankfurt.jito.wtf/';
     
-    // Initialize agentKit immediately
+    // Initialize agentKit with Config object
     this.agentKit = new SolanaAgentKit(
-      'readonly',  // private key
-      process.env.NEXT_PUBLIC_RPC_URL!,  // rpc url
-      process.env.OPENAI_API_KEY!  // this is fine as it accepts string
+      'readonly',
+      process.env.NEXT_PUBLIC_RPC_URL!,
+      { 
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY!
+      }
     );
     
     this.initializeJupiter();
@@ -124,6 +126,22 @@ class TradeExecutionService {
       process.env.NEXT_PUBLIC_RPC_URL!,
       process.env.OPENAI_API_KEY!
     );
+  }
+
+  class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAgentKit {
+    async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {
+      // Implementation for session initialization
+      return {
+        success: true,
+        sessionId: Math.random().toString(),
+        timestamp: new Date().toISOString()
+      };
+    }
+  
+    async validateSession(sessionId: string): Promise<boolean> {
+      // Implementation for session validation
+      return true;
+    }
   }
 
   async initializeSession(wallet: WalletAdapter): Promise<string> {

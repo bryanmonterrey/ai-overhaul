@@ -357,6 +357,12 @@ export interface ISolanaAgentKit {
   wallet_address: string;
 }
 
+export interface Config {
+  OPENAI_API_KEY?: string;
+  JUPITER_REFERRAL_ACCOUNT?: string;
+  JUPITER_FEE_BPS?: number;
+}
+
 // Add the session response interface
 export interface SessionResponse extends BaseResponse {
   sessionId?: string;
