@@ -30,6 +30,7 @@ const config: Config = {
 			darkish: '#11111A',
 			greenish: '#00FFA2',
 			purp: '#1D1D2C',
+			azul: '#0071e3',
 			navyy: '#0D0E15',
   			background: 'var(--background)',
   			foreground: 'var(--foreground)'

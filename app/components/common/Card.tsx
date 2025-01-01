@@ -16,8 +16,8 @@ export const Card = ({
   className = ''
 }: CardProps) => {
   const variants = {
-    default: 'bg-[#0D0E15] border border-zinc-900 rounded-md',
-    system: 'bg-[#0D0E15] border border-zinc-900 text-[#DDDDDD] font-ia rounded-xl'
+    default: 'bg-[#0D0E15] border border-zinc-900 rounded-2xl',
+    system: 'bg-[#0D0E15] border border-zinc-900 text-[#DDDDDD] font-ia rounded-2xl'
   };
 
   return (

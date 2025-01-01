@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import React, { useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { ArrowUp } from 'lucide-react';
+import SubmitButton from '../components/ui/SubmitButton';
 
 interface InputMorphMessageProps {
   input: string;
@@ -144,13 +146,7 @@ export default function InputMorphMessage({
             </div>
         </motion.div>
 
-          <Button
-            type="submit"
-            className="ml-2 flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 dark:bg-black"
-            disabled={isLoading}
-          >
-            <PlusIcon className="h-5 w-5 text-gray-600 dark:text-gray-50" />
-          </Button>
+        <SubmitButton isLoading={isLoading} onClick={() => console.log('clicked')} />
         </form>
       </div>
     </div>

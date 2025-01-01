@@ -9,6 +9,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { Magnetic } from '../common/MagButton';
 import { Logo } from '@/components/logo';
+import { Button } from '@/components/ui/button';
 
 const CustomWalletButton = () => {
   return (
@@ -95,7 +96,7 @@ export default function Header() {
               <button 
               type='button'
               className='inline-flex items-center rounded-md border border-zinc-900
-         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-normal hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
          dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600'>
                 admin
               </button>
@@ -117,14 +118,18 @@ export default function Header() {
             
             {connected && publicKey ? (
               <div className="flex items-center space-x-4">
-                <Card variant="system" className="px-3 py-1">
+                <button type='button' className="items-center rounded-md border border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600">
                   <span className="text-xs font-ia">
                     {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
                   </span>
-                </Card>
+                </button>
                 <button
                   onClick={handleSignOut}
-                  className="font-ia bg-[#0D0E15] text-[#DDDDDD] border rounded-md border-zinc-900 py-2 px-3 hover:text-red-500 text-xs"
+                  className="items-center rounded-md border border-zinc-900
+         bg-[#0D0E15] px-4 py-1 text-sm font-semibold hover:text-greenish text-[#DDDDDD] transition-all duration-300 hover:bg-zinc-600 dark:border-zinc-900
+         dark:bg-transparent dark:text-[#DDDDDD] dark:hover:bg-zinc-600"
                 >
                   disconnect
                 </button>
