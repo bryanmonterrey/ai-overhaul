@@ -35,6 +35,18 @@ class SolanaService:
             'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
         }
 
+    async def init_trading_session(self, wallet_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Initialize a trading session with agent-kit"""
+        try:
+            result = await self._call_agent_kit('initSession', {
+                'wallet': wallet_info
+            })
+            logging.info("Session initialization response:", result)
+            return result
+        except Exception as e:
+            logging.error(f"Session initialization error: {str(e)}")
+            raise
+
     async def _call_agent_kit(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
             logging.info(f"Making request to {self.agent_kit_url}")
@@ -128,6 +140,22 @@ class SolanaService:
         
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
+            # Initialize session first if wallet info is present
+            if wallet_info := params.get('wallet'):
+                try:
+                    session_result = await self.init_trading_session(wallet_info)
+                    if not session_result.get('success', False):
+                        raise ValueError(f"Failed to initialize session: {session_result.get('error')}")
+                        
+                    # Update wallet credentials with session token
+                    if session_token := session_result.get('session'):
+                        if isinstance(wallet_info.get('credentials'), dict):
+                            wallet_info['credentials']['signature'] = session_token
+                            logging.info("Added session token to wallet credentials")
+                except Exception as e:
+                    logging.error(f"Failed to initialize session: {str(e)}")
+                    raise
+
             # Get token data from params or lookup
             symbol = params['asset'].upper()
             token_address = self.token_addresses.get(symbol)
