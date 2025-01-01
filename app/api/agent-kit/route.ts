@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 // Store active agent-kit instances
 const activeKits = new Map<string, { kit: SolanaAgentKit, expiresAt: number }>();
 
-const READONLY_KEY = "11111111111111111111111111111111";
+const READONLY_KEY = "1111111111111111111111111111111111";
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
