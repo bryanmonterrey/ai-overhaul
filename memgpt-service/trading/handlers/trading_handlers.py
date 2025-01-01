@@ -231,8 +231,8 @@ class TradingHandlers:
                     if not isinstance(credentials, dict) or 'signature' not in credentials:
                         return {
                             "success": False,
-                            "error": "Invalid trading session",
-                            "natural_response": "Please initialize a trading session first."
+                            "error": "Session initialization required",
+                            "natural_response": "Please sign a message to initialize your trading session first."
                         }
                 
                 # Convert chat parameters to trade parameters 
