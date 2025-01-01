@@ -49,9 +49,14 @@ export async function POST(req: Request) {
         });
       }
 
+      const getReadOnlyKey = () => {
+        // Generate a dummy key that's valid base58 for read-only operations
+        return "11111111111111111111111111111111";
+      };
+
       const kit = new SolanaAgentKit(
-        'readonly',
-        process.env.NEXT_PUBLIC_RPC_URL!,
+        getReadOnlyKey(),
+        process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
         process.env.OPENAI_API_KEY!
       );
 
