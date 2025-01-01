@@ -241,6 +241,18 @@ class TradingChat:
         """Handle trade execution commands"""
         try:
             logging.info(f"Starting trade execution with params: {params}")
+
+            # Setup wallet from request context first
+            wallet_info = params.get('wallet') or {}
+            
+            # Check for trading session signature
+            if not wallet_info.get('signature'):
+                # Try to get it from the session
+                session = getattr(self.realtime_monitor, 'current_session', None)
+                if session and session.signature:
+                    if not wallet_info.get('credentials'):
+                        wallet_info['credentials'] = {}
+                    wallet_info['credentials']['signature'] = session.signature
             
             # Setup wallet from request context first
             wallet_info = params.get('wallet') or {}

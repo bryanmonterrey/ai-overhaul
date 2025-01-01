@@ -40,6 +40,15 @@ class SolanaService:
             logging.info(f"Making request to {self.agent_kit_url}")
             logging.info(f"Request payload: action={action}, params={params}")
             
+            # Extract session signature if available in wallet info
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            
+            if params.get('wallet', {}).get('credentials', {}).get('signature'):
+                headers['X-Trading-Session'] = params['wallet']['credentials']['signature']
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     self.agent_kit_url,
@@ -47,10 +56,7 @@ class SolanaService:
                         'action': action,
                         'params': params
                     },
-                    headers={
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
+                    headers=headers
                 ) as response:
                     logging.info(f"Response status: {response.status}")
                     logging.info(f"Response headers: {dict(response.headers)}")
