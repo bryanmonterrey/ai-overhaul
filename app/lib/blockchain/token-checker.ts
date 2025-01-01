@@ -1,18 +1,33 @@
 // app/lib/blockchain/token-checker.ts
 import { Connection, PublicKey } from '@solana/web3.js';
-import { Token, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Redis } from '@upstash/redis';
 import { getRedisClient } from '../redis/client';
+
+interface TokenSearchResult {
+  items: any[];
+  limit: number;
+  page: number;
+  total: number;
+}
+
+interface TokenBalanceResult {
+  balance: number;
+  tokenInfo?: {
+    address: string;
+    supply: number;
+    decimals: number;
+    symbol?: string;
+    name?: string;
+  };
+}
 
 export class TokenChecker {
   private connection: Connection;
   private tokenAddress: string;
   private redis?: Redis;
   private readonly CACHE_TTL = 300;
-  private readonly PRICE_RETRY_ATTEMPTS = 3;
-  private readonly BIRDEYE_API_URL = 'https://public-api.birdeye.so/public/price';
-  private readonly JUPITER_API_URL = 'https://price.jup.ag/v4/price';
-  private readonly DEX_POOL_ADDRESS = 'BiLKBPSrJxsoRQxcnxoX3KArGpFBPEKjJgGeoKpyhkgp';
+  private readonly HELIUS_API_KEY = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+  private readonly HELIUS_RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
   private readonly REQUIRED_USD_VALUE = 20;
   private static instance: TokenChecker;
   private checkInProgress: Map<string, Promise<any>> = new Map();
@@ -20,6 +35,10 @@ export class TokenChecker {
   private readonly MIN_CHECK_INTERVAL = 5000; // 5 seconds
 
   private constructor() {
+    if (!process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
+      throw new Error('HELIUS_API_KEY is not set in environment variables');
+    }
+    
     this.connection = new Connection(
       process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
       'confirmed'
@@ -71,29 +90,36 @@ export class TokenChecker {
     }
 
     try {
-      const wallet = new PublicKey(walletAddress);
-      const mint = new PublicKey(this.tokenAddress);
-      
-      const tokenAccount = await Token.getAssociatedTokenAddress(
-        ASSOCIATED_TOKEN_PROGRAM_ID,
-        TOKEN_PROGRAM_ID,
-        mint,
-        wallet
-      );
+      const response = await fetch(this.HELIUS_RPC_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'token-checker',
+          method: 'searchAssets',
+          params: {
+            ownerAddress: walletAddress,
+            grouping: ["collection", this.tokenAddress],
+            page: 1,
+            limit: 10
+          },
+        }),
+      });
 
-      try {
-        const balance = await this.connection.getTokenAccountBalance(tokenAccount);
-        const balanceAmount = balance.value.uiAmount || 0;
-        
-        await this.setCache(cacheKey, balanceAmount.toString());
-        return balanceAmount;
-      } catch (error: any) {
-        if (error.message.includes('Account does not exist')) {
-          await this.setCache(cacheKey, '0');
-          return 0;
-        }
-        throw error;
+      if (!response.ok) {
+        throw new Error(`Helius API error: ${response.status}`);
       }
+
+      const { result } = await response.json();
+      if (!result || !Array.isArray(result.items)) {
+        throw new Error('Invalid response format from Helius API');
+      }
+
+      const balance = result.items.length;
+      await this.setCache(cacheKey, balance.toString());
+      return balance;
     } catch (error) {
       console.error('Error getting token balance:', error);
       return 0;
@@ -107,7 +133,7 @@ export class TokenChecker {
       return parseFloat(cachedPrice);
     }
 
-    const price = 1;
+    const price = 1; // Replace with actual price fetching logic if needed
     await this.setCache(cacheKey, price.toString());
     return price;
   }
@@ -121,7 +147,7 @@ export class TokenChecker {
 
     try {
       const poolInfo = await this.connection.getAccountInfo(
-        new PublicKey(this.DEX_POOL_ADDRESS)
+        new PublicKey(this.tokenAddress)
       );
 
       if (!poolInfo) {
@@ -129,12 +155,9 @@ export class TokenChecker {
         return false;
       }
 
-      const poolSize = poolInfo.lamports / 1e9;
-      const impact = (balance / poolSize) * 100;
-      const result = impact > 1;
-      
-      await this.setCache(cacheKey, result.toString());
-      return result;
+      const impact = balance > 0;
+      await this.setCache(cacheKey, impact.toString());
+      return impact;
     } catch (error) {
       console.error('Error checking price impact:', error);
       return false;
