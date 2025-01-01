@@ -6,13 +6,15 @@ import { PublicKey } from '@solana/web3.js';
 import { TradingSessionManager } from '../../lib/session-manager';
 import { verifySession } from '../../lib/auth/session-verification';
 import { SolanaAgentKit } from 'solana-agent-kit';
+import { Keypair } from '@solana/web3.js';
 
 export const runtime = 'nodejs';
 
 // Store active agent-kit instances
 const activeKits = new Map<string, { kit: SolanaAgentKit, expiresAt: number }>();
 
-const READONLY_KEY = "11111111111111111111111111111111";
+const READONLY_KEYPAIR = Keypair.generate();
+const READONLY_KEY = READONLY_KEYPAIR.publicKey.toBase58();
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
@@ -76,7 +78,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Verify trading session for actions that require authentication
     if (['trade', 'validateTransaction'].includes(action)) {
       const sessionSignature = req.headers.get('X-Trading-Session');
       
@@ -159,8 +160,6 @@ export async function POST(req: Request) {
             'Content-Type': 'application/json'
           }
         });
-        
-      // ... rest of your cases remain the same ...
 
       case 'validateSession':
         if (!params?.sessionSignature || !params?.publicKey) {
