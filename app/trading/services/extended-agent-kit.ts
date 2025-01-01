@@ -81,10 +81,8 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
         };
       }
 
-      async pythFetchPrice(priceFeedID: string): Promise<number> {
-        const result = await super.pythFetchPrice(priceFeedID);
-        // Convert string to number since base returns string but interface expects number
-        return parseFloat(result);
+      async pythFetchPrice(priceFeedID: string): Promise<string> {
+        return super.pythFetchPrice(priceFeedID);
       }
 
   // Pass through methods

@@ -81,12 +81,11 @@ interface WebSocketSessionStatus {
   expiresAt?: number;
 }
 
-// Part 2: Class Definition and Core Methods
 class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
-  private agentKit: ExtendedSolanaAgentKit;  // Removed optional
+  private agentKit: ExtendedSolanaAgentKit; 
   private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;

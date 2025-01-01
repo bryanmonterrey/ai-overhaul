@@ -338,7 +338,7 @@ export interface ISolanaAgentKit {
   // DeFi operations
   lendAssets(amount: number): Promise<string>;
   stake(amount: number): Promise<string>;
-  pythFetchPrice(priceFeedID: string): Promise<number>;
+  pythFetchPrice(priceFeedID: string): Promise<string>;
   
   // Domain operations
   resolveAllDomains(domain: string): Promise<PublicKey | undefined>;
