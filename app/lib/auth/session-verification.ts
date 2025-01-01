@@ -23,7 +23,7 @@ export async function verifySession(
     }
 
     // Check if session is expired (24 hours)
-    const sessionAge = Date.now() - new Date(session.createdAt).getTime();
+    const sessionAge = Date.now() - session.timestamp;
     if (sessionAge > 24 * 60 * 60 * 1000) {
       TradingSessionManager.clearSession();
       return false;

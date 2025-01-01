@@ -5,7 +5,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { WalletAuthManager } from '../lib/auth/wallet-auth';
-import { TradingSessionManager } from '../lib/trading/session-manager';
+import { TradingSessionManager } from '../lib/session-manager';
 
 // Dynamically import WalletMultiButton with no SSR
 const WalletMultiButtonDynamic = dynamic(
