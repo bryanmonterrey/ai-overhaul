@@ -283,9 +283,34 @@ export interface TradeStatusUpdate {
   };
 }
 
-// Add this interface for the kit's methods
-// First, update the SolanaAgentKit interface definition in agent-kit.ts:
-export interface SolanaAgentKit {
+export interface CollectionDeployment {
+  collectionMint: PublicKey;
+  metadata: PublicKey;
+  masterEdition: PublicKey;
+}
+
+export interface MintCollectionNFTResponse {
+  mint: PublicKey;
+  metadata: PublicKey;  
+  signature: string;
+}
+
+// Parameters interface for deployToken
+export interface DeployTokenParams {
+  name: string;
+  uri: string;
+  symbol: string;
+  decimals?: number;
+  initialSupply?: number;
+}
+
+export interface BlockchainResponse {
+  signature?: string;
+  signatures?: string[];
+  error?: string;
+}
+
+export interface ISolanaAgentKit {
   // Session management
   initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse>;
   validateSession(sessionId: string): Promise<boolean>;
@@ -353,6 +378,19 @@ export interface NetworkStatusUpdate {
     slot: number;
     blockTime: number;
   };
+}
+
+export const DEFAULT_OPTIONS = {
+  TOKEN_DECIMALS: 9,
+  SLIPPAGE_BPS: 100, // 1%
+  BASE_TICKS_PER_SECOND: 1500,
+  DEFAULT_PRIORITY_FEE: 10000 // lamports
+} as const;
+
+export interface Creator {
+  address: string;
+  verified: boolean;
+  share: number;
 }
 
 export type WebSocketUpdate = TradeStatusUpdate | NetworkStatusUpdate;

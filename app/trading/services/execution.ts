@@ -4,6 +4,7 @@ import { Jupiter, RouteInfo, TOKEN_LIST_URL } from '@jup-ag/core';
 import { WalletAdapter } from '../types/wallet';
 import { BN } from '@coral-xyz/anchor';
 import Decimal from 'decimal.js';
+import { ISolanaAgentKit } from '../types/agent-kit';
 import { SolanaAgentKit } from 'solana-agent-kit';
 import type { PumpFunTokenOptions } from 'solana-agent-kit';
 import { 
@@ -82,7 +83,7 @@ class TradeExecutionService {
   private connection: Connection;
   private jupiter!: Jupiter;
   private blockEngineUrl: string;
-  private agentKit: SolanaAgentKit;  // Removed optional
+  private agentKit: ISolanaAgentKit;  // Removed optional
   private wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/ws';
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
