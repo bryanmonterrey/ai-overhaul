@@ -1,5 +1,5 @@
 // Part 1: Imports and Basic Interfaces
-import { Connection, PublicKey, TransactionInstruction, Transaction } from '@solana/web3.js';
+import { Connection, PublicKey, TransactionInstruction, Transaction, VersionedTransaction } from '@solana/web3.js';
 import JSBI from 'jsbi';
 import { Jupiter, RouteInfo, TOKEN_LIST_URL } from '@jup-ag/core';
 import { WalletAdapter } from '../types/wallet';
@@ -32,7 +32,8 @@ import {
   TokenTransferResponse,
   DomainResolutionResponse,
   LendingResponse,
-  SessionResponse
+  SessionResponse,
+  GibworkCreateTaskReponse
 } from '../types/agent-kit';
 import bs58 from 'bs58';
 import { ExtendedSolanaAgentKit } from './extended-agent-kit';
@@ -99,12 +100,11 @@ class TradeExecutionService {
     this.connection = new Connection(process.env.NEXT_PUBLIC_RPC_URL!);
     this.blockEngineUrl = 'https://frankfurt.jito.wtf/';
     
+    // Pass OPENAI_API_KEY directly as string
     this.agentKit = new ExtendedSolanaAgentKit(
       'readonly',
       process.env.NEXT_PUBLIC_RPC_URL!,
-      { 
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY!
-      }
+      process.env.OPENAI_API_KEY!
     );
     
     this.initializeJupiter();
@@ -112,18 +112,18 @@ class TradeExecutionService {
     this.startSessionCleanup();
   }
 
-  private async getOrCreateAgentKit(wallet?: WalletAdapter, session?: TradingSession): Promise<SolanaAgentKit> {
+  private async getOrCreateAgentKit(wallet?: WalletAdapter, session?: TradingSession): Promise<ExtendedSolanaAgentKit> {
     if (!wallet) {
       return this.agentKit;
     }
-
+  
     // Create new instance with session if available
     const credentials = session ? session.signature : wallet.publicKey.toString();
     
-    return new SolanaAgentKit(
+    return new ExtendedSolanaAgentKit(
       credentials,
       process.env.NEXT_PUBLIC_RPC_URL!,
-      process.env.OPENAI_API_KEY!
+      process.env.OPENAI_API_KEY!  // Pass API key directly
     );
   }
 
@@ -155,7 +155,7 @@ class TradeExecutionService {
           }
         });
   
-        if (signedResult?.success) {
+        if (signedResult?.success && signedResult.sessionId) {
           // Store session
           await this.createTradingSession(wallet, signedResult.sessionId);
           return signedResult.sessionId;
@@ -163,7 +163,7 @@ class TradeExecutionService {
         throw new Error(signedResult?.error || 'Session initialization failed');
       }
   
-      if (sessionResult?.success) {
+      if (sessionResult?.success && sessionResult.sessionId) {
         // Store session
         await this.createTradingSession(wallet, sessionResult.sessionId);
         return sessionResult.sessionId;
@@ -403,15 +403,24 @@ class TradeExecutionService {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
-  private async submitToBlockEngine(signedTransaction: Transaction) {
+  private async submitToBlockEngine(signedTransaction: Transaction | VersionedTransaction) {
     try {
+      const serializedTx = Buffer.from(
+        signedTransaction instanceof VersionedTransaction 
+          ? signedTransaction.serialize()
+          : signedTransaction.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false
+            })
+      );
+
       const response = await fetch(`${this.blockEngineUrl}/bundle`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          transactions: [signedTransaction.serialize()],
+          transactions: [serializedTx.toString('base64')],
         }),
       });
 
@@ -570,7 +579,12 @@ class TradeExecutionService {
         // For non-MEV trades
         if (typeof wallet.signTransaction === 'function' && swapTransaction instanceof Transaction) {
           await wallet.signTransaction(swapTransaction);
-          const signature = await this.connection.sendTransaction(swapTransaction);
+          const signature = await this.connection.sendRawTransaction(
+            swapTransaction.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false
+            })
+          );
           signatures.push(signature);
         } else {
           throw new Error('Invalid transaction or wallet');
@@ -698,7 +712,13 @@ class TradeExecutionService {
           address: token.address,
           name: token.name,
           decimals: token.decimals,
-          logoURI: token.logoURI
+          logoURI: token.logoURI,
+          tags: [],
+          daily_volume: 0,
+          freeze_authority: null,
+          mint_authority: null,
+          permanent_delegate: null,
+          extensions: {}
         };
       }
 
@@ -709,7 +729,14 @@ class TradeExecutionService {
           symbol: symbolOrAddress.slice(0, 8),
           address: symbolOrAddress,
           name: `Token ${symbolOrAddress.slice(0, 8)}`,
-          decimals: 9
+          decimals: 9,
+          logoURI: '',
+          tags: [],
+          daily_volume: 0,
+          freeze_authority: null,
+          mint_authority: null,
+          permanent_delegate: null,
+          extensions: {}
         };
       }
 

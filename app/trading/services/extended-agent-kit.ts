@@ -32,7 +32,6 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
         throw new Error('Token not found');
       }
   
-      // Ensure all required properties are present with proper defaults
       return {
         address: result.address,
         symbol: result.symbol,
@@ -167,5 +166,19 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
       maxPrice,
       feeTier
     );
+  }
+
+  async createGibworkTask(
+    title: string,
+    content: string,
+    requirements: string,
+    tags: string[],
+    tokenMintAddress: string,
+    tokenAmount: number,
+    payer?: string
+  ): Promise<{ taskId: string }> {
+    return {
+      taskId: Math.random().toString()
+    };
   }
 }

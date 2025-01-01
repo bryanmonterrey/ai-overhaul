@@ -198,7 +198,7 @@ export interface GibworkCreateTaskReponse extends BaseResponse {
     mint: string;
     amount: number;
   };
-  status: 'created' | 'inProgress' | 'completed';
+  status: string;
 }
 
 // Market Data Response
