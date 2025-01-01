@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 const CustomWalletButton = () => {
   return (
     <WalletMultiButton className="!bg-[#0D0E15] !border !border-zinc-900 !rounded-md !font-ia !text-sm !px-3 !py-1">
-      select&nbsp;wallet
+      connect
     </WalletMultiButton>
   );
 };

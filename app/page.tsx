@@ -34,7 +34,7 @@ export default function Home({ href, icon: Icon, text }: AnimatedLinkProps): JSX
   
 >
   <div 
-    className="border-zinc-900 w-[300px] h-[200px] font-medium hover:cursor-pointer border-2 bg-[#0D0E15] hover:border-[#00FFA2] transition-colors ease-in-out duration-300 rounded-lg p-12 text-white relative"
+    className="border-zinc-900 w-[300px] h-[200px] font-medium hover:cursor-pointer border-2 bg-[#0D0E15] hover:border-[#00FFA2] transition-colors ease-in-out duration-300 rounded-3xl p-12 text-white relative"
     onMouseEnter={() => setChatHovered(true)}
     onMouseLeave={() => setChatHovered(false)}
   >
@@ -79,7 +79,7 @@ export default function Home({ href, icon: Icon, text }: AnimatedLinkProps): JSX
   range={200}
 >
   <div 
-    className="border-zinc-900 w-[300px] h-[200px] font-medium hover:cursor-pointer border-2 bg-[#0D0E15] hover:border-[#00FFA2] transition-colors ease-in-out duration-300 rounded-lg p-12 text-white relative"
+    className="border-zinc-900 w-[300px] h-[200px] font-medium hover:cursor-pointer border-2 bg-[#0D0E15] hover:border-[#00FFA2] transition-colors ease-in-out duration-300 rounded-3xl p-12 text-white relative"
     onMouseEnter={() => setConversationsHovered(true)}
     onMouseLeave={() => setConversationsHovered(false)}
   >
