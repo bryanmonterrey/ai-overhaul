@@ -7,8 +7,12 @@ import { TradingSessionManager } from '../../lib/session-manager';
 import { verifySession } from '../../lib/auth/session-verification';
 import { SolanaAgentKit } from 'solana-agent-kit';
 
+export const runtime = 'nodejs';
+
 // Store active agent-kit instances
 const activeKits = new Map<string, { kit: SolanaAgentKit, expiresAt: number }>();
+
+const READONLY_KEY = "11111111111111111111111111111111";
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
@@ -49,13 +53,8 @@ export async function POST(req: Request) {
         });
       }
 
-      const getReadOnlyKey = () => {
-        // Generate a dummy key that's valid base58 for read-only operations
-        return "11111111111111111111111111111111";
-      };
-
       const kit = new SolanaAgentKit(
-        getReadOnlyKey(),
+        READONLY_KEY,
         process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
         process.env.OPENAI_API_KEY!
       );
