@@ -1,6 +1,6 @@
 // app/lib/blockchain/token-checker.ts
 import { Connection, PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress, ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Token, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Redis } from '@upstash/redis';
 import { getRedisClient } from '../redis/client';
 
@@ -14,8 +14,12 @@ export class TokenChecker {
   private readonly JUPITER_API_URL = 'https://price.jup.ag/v4/price';
   private readonly DEX_POOL_ADDRESS = 'BiLKBPSrJxsoRQxcnxoX3KArGpFBPEKjJgGeoKpyhkgp';
   private readonly REQUIRED_USD_VALUE = 20;
+  private static instance: TokenChecker;
+  private checkInProgress: Map<string, Promise<any>> = new Map();
+  private lastCheckTime: Map<string, number> = new Map();
+  private readonly MIN_CHECK_INTERVAL = 5000; // 5 seconds
 
-  constructor() {
+  private constructor() {
     this.connection = new Connection(
       process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
       'confirmed'
@@ -25,6 +29,13 @@ export class TokenChecker {
     if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
       this.redis = getRedisClient();
     }
+  }
+
+  public static getInstance(): TokenChecker {
+    if (!TokenChecker.instance) {
+      TokenChecker.instance = new TokenChecker();
+    }
+    return TokenChecker.instance;
   }
 
   private async getFromCache(key: string): Promise<string | null> {
@@ -46,6 +57,12 @@ export class TokenChecker {
     }
   }
 
+  private shouldThrottle(walletAddress: string): boolean {
+    const lastCheck = this.lastCheckTime.get(walletAddress) || 0;
+    const now = Date.now();
+    return (now - lastCheck) < this.MIN_CHECK_INTERVAL;
+  }
+
   async getTokenBalance(walletAddress: string): Promise<number> {
     const cacheKey = `token_balance:${walletAddress}`;
     const cachedBalance = await this.getFromCache(cacheKey);
@@ -57,8 +74,9 @@ export class TokenChecker {
       const wallet = new PublicKey(walletAddress);
       const mint = new PublicKey(this.tokenAddress);
       
-      // Use getAssociatedTokenAddress directly
-      const tokenAccount = await getAssociatedTokenAddress(
+      const tokenAccount = await Token.getAssociatedTokenAddress(
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
         mint,
         wallet
       );
@@ -89,7 +107,6 @@ export class TokenChecker {
       return parseFloat(cachedPrice);
     }
 
-    // Your default price
     const price = 1;
     await this.setCache(cacheKey, price.toString());
     return price;
@@ -130,6 +147,20 @@ export class TokenChecker {
     price: number;
     value: number;
   }> {
+    // Throttle checks
+    if (this.shouldThrottle(walletAddress)) {
+      const lastResult = this.checkInProgress.get(walletAddress);
+      if (lastResult) return lastResult;
+    }
+
+    // Update last check time
+    this.lastCheckTime.set(walletAddress, Date.now());
+
+    // Return existing check if one is in progress
+    if (this.checkInProgress.has(walletAddress)) {
+      return this.checkInProgress.get(walletAddress)!;
+    }
+
     const cacheKey = `eligibility:${walletAddress}`;
     const cachedEligibility = await this.getFromCache(cacheKey);
     
@@ -137,29 +168,47 @@ export class TokenChecker {
       return JSON.parse(cachedEligibility);
     }
 
-    try {
-      const [balance, price] = await Promise.all([
-        this.getTokenBalance(walletAddress),
-        this.getTokenPrice()
-      ]);
+    const checkPromise = (async () => {
+      try {
+        const [balance, price] = await Promise.all([
+          this.getTokenBalance(walletAddress),
+          this.getTokenPrice()
+        ]);
 
-      const value = balance * price;
-      const isEligible = value >= this.REQUIRED_USD_VALUE;
+        const value = balance * price;
+        const isEligible = value >= this.REQUIRED_USD_VALUE;
 
-      const result = {
-        isEligible,
-        balance,
-        price,
-        value
-      };
+        const result = {
+          isEligible,
+          balance,
+          price,
+          value
+        };
 
-      // Cache the eligibility result for a shorter time
-      await this.setCache(cacheKey, JSON.stringify(result), 60); // Cache for 1 minute
-      
-      return result;
-    } catch (error) {
-      console.error('Error checking eligibility:', error);
-      throw error;
-    }
+        // Cache the result with a longer TTL to prevent rate limiting
+        await this.setCache(cacheKey, JSON.stringify(result), 300); // Cache for 5 minutes
+        
+        return result;
+      } catch (error) {
+        console.error('Error checking eligibility:', error);
+        // Cache errors briefly to prevent hammering
+        await this.setCache(cacheKey, JSON.stringify({
+          isEligible: false,
+          balance: 0,
+          price: 0,
+          value: 0,
+          error: true
+        }), 30); // Cache errors for 30 seconds
+        throw error;
+      } finally {
+        this.checkInProgress.delete(walletAddress);
+      }
+    })();
+
+    this.checkInProgress.set(walletAddress, checkPromise);
+    return checkPromise;
   }
 }
+
+// Export singleton instance
+export const tokenChecker = TokenChecker.getInstance();
