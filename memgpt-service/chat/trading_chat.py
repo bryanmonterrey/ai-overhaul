@@ -294,6 +294,10 @@ class TradingChat:
                         'connected': True
                     })
                 }
+
+                if wallet_info and hasattr(wallet_info, 'get') and wallet_info.get('signature'):
+                    params['wallet']['credentials']['signature'] = wallet_info['signature']
+
             except Exception as e:
                 logging.error(f"Error formatting wallet info: {str(e)}")
                 return {
