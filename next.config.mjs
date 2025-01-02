@@ -1,100 +1,89 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    reactStrictMode: true,
-    transpilePackages: [
-        '@solana/wallet-adapter-base',
-        '@solana/wallet-adapter-react',
-        '@solana/wallet-adapter-react-ui',
-        '@solana/wallet-adapter-wallets'
-    ],
-    webpack: (config, { isServer }) => {
-        if (!isServer) {
-            config.resolve = {
-                ...config.resolve,
-                fallback: {
-                    ...config.resolve?.fallback,
-                    fs: false,
-                    net: false,
-                    tls: false,
-                    crypto: false,
-                    stream: false,
-                    buffer: false
-                }
-            }
-        }
+  reactStrictMode: true,
+  transpilePackages: [
+      '@solana/wallet-adapter-base',
+      '@solana/wallet-adapter-react',
+      '@solana/wallet-adapter-react-ui',
+      '@solana/wallet-adapter-wallets'
+  ],
+  webpack: (config, { isServer }) => {
+      if (!isServer) {
+          config.resolve = {
+              ...config.resolve,
+              fallback: {
+                  ...config.resolve?.fallback,
+                  fs: false,
+                  net: false,
+                  tls: false,
+                  crypto: false,
+                  stream: false,
+                  buffer: false
+              }
+          }
+      }
 
-        config.resolve.alias = {
-            ...config.resolve.alias,
-            'twitter-api-v2': isServer 
-                ? 'twitter-api-v2/dist/esm/index.js'
-                : 'twitter-api-v2/dist/esm/index.browser.js'
-        }
+      config.resolve.alias = {
+          ...config.resolve.alias,
+          'twitter-api-v2': isServer 
+              ? 'twitter-api-v2/dist/esm/index.js'
+              : 'twitter-api-v2/dist/esm/index.browser.js'
+      }
 
-        config.module.rules.push({
-            test: /\.m?js$/,
-            resolve: {
-                fullySpecified: false,
-            }
-        });
+      config.module.rules.push({
+          test: /\.m?js$/,
+          resolve: {
+              fullySpecified: false,
+          }
+      });
 
-        return config
-    },
-    experimental: {
-        serverActions: {
-            bodySizeLimit: '2mb'
-        },
-        esmExternals: true,
-        // Add these new configurations
-        serverComponentsExternalPackages: [
-            '@solana/web3.js',
-            'rpc-websockets',
-            'solana-agent-kit'
-        ]
-    },
-    serverExternalPackages: [
-        'twitter-api-v2',
-        '@solana/web3.js',
-        'rpc-websockets',
-        'solana-agent-kit'
-    ],
-    typescript: {
-        ignoreBuildErrors: true
-    },
-    eslint: {
-        ignoreDuringBuilds: true
-    },
-    headers() {
+      return config
+  },
+  experimental: {
+      serverActions: {
+          bodySizeLimit: '2mb'
+      },
+      esmExternals: true
+  },
+  serverExternalPackages: ['twitter-api-v2'],
+  typescript: {
+      ignoreBuildErrors: true
+  },
+  eslint: {
+      ignoreDuringBuilds: true
+  },
+  headers() {
+      return [
+          {
+              source: '/api/twitter/:path*',
+              headers: [
+                  { key: 'Cache-Control', value: 'no-store, must-revalidate' },
+                  { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
+                  { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' }
+              ]
+          }
+      ]
+  },
+  async rewrites() {
+      if (process.env.NODE_ENV === 'development') {
         return [
-            {
-                source: '/api/twitter/:path*',
-                headers: [
-                    { key: 'Cache-Control', value: 'no-store, must-revalidate' },
-                    { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-                    { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' }
-                ]
-            }
-        ]
-    },
-    async rewrites() {
-        if (process.env.NODE_ENV === 'development') {
-            return [
-                {
-                    source: '/api/memory/:path*',
-                    destination: 'http://localhost:3001/:path*'
-                }
-            ];
-        } else {
-            if (!process.env.NEXT_PUBLIC_PYTHON_API_URL) {
-                console.warn('NEXT_PUBLIC_PYTHON_API_URL not set in production!');
-            }
-            return [
-                {
-                    source: '/api/memory/:path*',
-                    destination: `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/:path*`
-                }
-            ];
+          {
+            source: '/api/memory/:path*',
+            destination: 'http://localhost:3001/:path*'
+          }
+        ];
+      } else {
+        if (!process.env.NEXT_PUBLIC_PYTHON_API_URL) {
+          console.warn('NEXT_PUBLIC_PYTHON_API_URL not set in production!');
         }
-    }
+        return [
+          {
+            source: '/api/memory/:path*',
+            destination: `${process.env.NEXT_PUBLIC_PYTHON_API_URL}/:path*`
+          }
+        ];
+      }
+  }
 }
 
 export default nextConfig
