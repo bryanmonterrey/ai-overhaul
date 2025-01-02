@@ -7,11 +7,12 @@ import { TradingSessionManager } from '../../lib/session-manager';
 import { verifySession } from '../../lib/auth/session-verification';
 import { SolanaAgentKit } from 'solana-agent-kit';
 import { Keypair } from '@solana/web3.js';
+import { ExtendedSolanaAgentKit } from '../../trading/services/extended-agent-kit'; 
 
 export const runtime = 'nodejs';
 
 // Store active agent-kit instances
-const activeKits = new Map<string, { kit: SolanaAgentKit, expiresAt: number }>();
+const activeKits = new Map<string, { kit: ExtendedSolanaAgentKit, expiresAt: number }>();
 
 const READONLY_KEYPAIR = Keypair.generate();
 const READONLY_KEY = READONLY_KEYPAIR.publicKey.toBase58();
@@ -55,8 +56,8 @@ export async function POST(req: Request) {
         });
       }
 
-      const kit = new SolanaAgentKit(
-        READONLY_KEY,
+      const kit = new ExtendedSolanaAgentKit(
+        'readonly',
         process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
         process.env.OPENAI_API_KEY!
       );
