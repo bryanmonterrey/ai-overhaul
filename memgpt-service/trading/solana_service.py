@@ -72,17 +72,25 @@ class SolanaService:
             logging.info(f"Making request to {self.agent_kit_url}")
             logging.info(f"Request payload: action={action}, params={params}")
             
-            # Extract session signature if available in wallet info
             headers = {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
             }
             
+            # Extract session signature from all possible locations
             wallet_info = params.get('wallet', {})
             if isinstance(wallet_info, dict):
-                credentials = wallet_info.get('credentials', {})
-                if isinstance(credentials, dict) and 'signature' in credentials:
-                    headers['X-Trading-Session'] = credentials['signature']
+                # Try the new location first
+                session_sig = wallet_info.get('signature')
+                if not session_sig:
+                    # Try the legacy locations
+                    session_sig = (
+                        wallet_info.get('credentials', {}).get('signature') or
+                        wallet_info.get('credentials', {}).get('sessionProof')
+                    )
+                
+                if session_sig:
+                    headers['X-Trading-Session'] = session_sig
                     logging.info("Added session signature to headers")
             
             async with aiohttp.ClientSession() as session:
@@ -162,14 +170,18 @@ class SolanaService:
         try:
             # Check for session signature first
             if wallet_info := params.get('wallet'):
-                session_proof = wallet_info.get('credentials', {}).get('sessionProof')
+                # First try the new location
+                session_proof = wallet_info.get('signature')
                 if not session_proof:
-                    # Try to get an existing session
+                    # Try the legacy location
+                    session_proof = wallet_info.get('credentials', {}).get('sessionProof')
+                    
+                if not session_proof:
+                    # Initialize new session
                     try:
                         session_result = await self.init_trading_session(wallet_info)
                         if not session_result.get('success'):
                             if session_result.get('error') == 'session_signature_required':
-                                # Need frontend to sign the session message
                                 return {
                                     'success': False,
                                     'error': 'session_required',
@@ -180,9 +192,10 @@ class SolanaService:
                             
                         # Update wallet credentials with session info    
                         if session_token := session_result.get('sessionId'):
+                            wallet_info['signature'] = session_token  # Store directly in wallet_info
                             if isinstance(wallet_info.get('credentials'), dict):
-                                wallet_info['credentials']['signature'] = session_token
-                                logging.info("Added session token to wallet credentials")
+                                wallet_info['credentials']['signature'] = session_token  # Also store in credentials for backwards compatibility
+                            logging.info("Added session token to wallet info")
                     except Exception as e:
                         logging.error(f"Failed to initialize session: {str(e)}")
                         raise ValueError(f"Session initialization failed: {str(e)}")
