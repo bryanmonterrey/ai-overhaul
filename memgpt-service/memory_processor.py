@@ -637,15 +637,23 @@ class MemoryProcessor:
         except Exception as e:
             self.logger.error(f"Error in memory maintenance: {str(e)}")
 
-    async def process_new_memory(self, content: str, metadata: Dict) -> Dict[str, Any]:
+    async def process_new_memory(self, content: str | Dict[str, Any], metadata: Dict[str, Any] = None) -> Dict[str, Any]:
         """Process and store new memory with all enhancements"""
         try:
+            # Handle dict content
+            if isinstance(content, dict):
+                content_str = json.dumps(content)
+            else:
+                content_str = str(content)
+
+            metadata = metadata or {}
+
             # Analyze content
-            analysis = await self.analyze_content(content)
+            analysis = await self.analyze_content(content_str)
             
             # Prepare memory data
             memory_data = {
-                'content': await compress_memory_content(content),
+                'content': await compress_memory_content(content_str),
                 'metadata': {
                     **metadata,
                     'analysis_version': '2.0',
@@ -661,45 +669,56 @@ class MemoryProcessor:
             }
             
             # Store in database
-            response = await self.agent.supabase.table('memories')\
-                .insert(memory_data)\
-                .execute()
+            try:
+                response = await self.agent.supabase.table('memories')\
+                    .insert(memory_data)\
+                    .execute()
             
-            if response.data:
+                if not response.data:
+                    raise ValueError("No data returned from memory storage")
+
                 memory_id = response.data[0]['id']
                 
                 # Store vector embedding
                 if 'vector_embedding' in analysis:
-                    await self.vector_store.store_vector(
-                        memory_id,
-                        np.array(analysis['vector_embedding'])
+                    try:
+                        await self.vector_store.store_vector(
+                            memory_id,
+                            np.array(analysis['vector_embedding'])
+                        )
+                    except Exception as ve:
+                        self.logger.warning(f"Failed to store vector embedding: {ve}")
+                
+                try:
+                    # Add to hierarchy if related memories exist
+                    similar = await self.find_most_similar(
+                        {'content': content_str},
+                        []  # Let the system find candidates
                     )
-                
-                # Add to hierarchy if related memories exist
-                similar = await self.find_most_similar(
-                    {'content': content},
-                    []  # Let the system find candidates
-                )
-                
-                if similar:
-                    await self.hierarchy.add_memory_relationship(
-                        similar.get('id'),
-                        memory_id,
-                        'semantic',
-                        similar.get('similarity', 0.5)
-                    )
-                
+                    
+                    if similar:
+                        await self.hierarchy.add_memory_relationship(
+                            similar.get('id'),
+                            memory_id,
+                            'semantic',
+                            similar.get('similarity', 0.5)
+                        )
+                except Exception as hierarchy_error:
+                    self.logger.warning(f"Failed to establish memory relationships: {hierarchy_error}")
+
                 return {
                     **memory_data,
                     'id': memory_id,
                     'analysis': analysis
                 }
-            
-            raise ValueError("Failed to store memory")
-            
+                
+            except Exception as db_error:
+                self.logger.error(f"Database operation failed: {db_error}")
+                return None
+
         except Exception as e:
             self.logger.error(f"Error processing new memory: {str(e)}")
-            raise
+            return None
 
     @staticmethod
     def get_memory_config() -> Dict[str, Any]:
