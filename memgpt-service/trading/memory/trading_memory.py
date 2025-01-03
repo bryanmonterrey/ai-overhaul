@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from memory_base import Memory
 from ..risk_helpers import RiskHelpers
 import json
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 @dataclass
 class TradingState:
@@ -30,20 +36,29 @@ class TradingMemory:
         self.realtime_monitor = None
 
     async def store_interaction(
-        self,
-        content: str,
-        response: Dict[str, Any],
-        metadata: Dict[str, Any]
-    ):
+    self,
+    content: str,
+    response: Dict[str, Any],
+    metadata: Dict[str, Any]
+):
         """Store trading interaction in memory"""
-        await self.memory_processor.process_new_memory(
-            content=content,
-            metadata={
-                **metadata,
-                "type": "trading_interaction",
-                "response": response
-            }
-        )
+        try:
+            if isinstance(content, str):
+                processed_content = content
+            else:
+                processed_content = json.dumps(content)
+
+            await self.memory_processor.process_new_memory(
+                content=processed_content,
+                metadata={
+                    **metadata,
+                    "type": "trading_interaction",
+                    "response": response
+                }
+            )
+        except Exception as e:
+            logging.error(f"Error storing interaction: {str(e)}")
+            raise
 
     async def get_relevant_context(
         self,
@@ -108,9 +123,10 @@ class TradingMemory:
                 }
             }
 
-            # Use process_new_memory instead of store_memory
+             # Process memory - key changes here
+            memory_content = json.dumps(trade_memory["content"])
             result = await self.memory_processor.process_new_memory(
-                content=json.dumps(trade_memory["content"]),
+                content=memory_content,
                 metadata=trade_memory["metadata"]
             )
 

@@ -579,13 +579,18 @@ class TradeExecutionService {
         // For non-MEV trades
         if (typeof wallet.signTransaction === 'function' && swapTransaction instanceof Transaction) {
           await wallet.signTransaction(swapTransaction);
-          const signature = await this.connection.sendRawTransaction(
-            swapTransaction.serialize({
-              requireAllSignatures: false,
-              verifySignatures: false
-            })
-          );
-          signatures.push(signature);
+          try {
+            const signature = await this.connection.sendRawTransaction(
+              swapTransaction.serialize({
+                requireAllSignatures: false,
+                verifySignatures: false
+              })
+            );
+            signatures.push(signature);
+          } catch (error) {
+            console.error('Transaction send error:', error);
+            throw error;
+          }
         } else {
           throw new Error('Invalid transaction or wallet');
         }
