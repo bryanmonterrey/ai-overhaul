@@ -1,21 +1,15 @@
 // app/api/agent-kit/route.ts
-
 import { NextResponse } from 'next/server';
 import { tradeExecution } from '../../trading/services/execution';
 import { PublicKey } from '@solana/web3.js';
 import { TradingSessionManager } from '../../lib/session-manager';
 import { verifySession } from '../../lib/auth/session-verification';
-import { SolanaAgentKit } from 'solana-agent-kit';
-import { Keypair } from '@solana/web3.js';
 import { ExtendedSolanaAgentKit } from '../../trading/services/extended-agent-kit'; 
 
 export const runtime = 'nodejs';
 
 // Store active agent-kit instances
 const activeKits = new Map<string, { kit: ExtendedSolanaAgentKit, expiresAt: number }>();
-
-const READONLY_KEYPAIR = Keypair.generate();
-const READONLY_KEY = READONLY_KEYPAIR.publicKey.toBase58();
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
@@ -56,11 +50,17 @@ export async function POST(req: Request) {
         });
       }
 
-      const kit = new ExtendedSolanaAgentKit(
-        'readonly',
-        process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
-        process.env.OPENAI_API_KEY!
-      );
+      let kit: ExtendedSolanaAgentKit;
+      try {
+        kit = new ExtendedSolanaAgentKit(
+          'readonly',
+          process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
+          process.env.OPENAI_API_KEY!
+        );
+      } catch (error) {
+        console.error('Failed to initialize ExtendedSolanaAgentKit:', error);
+        throw error;
+      }
 
       const sessionId = params.wallet.publicKey;
       activeKits.set(sessionId, {
@@ -79,6 +79,7 @@ export async function POST(req: Request) {
       });
     }
 
+    // Verify trading session for actions that require authentication
     if (['trade', 'validateTransaction'].includes(action)) {
       const sessionSignature = req.headers.get('X-Trading-Session');
       

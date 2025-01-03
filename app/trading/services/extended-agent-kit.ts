@@ -15,7 +15,7 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
     private readonly isReadonly: boolean;
 
     constructor(
-        key: string,
+        key: string | 'readonly',
         rpcUrl: string,
         openaiApiKey: string
     ) {
