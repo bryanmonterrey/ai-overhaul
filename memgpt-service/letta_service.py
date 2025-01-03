@@ -1386,6 +1386,7 @@ async def admin_chat_endpoint(request: Request):
 
             # Pass wallet info to process_admin_message
             wallet_info = data.get('wallet', {})
+            print("getting wallet_info:", wallet_info)
             
             result = await app.state.memgpt_service.trading_chat.process_admin_message(
                 message=last_message,
