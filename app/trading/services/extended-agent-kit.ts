@@ -12,6 +12,25 @@ import {
 } from '../types/agent-kit';
 
 export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAgentKit {
+
+      constructor(
+        key: string,
+        rpcUrl: string,
+        openaiApiKey: string
+    ) {
+        // If key is 'readonly', use a valid base58 public key
+        const baseKey = key === 'readonly' 
+            ? '11111111111111111111111111111111' // System Program address
+            : key;
+            
+        super(baseKey, rpcUrl, openaiApiKey);
+        
+        // Store the original key type
+        this.isReadonly = key === 'readonly';
+    }
+
+    private isReadonly: boolean;
+
     // Session management
     async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {
       return {
