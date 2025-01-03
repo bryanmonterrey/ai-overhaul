@@ -15,6 +15,7 @@ import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { PublicKey } from '@solana/web3.js';
 import { SignerWalletAdapterProps } from '@solana/wallet-adapter-base';
+import bs58 from 'bs58';
 
 // Updated interfaces for session management
 interface TradeSession {
@@ -244,7 +245,7 @@ export function AdminTradingChat() {
 
       const session: TradeSession = {
         publicKey: publicKey.toString(),
-        signature: Buffer.from(signature).toString('base64'),
+        signature: bs58.encode(signature),  // Use base58 instead of base64
         timestamp: Date.now(),
         expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
       };
@@ -419,6 +420,7 @@ export function AdminTradingChat() {
             sessionSignature: activeSession?.signature,
             credentials: {
               publicKey: publicKey.toString(),
+              signature: activeSession?.signature,
               signTransaction: !!signTransaction,
               signAllTransactions: !!signAllTransactions,
               connected

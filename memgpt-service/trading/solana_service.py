@@ -232,48 +232,46 @@ class SolanaService:
         return Decimal(str(result.get('price', 0)))
 
     async def get_token_info(self, symbol_or_address: str) -> Dict[str, Any]:
-        """Dynamically get token info from Jupiter API or agent-kit"""
+        """Dynamically get token info from Jupiter API or on-chain"""
         try:
             # Check if it's a known token first
-            symbol = symbol_or_address.upper()
-            if address := self.token_addresses.get(symbol):
-                result = {
-                    'symbol': symbol,
-                    'address': address,
-                    'verified': True,
-                    'decimals': 9  # Default for known tokens
-                }
-            else:
-                # Use agent-kit to get token data
-                params = {
-                    'symbol': symbol if len(symbol_or_address) < 44 else None,
-                    'mint': symbol_or_address if len(symbol_or_address) == 44 else None,
-                    'discover': True
-                }
-
-                try:
-                    result = await self._call_agent_kit('getTokenData', params)
-                    if result.get('success') and result.get('data'):
-                        result = result['data']
-                    else:
-                        logging.warning(f"Token data not found, using basic info for: {symbol_or_address}")
-                        result = {
-                            'symbol': symbol,
-                            'address': symbol_or_address if len(symbol_or_address) == 44 else None,
-                            'verified': False,
-                            'decimals': 9
-                        }
-                except Exception as api_error:
-                    logging.error(f"Agent-kit token lookup failed: {str(api_error)}")
-                    # Fallback to basic info
-                    result = {
+            if symbol := symbol_or_address.upper():
+                if address := self.token_addresses.get(symbol):
+                    return {
                         'symbol': symbol,
-                        'address': symbol_or_address if len(symbol_or_address) == 44 else None,
-                        'verified': False,
-                        'decimals': 9
+                        'address': address,
+                        'verified': True
                     }
 
-            return result
+            # Try Jupiter token list
+            jupiter_url = "https://token.jup.ag/all"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(jupiter_url) as response:
+                    if response.ok:
+                        token_list = await response.json()
+                        # Look for exact matches first
+                        token = next((t for t in token_list 
+                            if t['symbol'].upper() == symbol_or_address.upper() or 
+                            t['address'] == symbol_or_address), None)
+                        
+                        if token:
+                            return {
+                                'symbol': token['symbol'],
+                                'address': token['address'],
+                                'verified': True,
+                                'decimals': token.get('decimals', 9)
+                            }
+
+            # If it looks like an address, treat as unverified token
+            if len(symbol_or_address) == 44:
+                return {
+                    'symbol': symbol_or_address[:8],  # Short version of address
+                    'address': symbol_or_address,
+                    'verified': False,
+                    'decimals': 9
+                }
+
+            raise ValueError(f"Could not find token info for: {symbol_or_address}")
 
         except Exception as e:
             logging.error(f"Error getting token info: {str(e)}")
