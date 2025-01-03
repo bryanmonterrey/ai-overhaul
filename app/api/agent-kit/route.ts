@@ -1,15 +1,15 @@
 // app/api/agent-kit/route.ts
+
 import { NextResponse } from 'next/server';
-import { tradeExecution } from '../../trading/services/execution';
-import { PublicKey } from '@solana/web3.js';
-import { TradingSessionManager } from '../../lib/session-manager';
 import { verifySession } from '../../lib/auth/session-verification';
-import { ExtendedSolanaAgentKit } from '../../trading/services/extended-agent-kit'; 
+import { tradeExecution } from '../../trading/services/execution';
+import { ExtendedSolanaAgentKit } from '../../trading/services/extended-agent-kit';
 
 export const runtime = 'nodejs';
 
 // Store active agent-kit instances
 const activeKits = new Map<string, { kit: ExtendedSolanaAgentKit, expiresAt: number }>();
+
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
@@ -20,13 +20,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     console.log('Request body:', body);
-    
+
     const { action, params } = body;
-    
+
     if (!action) {
-      return NextResponse.json({ 
-        error: 'Missing action parameter' 
-      }, { 
+      return NextResponse.json({
+        error: 'Missing action parameter'
+      }, {
         status: 400,
         headers: {
           'Content-Type': 'application/json'
@@ -39,10 +39,10 @@ export async function POST(req: Request) {
     // Initialize agent-kit for sessions if needed
     if (action === 'initSession') {
       if (!params?.wallet?.publicKey || !params?.wallet?.signature) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Wallet and signature required for session initialization',
           code: 'INVALID_SESSION_PARAMS'
-        }, { 
+        }, {
           status: 400,
           headers: {
             'Content-Type': 'application/json'
@@ -50,17 +50,11 @@ export async function POST(req: Request) {
         });
       }
 
-      let kit: ExtendedSolanaAgentKit;
-      try {
-        kit = new ExtendedSolanaAgentKit(
-          'readonly',
-          process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
-          process.env.OPENAI_API_KEY!
-        );
-      } catch (error) {
-        console.error('Failed to initialize ExtendedSolanaAgentKit:', error);
-        throw error;
-      }
+      const kit = new ExtendedSolanaAgentKit(
+        'readonly',
+        process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        process.env.OPENAI_API_KEY!
+      );
 
       const sessionId = params.wallet.publicKey;
       activeKits.set(sessionId, {
@@ -79,15 +73,14 @@ export async function POST(req: Request) {
       });
     }
 
-    // Verify trading session for actions that require authentication
     if (['trade', 'validateTransaction'].includes(action)) {
       const sessionSignature = req.headers.get('X-Trading-Session');
-      
+
       if (!sessionSignature) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'No trading session found',
           code: 'SESSION_REQUIRED'
-        }, { 
+        }, {
           status: 401,
           headers: {
             'Content-Type': 'application/json'
@@ -96,10 +89,10 @@ export async function POST(req: Request) {
       }
 
       if (!params?.wallet?.publicKey) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Wallet public key required',
           code: 'INVALID_WALLET'
-        }, { 
+        }, {
           status: 400,
           headers: {
             'Content-Type': 'application/json'
@@ -111,10 +104,10 @@ export async function POST(req: Request) {
       const kitSession = activeKits.get(params.wallet.publicKey);
       if (!kitSession || Date.now() > kitSession.expiresAt) {
         activeKits.delete(params.wallet.publicKey);
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Session expired',
           code: 'SESSION_EXPIRED'
-        }, { 
+        }, {
           status: 401,
           headers: {
             'Content-Type': 'application/json'
@@ -129,10 +122,10 @@ export async function POST(req: Request) {
       );
 
       if (!isValidSession) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Invalid session signature',
           code: 'SESSION_INVALID'
-        }, { 
+        }, {
           status: 401,
           headers: {
             'Content-Type': 'application/json'
@@ -144,12 +137,12 @@ export async function POST(req: Request) {
       params.kit = kitSession.kit;
     }
 
-    switch(action) {
+    switch (action) {
       case 'trade':
         if (!params?.wallet) {
-          return NextResponse.json({ 
-            error: 'Wallet required for trade' 
-          }, { 
+          return NextResponse.json({
+            error: 'Wallet required for trade'
+          }, {
             status: 400,
             headers: {
               'Content-Type': 'application/json'
@@ -165,9 +158,9 @@ export async function POST(req: Request) {
 
       case 'validateSession':
         if (!params?.sessionSignature || !params?.publicKey) {
-          return NextResponse.json({ 
+          return NextResponse.json({
             error: 'Session signature and public key required'
-          }, { 
+          }, {
             status: 400,
             headers: {
               'Content-Type': 'application/json'
@@ -179,7 +172,7 @@ export async function POST(req: Request) {
           params.sessionSignature
         );
         const kitSession = activeKits.get(params.publicKey);
-        return NextResponse.json({ 
+        return NextResponse.json({
           valid: sessionValid && !!kitSession && Date.now() <= kitSession.expiresAt,
           timestamp: new Date().toISOString()
         }, {
@@ -187,13 +180,13 @@ export async function POST(req: Request) {
             'Content-Type': 'application/json'
           }
         });
-        
+
       default:
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Invalid action',
           action: action,
           supported: ['initSession', 'trade', 'getTokenData', 'getPrice', 'getRoutes', 'validateTransaction', 'validateSession']
-        }, { 
+        }, {
           status: 400,
           headers: {
             'Content-Type': 'application/json'
@@ -207,15 +200,15 @@ export async function POST(req: Request) {
       stack: error.stack,
       cause: error.cause
     });
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       error: error.message,
       type: error.name,
       details: process.env.NODE_ENV === 'development' ? {
         stack: error.stack,
         cause: error.cause
       } : undefined
-    }, { 
+    }, {
       status: 500,
       headers: {
         'Content-Type': 'application/json'
