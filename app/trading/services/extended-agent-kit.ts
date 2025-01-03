@@ -19,9 +19,9 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
       rpcUrl: string,
       openaiApiKey: string
   ) {
-      // Use a valid 32-byte base58 encoded private key for readonly mode
+      // Use a valid 64-character (32-byte) base58 encoded private key for readonly mode
       const baseKey = key === 'readonly' 
-          ? '11111111111111111111111111111111111111111111111111111111111111' 
+          ? '4'.repeat(64) // 64-character mock private key
           : key;
           
       super(baseKey, rpcUrl, openaiApiKey);

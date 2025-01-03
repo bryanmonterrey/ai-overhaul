@@ -36,6 +36,24 @@ export async function POST(req: Request) {
 
     console.log('Processing action:', action, 'with params:', params);
 
+    // Before initializing the kit, add error checks for environment variables
+if (!process.env.NEXT_PUBLIC_RPC_URL) {
+  console.error('Missing RPC URL environment variable');
+  return NextResponse.json({
+      error: 'Server configuration error',
+      code: 'MISSING_CONFIG'
+  }, { status: 500 });
+}
+
+if (!process.env.OPENAI_API_KEY) {
+  console.error('Missing OpenAI API key environment variable');
+  return NextResponse.json({
+      error: 'Server configuration error',
+      code: 'MISSING_CONFIG'
+  }, { status: 500 });
+}
+
+
     // Initialize agent-kit for sessions if needed
     if (action === 'initSession') {
       if (!params?.wallet?.publicKey || !params?.wallet?.signature) {
@@ -49,6 +67,8 @@ export async function POST(req: Request) {
           }
         });
       }
+
+
 
       const kit = new ExtendedSolanaAgentKit(
         'readonly',
