@@ -479,6 +479,37 @@ class HolderTradingService {
     return response.json();
   }
 
+  async getTokenBalance(userAddress: string) {
+    const response = await fetch(`${this.baseUrl}/balance/${userAddress}`);
+  
+    if (!response.ok) {
+      throw new Error('Failed to fetch token balance');
+    }
+  
+    return response.json();
+  }
+  
+  // Toggle Trading
+  async toggleTrading(userAddress: string, enabled: boolean) {
+    const response = await fetch(`${this.baseUrl}/toggle-trading`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Address': userAddress
+      },
+      body: JSON.stringify({
+        enabled,
+        userAddress
+      })
+    });
+  
+    if (!response.ok) {
+      throw new Error('Failed to toggle trading status');
+    }
+  
+    return response.json();
+  }
+
   // Clear Holder Session
   async clearHolderSession(userAddress: string) {
     const userCallbacks = this.tradeStatusCallbacks.get(userAddress);
