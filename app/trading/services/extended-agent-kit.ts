@@ -1,5 +1,5 @@
 import { SolanaAgentKit } from 'solana-agent-kit';
-import { PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import Decimal from 'decimal.js';
 import type { JupiterTokenData } from 'solana-agent-kit'; 
@@ -10,28 +10,33 @@ import {
   TokenDeploymentResponse,
   NFTMintResponse 
 } from '../types/agent-kit';
+import { Buffer } from 'buffer';
 
-function generateMockBase58Key(): string {
-  // Generate a valid base58 encoded 32-byte key for readonly mode
-  return 'X'.repeat(32).split('').map(() => '1').join('');
+import bs58 from 'bs58';
+
+function generateReadOnlyKey(): string {
+  // Generate a proper Solana keypair for readonly mode
+  const keypair = Keypair.generate();
+  // Convert to base58 string
+  return bs58.encode(keypair.secretKey);
 }
 
 export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAgentKit {
   private readonly isReadonly: boolean;
 
   constructor(
-      key: string | 'readonly',
-      rpcUrl: string,
-      openaiApiKey: string
-  ) {
-      // Use a valid base58 encoded 32-byte key for readonly mode
-      const baseKey = key === 'readonly' 
-          ? generateMockBase58Key()
-          : key;
-      
-      super(baseKey, rpcUrl, openaiApiKey);
-      this.isReadonly = key === 'readonly';
-  }
+    key: string | 'readonly',
+    rpcUrl: string,
+    openaiApiKey: string
+) {
+    // Generate a valid Solana keypair for readonly mode
+    const baseKey = key === 'readonly' 
+        ? generateReadOnlyKey()
+        : key;
+        
+    super(baseKey, rpcUrl, openaiApiKey);
+    this.isReadonly = key === 'readonly';
+}
 
     // Session management
     async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {

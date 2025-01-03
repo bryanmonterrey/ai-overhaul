@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { verifySession } from '../../lib/auth/session-verification';
 import { tradeExecution } from '../../trading/services/execution';
 import { ExtendedSolanaAgentKit } from '../../trading/services/extended-agent-kit';
+import { Keypair } from '@solana/web3.js';
 
 export const runtime = 'nodejs';
 
@@ -20,6 +21,24 @@ function validateEnvironment() {
   if (!process.env.OPENAI_API_KEY) {
     console.error('Missing OpenAI API key environment variable');
     throw new Error('Server configuration error: Missing OpenAI API key');
+  }
+}
+
+// Helper function to create an agent kit instance
+function createAgentKit(): ExtendedSolanaAgentKit {
+  try {
+    // Generate a valid Solana keypair for readonly mode
+    const dummyKeypair = Keypair.generate();
+    const base58PrivateKey = Buffer.from(dummyKeypair.secretKey).toString('base64');
+
+    return new ExtendedSolanaAgentKit(
+      base58PrivateKey,
+      process.env.NEXT_PUBLIC_RPC_URL!,
+      process.env.OPENAI_API_KEY!
+    );
+  } catch (error: any) {
+    console.error('Failed to create agent kit:', error);
+    throw new Error(`Agent kit initialization failed: ${error.message}`);
   }
 }
 
@@ -65,12 +84,7 @@ export async function POST(req: Request) {
       }
 
       try {
-        const kit = new ExtendedSolanaAgentKit(
-          'readonly',
-          process.env.NEXT_PUBLIC_RPC_URL!,
-          process.env.OPENAI_API_KEY!
-        );
-
+        const kit = createAgentKit();
         const sessionId = params.wallet.publicKey;
         const sessionExpiry = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
 
