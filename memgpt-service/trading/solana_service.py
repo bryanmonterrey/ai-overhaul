@@ -134,24 +134,24 @@ class SolanaService:
             }
 
     async def _verify_token(self, asset: str) -> Dict[str, Any]:
-        """Verify and get token information"""
+        """Verify and get token information dynamically"""
         try:
-            # First try exact matches in token_addresses (both symbol and address)
+            # First check known tokens (keep this for fast lookups of common tokens)
             upper_asset = asset.upper()
-            for symbol, address in self.token_addresses.items():
-                if upper_asset == symbol or asset == address:
-                    return {
-                        'symbol': symbol,
-                        'address': address,
-                        'verified': True,
-                        'decimals': 9,
-                        'source': 'internal'
-                    }
+            if token_address := self.token_addresses.get(upper_asset):
+                return {
+                    'symbol': upper_asset,
+                    'address': token_address,
+                    'verified': True,
+                    'decimals': 9,
+                    'source': 'internal'
+                }
 
-            # For addresses, try getting direct token data
+            # For addresses, try direct lookup first
             if len(asset) == 44:
                 try:
-                    token_data = await self.get_token_data(asset)
+                    params = {'mint': asset}
+                    token_data = await self._call_agent_kit('getTokenData', params)
                     if token_data and token_data.get('success'):
                         return {
                             'symbol': token_data.get('symbol', asset[:8]),
@@ -161,25 +161,35 @@ class SolanaService:
                             'source': 'api'
                         }
                 except Exception as api_error:
-                    logging.warning(f"API token verification failed, proceeding with unverified token: {str(api_error)}")
-                    return {
-                        'symbol': asset[:8],
-                        'address': asset,
-                        'verified': False,
-                        'decimals': 9,
-                        'source': 'address'
-                    }
+                    logging.warning(f"Direct token lookup failed: {str(api_error)}")
 
-            # Try Jupiter API for symbol lookup as last resort
+            # Try ticker lookup through agent-kit
             try:
-                token_info = await self.get_token_info(asset)
-                if token_info and token_info.get('address'):
+                params = {
+                    'symbol': asset,
+                    'discover': True  # Tell agent-kit to try discovering the token
+                }
+                token_data = await self._call_agent_kit('getTokenData', params)
+                if token_data and token_data.get('success'):
                     return {
-                        **token_info,
+                        'symbol': token_data.get('symbol', asset),
+                        'address': token_data.get('address'),
+                        'verified': True,
+                        'decimals': token_data.get('decimals', 9),
                         'source': 'jupiter'
                     }
             except Exception as jup_error:
                 logging.warning(f"Jupiter token lookup failed: {str(jup_error)}")
+
+            # For addresses without API data, return unverified token info
+            if len(asset) == 44:
+                return {
+                    'symbol': asset[:8],
+                    'address': asset,
+                    'verified': False,
+                    'decimals': 9,
+                    'source': 'address'
+                }
 
             raise ValueError(f"Could not verify token: {asset}")
 
