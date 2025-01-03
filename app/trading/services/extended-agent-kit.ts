@@ -14,7 +14,7 @@ import { Buffer } from 'buffer';
 
 import bs58 from 'bs58';
 
-function generateReadOnlyKey(): string {
+export function generateReadOnlyKey(): string {
   // Generate a proper Solana keypair for readonly mode
   const keypair = Keypair.generate();
   // Convert to base58 string

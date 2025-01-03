@@ -5,6 +5,7 @@ import { verifySession } from '../../lib/auth/session-verification';
 import { tradeExecution } from '../../trading/services/execution';
 import { ExtendedSolanaAgentKit } from '../../trading/services/extended-agent-kit';
 import { Keypair } from '@solana/web3.js';
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 
 export const runtime = 'nodejs';
 
@@ -27,12 +28,8 @@ function validateEnvironment() {
 // Helper function to create an agent kit instance
 function createAgentKit(): ExtendedSolanaAgentKit {
   try {
-    // Generate a valid Solana keypair for readonly mode
-    const dummyKeypair = Keypair.generate();
-    const base58PrivateKey = Buffer.from(dummyKeypair.secretKey).toString('base64');
-
     return new ExtendedSolanaAgentKit(
-      base58PrivateKey,
+      'readonly',  // Use the 'readonly' flag instead of generating key here
       process.env.NEXT_PUBLIC_RPC_URL!,
       process.env.OPENAI_API_KEY!
     );
