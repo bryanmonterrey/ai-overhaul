@@ -200,6 +200,41 @@ export async function POST(req: Request) {
           }
         });
 
+        case 'getTokenData':
+    try {
+      const kit = createAgentKit();
+      let tokenData;
+      // Use the correct method based on params
+      if (params.symbol) {
+        tokenData = await kit.getTokenDataByTicker(params.symbol);
+      } else if (params.mint) {
+        tokenData = await kit.getTokenDataByAddress(params.mint);
+      } else {
+        return NextResponse.json({
+          error: 'Either symbol or mint address required'
+        }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, data: tokenData });
+    } catch (error: any) {
+      console.error('Token data error:', error);
+      return NextResponse.json({
+        error: 'Failed to fetch token data',
+        details: error.message
+      }, { status: 500 });
+    }
+
+    case 'getPrice':
+      try {
+        const kit = createAgentKit();
+        const price = await kit.fetchTokenPrice(params.mint);
+        return NextResponse.json({ success: true, price });
+      } catch (error: any) {
+        return NextResponse.json({
+          error: 'Failed to fetch price',
+          details: error.message
+        }, { status: 500 });
+      }
+
       case 'validateSession':
         if (!params?.sessionSignature || !params?.publicKey) {
           return NextResponse.json({

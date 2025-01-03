@@ -251,6 +251,26 @@ class SolanaService:
         })
         return Decimal(str(result.get('price', 0)))
 
+    async def get_token_info(self, symbol_or_address: str) -> Dict[str, Any]:
+        """Dynamically get token info from Jupiter API or on-chain"""
+        try:
+            # Use the correct parameter name for getTokenData
+            params = {
+                'symbol': symbol_or_address.upper() if len(symbol_or_address) < 44 else None,
+                'mint': symbol_or_address if len(symbol_or_address) == 44 else None,
+                'discover': True
+            }
+
+            result = await self._call_agent_kit('getTokenData', params)
+            if result.get('success'):
+                return result.get('data')
+
+            raise ValueError(f"Could not find token info for: {symbol_or_address}")
+
+        except Exception as e:
+            logging.error(f"Error getting token info: {str(e)}")
+            raise
+
     async def get_routes(self, input_mint: str, output_mint: str, amount: float) -> Dict[str, Any]:
         """Get routes through agent-kit"""
         return await self._call_agent_kit('getRoutes', {
