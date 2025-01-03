@@ -134,9 +134,9 @@ class SolanaService:
             }
 
     async def _verify_token(self, asset: str) -> Dict[str, Any]:
-        """Verify and get token information dynamically"""
+        """Verify and get token information using Jupiter's token list via agent-kit"""
         try:
-            # First check known tokens (keep this for fast lookups of common tokens)
+            # First check our known tokens for quick lookup
             upper_asset = asset.upper()
             if token_address := self.token_addresses.get(upper_asset):
                 return {
@@ -147,55 +147,68 @@ class SolanaService:
                     'source': 'internal'
                 }
 
-            # For addresses, try direct lookup first
-            if len(asset) == 44:
-                try:
+            # Try Jupiter API through agent-kit
+            try:
+                # If it looks like an address, try address lookup first
+                if len(asset) == 44:
                     params = {'mint': asset}
                     token_data = await self._call_agent_kit('getTokenData', params)
                     if token_data and token_data.get('success'):
                         return {
-                            'symbol': token_data.get('symbol', asset[:8]),
+                            'symbol': token_data.get('data', {}).get('symbol', asset[:8]),
                             'address': asset,
                             'verified': True,
-                            'decimals': token_data.get('decimals', 9),
-                            'source': 'api'
+                            'decimals': token_data.get('data', {}).get('decimals', 9),
+                            'source': 'jupiter_address'
                         }
-                except Exception as api_error:
-                    logging.warning(f"Direct token lookup failed: {str(api_error)}")
 
-            # Try ticker lookup through agent-kit
-            try:
+                # Try symbol lookup
                 params = {
                     'symbol': asset,
-                    'discover': True  # Tell agent-kit to try discovering the token
+                    'discover': True  # Enable Jupiter discovery
                 }
                 token_data = await self._call_agent_kit('getTokenData', params)
                 if token_data and token_data.get('success'):
+                    data = token_data.get('data', {})
                     return {
-                        'symbol': token_data.get('symbol', asset),
-                        'address': token_data.get('address'),
+                        'symbol': data.get('symbol', asset),
+                        'address': data.get('address'),
                         'verified': True,
-                        'decimals': token_data.get('decimals', 9),
-                        'source': 'jupiter'
+                        'decimals': data.get('decimals', 9),
+                        'source': 'jupiter_symbol'
                     }
-            except Exception as jup_error:
-                logging.warning(f"Jupiter token lookup failed: {str(jup_error)}")
 
-            # For addresses without API data, return unverified token info
-            if len(asset) == 44:
-                return {
-                    'symbol': asset[:8],
-                    'address': asset,
-                    'verified': False,
-                    'decimals': 9,
-                    'source': 'address'
-                }
+                # If symbol lookup failed but it's an address, return unverified
+                if len(asset) == 44:
+                    logging.warning(f"Token {asset} not found in Jupiter, proceeding as unverified address")
+                    return {
+                        'symbol': asset[:8],
+                        'address': asset,
+                        'verified': False,
+                        'decimals': 9,
+                        'source': 'unverified_address'
+                    }
 
-            raise ValueError(f"Could not verify token: {asset}")
+                # If we get here, token couldn't be verified at all
+                raise ValueError(f"Token not found: {asset}")
+
+            except Exception as api_error:
+                logging.error(f"Jupiter API error: {str(api_error)}")
+                
+                # If it's an address, we can still proceed unverified
+                if len(asset) == 44:
+                    return {
+                        'symbol': asset[:8],
+                        'address': asset,
+                        'verified': False,
+                        'decimals': 9,
+                        'source': 'fallback_address'
+                    }
+                raise  # Re-raise if not an address
 
         except Exception as e:
             logging.error(f"Token verification error: {str(e)}")
-            raise
+            raise ValueError(f"Could not verify token: {asset}")
 
     async def _call_agent_kit(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
