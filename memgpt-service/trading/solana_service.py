@@ -119,52 +119,6 @@ class SolanaService:
             logging.error(f"Agent-kit API call error: {str(e)}")
             raise
 
-
-    async def get_token_info(self, symbol_or_address: str) -> Dict[str, Any]:
-        """Dynamically get token info from Jupiter API or on-chain"""
-        try:
-            # Check if it's a known token first
-            if symbol := symbol_or_address.upper():
-                if address := self.token_addresses.get(symbol):
-                    return {
-                        'symbol': symbol,
-                        'address': address,
-                        'verified': True
-                    }
-
-            # Try Jupiter token list
-            jupiter_url = "https://token.jup.ag/all"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(jupiter_url) as response:
-                    if response.ok:
-                        token_list = await response.json()
-                        # Look for exact matches first
-                        token = next((t for t in token_list 
-                            if t['symbol'].upper() == symbol_or_address.upper() or 
-                            t['address'] == symbol_or_address), None)
-                        
-                        if token:
-                            return {
-                                'symbol': token['symbol'],
-                                'address': token['address'],
-                                'verified': True,
-                                'decimals': token.get('decimals', 9)
-                            }
-
-            # If it looks like an address, treat as unverified token
-            if len(symbol_or_address) == 44:
-                return {
-                    'symbol': symbol_or_address[:8],  # Short version of address
-                    'address': symbol_or_address,
-                    'verified': False,
-                    'decimals': 9
-                }
-
-            raise ValueError(f"Could not find token info for: {symbol_or_address}")
-
-        except Exception as e:
-            logging.error(f"Error getting token info: {str(e)}")
-            raise
         
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -200,15 +154,39 @@ class SolanaService:
                         logging.error(f"Failed to initialize session: {str(e)}")
                         raise ValueError(f"Session initialization failed: {str(e)}")
 
-            # Get token data from params or lookup
-            symbol = params['asset'].upper()
-            token_address = self.token_addresses.get(symbol)
+            # Get token info and validate
+            try:
+                token_info = await self.get_token_info(params['asset'])
+                params['token_data'] = token_info  # Add token data to params
+                token_address = token_info.get('address')
                 
-            if not token_address:
-                if len(params['asset']) == 44:
-                    token_address = params['asset']
-                else:
-                    raise ValueError(f"Unknown token: {params['asset']}")
+                if not token_address:
+                    if len(params['asset']) == 44:
+                        token_address = params['asset']
+                    else:
+                        raise ValueError(f"Unknown token: {params['asset']}")
+                        
+            except Exception as token_error:
+                logging.error(f"Error getting token info: {str(token_error)}")
+                logging.info("Proceeding with unverified token")
+                
+                # Fallback to direct address or lookup
+                symbol = params['asset'].upper()
+                token_address = self.token_addresses.get(symbol)
+                
+                if not token_address:
+                    if len(params['asset']) == 44:
+                        token_address = params['asset']
+                    else:
+                        raise ValueError(f"Unknown token: {params['asset']}")
+                        
+                # Set basic token data
+                params['token_data'] = {
+                    'symbol': symbol,
+                    'address': token_address,
+                    'verified': False,
+                    'decimals': 9  # Default decimals
+                }
 
             # Format parameters for agent-kit trade
             swap_params = {
@@ -217,7 +195,8 @@ class SolanaService:
                 'inputMint': self.token_addresses['SOL'],
                 'tokenIn': self.token_addresses['SOL'],
                 'tokenOut': token_address,
-                'slippageBps': params.get('slippage', 100)
+                'slippageBps': params.get('slippage', 100),
+                'token_data': params.get('token_data')  # Include token data
             }
             
             # Pass through wallet info without modification
@@ -233,6 +212,7 @@ class SolanaService:
                 'params': params,
                 'result': result,
                 'token_address': token_address,
+                'token_data': params.get('token_data'),  # Include token data in response
                 'timestamp': datetime.now().isoformat()
             }
 
@@ -252,20 +232,48 @@ class SolanaService:
         return Decimal(str(result.get('price', 0)))
 
     async def get_token_info(self, symbol_or_address: str) -> Dict[str, Any]:
-        """Dynamically get token info from Jupiter API or on-chain"""
+        """Dynamically get token info from Jupiter API or agent-kit"""
         try:
-            # Use the correct parameter name for getTokenData
-            params = {
-                'symbol': symbol_or_address.upper() if len(symbol_or_address) < 44 else None,
-                'mint': symbol_or_address if len(symbol_or_address) == 44 else None,
-                'discover': True
-            }
+            # Check if it's a known token first
+            symbol = symbol_or_address.upper()
+            if address := self.token_addresses.get(symbol):
+                result = {
+                    'symbol': symbol,
+                    'address': address,
+                    'verified': True,
+                    'decimals': 9  # Default for known tokens
+                }
+            else:
+                # Use agent-kit to get token data
+                params = {
+                    'symbol': symbol if len(symbol_or_address) < 44 else None,
+                    'mint': symbol_or_address if len(symbol_or_address) == 44 else None,
+                    'discover': True
+                }
 
-            result = await self._call_agent_kit('getTokenData', params)
-            if result.get('success'):
-                return result.get('data')
+                try:
+                    result = await self._call_agent_kit('getTokenData', params)
+                    if result.get('success') and result.get('data'):
+                        result = result['data']
+                    else:
+                        logging.warning(f"Token data not found, using basic info for: {symbol_or_address}")
+                        result = {
+                            'symbol': symbol,
+                            'address': symbol_or_address if len(symbol_or_address) == 44 else None,
+                            'verified': False,
+                            'decimals': 9
+                        }
+                except Exception as api_error:
+                    logging.error(f"Agent-kit token lookup failed: {str(api_error)}")
+                    # Fallback to basic info
+                    result = {
+                        'symbol': symbol,
+                        'address': symbol_or_address if len(symbol_or_address) == 44 else None,
+                        'verified': False,
+                        'decimals': 9
+                    }
 
-            raise ValueError(f"Could not find token info for: {symbol_or_address}")
+            return result
 
         except Exception as e:
             logging.error(f"Error getting token info: {str(e)}")
