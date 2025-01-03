@@ -21,7 +21,7 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
     ) {
         // If key is 'readonly', use a valid base58 public key
         const baseKey = key === 'readonly' 
-            ? '1111111111111111111111111111111111' // System Program address
+            ? '11111111111111111111111111111111' // System Program address
             : key;
             
         super(baseKey, rpcUrl, openaiApiKey);
