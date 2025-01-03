@@ -11,29 +11,27 @@ import {
   NFTMintResponse 
 } from '../types/agent-kit';
 
-function isValidKeySize(key: string): boolean {
-  return key.length === 64;
+function generateMockBase58Key(): string {
+  // Generate a valid base58 encoded 32-byte key for readonly mode
+  return 'X'.repeat(32).split('').map(() => '1').join('');
 }
 
 export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAgentKit {
   private readonly isReadonly: boolean;
 
   constructor(
-    key: string | 'readonly',
-    rpcUrl: string,
-    openaiApiKey: string
-) {
-    const baseKey = key === 'readonly' 
-        ? '4'.repeat(64)  // 64-character mock private key
-        : key;
-        
-    if (!isValidKeySize(baseKey)) {
-        throw new Error('Invalid key size. Key must be 64 characters long.');
-    }
-    
-    super(baseKey, rpcUrl, openaiApiKey);
-    this.isReadonly = key === 'readonly';
-}
+      key: string | 'readonly',
+      rpcUrl: string,
+      openaiApiKey: string
+  ) {
+      // Use a valid base58 encoded 32-byte key for readonly mode
+      const baseKey = key === 'readonly' 
+          ? generateMockBase58Key()
+          : key;
+      
+      super(baseKey, rpcUrl, openaiApiKey);
+      this.isReadonly = key === 'readonly';
+  }
 
     // Session management
     async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {

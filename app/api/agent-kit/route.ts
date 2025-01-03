@@ -10,6 +10,18 @@ export const runtime = 'nodejs';
 // Store active agent-kit instances
 const activeKits = new Map<string, { kit: ExtendedSolanaAgentKit, expiresAt: number }>();
 
+// Helper function to validate environment variables
+function validateEnvironment() {
+  if (!process.env.NEXT_PUBLIC_RPC_URL) {
+    console.error('Missing RPC URL environment variable');
+    throw new Error('Server configuration error: Missing RPC URL');
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('Missing OpenAI API key environment variable');
+    throw new Error('Server configuration error: Missing OpenAI API key');
+  }
+}
 
 export async function POST(req: Request) {
   console.log('Agent-kit API called with request:', {
@@ -18,6 +30,8 @@ export async function POST(req: Request) {
   });
 
   try {
+    validateEnvironment();
+
     const body = await req.json();
     console.log('Request body:', body);
 
@@ -36,24 +50,6 @@ export async function POST(req: Request) {
 
     console.log('Processing action:', action, 'with params:', params);
 
-    // Before initializing the kit, add error checks for environment variables
-if (!process.env.NEXT_PUBLIC_RPC_URL) {
-  console.error('Missing RPC URL environment variable');
-  return NextResponse.json({
-      error: 'Server configuration error',
-      code: 'MISSING_CONFIG'
-  }, { status: 500 });
-}
-
-if (!process.env.OPENAI_API_KEY) {
-  console.error('Missing OpenAI API key environment variable');
-  return NextResponse.json({
-      error: 'Server configuration error',
-      code: 'MISSING_CONFIG'
-  }, { status: 500 });
-}
-
-
     // Initialize agent-kit for sessions if needed
     if (action === 'initSession') {
       if (!params?.wallet?.publicKey || !params?.wallet?.signature) {
@@ -68,29 +64,43 @@ if (!process.env.OPENAI_API_KEY) {
         });
       }
 
+      try {
+        const kit = new ExtendedSolanaAgentKit(
+          'readonly',
+          process.env.NEXT_PUBLIC_RPC_URL!,
+          process.env.OPENAI_API_KEY!
+        );
 
+        const sessionId = params.wallet.publicKey;
+        const sessionExpiry = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
 
-      const kit = new ExtendedSolanaAgentKit(
-        'readonly',
-        process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com',
-        process.env.OPENAI_API_KEY!
-      );
+        activeKits.set(sessionId, {
+          kit,
+          expiresAt: sessionExpiry
+        });
 
-      const sessionId = params.wallet.publicKey;
-      activeKits.set(sessionId, {
-        kit,
-        expiresAt: Date.now() + (24 * 60 * 60 * 1000)
-      });
-
-      return NextResponse.json({
-        success: true,
-        sessionId,
-        expiresAt: Date.now() + (24 * 60 * 60 * 1000)
-      }, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+        return NextResponse.json({
+          success: true,
+          sessionId,
+          expiresAt: sessionExpiry
+        }, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (error: any) {
+        console.error('Failed to initialize agent-kit:', error);
+        return NextResponse.json({
+          error: 'Failed to initialize agent-kit',
+          details: error.message,
+          code: 'INIT_FAILED'
+        }, { 
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }
     }
 
     if (['trade', 'validateTransaction'].includes(action)) {
@@ -224,6 +234,7 @@ if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({
       error: error.message,
       type: error.name,
+      code: error.code || 'UNKNOWN_ERROR',
       details: process.env.NODE_ENV === 'development' ? {
         stack: error.stack,
         cause: error.cause
