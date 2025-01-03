@@ -38,8 +38,13 @@ class SolanaService:
     async def init_trading_session(self, wallet_info: Dict[str, Any]) -> Dict[str, Any]:
         """Initialize a trading session with agent-kit"""
         try:
-            # Get SignatureProof from frontend's signed message
-            signature = wallet_info.get('credentials', {}).get('sessionProof')
+            # Try all possible signature locations
+            signature = (
+                wallet_info.get('signature') or
+                wallet_info.get('credentials', {}).get('signature') or
+                wallet_info.get('credentials', {}).get('sessionProof')
+            )
+            
             if not signature:
                 # Generate session message and ask frontend to sign
                 return {
@@ -51,13 +56,28 @@ class SolanaService:
             init_params = {
                 'wallet': {
                     'publicKey': wallet_info['publicKey'],
-                    'signature': signature
+                    'signature': signature,
+                    'credentials': {
+                        'publicKey': wallet_info['publicKey'],
+                        'signature': signature,
+                        'signTransaction': wallet_info.get('credentials', {}).get('signTransaction', True),
+                        'signAllTransactions': wallet_info.get('credentials', {}).get('signAllTransactions', True),
+                        'connected': wallet_info.get('credentials', {}).get('connected', True)
+                    }
                 }
             }
             
+            logging.info(f"Initializing session with params: {init_params}")
             result = await self._call_agent_kit('initSession', init_params)
+            
             if result.get('success'):
                 logging.info("Session initialization successful")
+                
+                # Update wallet credentials with session info if provided
+                if session_id := result.get('sessionId'):
+                    init_params['wallet']['signature'] = session_id
+                    init_params['wallet']['credentials']['signature'] = session_id
+                    logging.info(f"Updated session ID: {session_id}")
             else:
                 logging.error(f"Session initialization failed: {result.get('error')}")
                 
@@ -65,6 +85,106 @@ class SolanaService:
             
         except Exception as e:
             logging.error(f"Session initialization error: {str(e)}")
+            raise
+
+    async def _verify_session(self, wallet_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Verify and initialize trading session if needed"""
+        try:
+            # First try the new location
+            session_proof = wallet_info.get('signature')
+            if not session_proof:
+                # Try the legacy location
+                session_proof = wallet_info.get('credentials', {}).get('sessionProof')
+                
+            if not session_proof:
+                # Initialize new session
+                try:
+                    session_result = await self.init_trading_session(wallet_info)
+                    if not session_result.get('success'):
+                        if session_result.get('error') == 'session_signature_required':
+                            return {
+                                'success': False,
+                                'error': 'session_required',
+                                'session_message': session_result.get('session_message'),
+                                'user_message': 'Please sign the message to start your trading session'
+                            }
+                        raise ValueError(f"Failed to initialize session: {session_result.get('error')}")
+                            
+                    # Update wallet credentials with session info    
+                    if session_token := session_result.get('sessionId'):
+                        wallet_info['signature'] = session_token  # Store directly in wallet_info
+                        if isinstance(wallet_info.get('credentials'), dict):
+                            wallet_info['credentials']['signature'] = session_token  # Also store in credentials for backwards compatibility
+                        logging.info("Added session token to wallet info")
+                except Exception as e:
+                    logging.error(f"Failed to initialize session: {str(e)}")
+                    raise ValueError(f"Session initialization failed: {str(e)}")
+
+            return {
+                'success': True,
+                'wallet_info': wallet_info
+            }
+
+        except Exception as e:
+            logging.error(f"Session verification error: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'user_message': 'Failed to verify trading session'
+            }
+
+    async def _verify_token(self, asset: str) -> Dict[str, Any]:
+        """Verify and get token information"""
+        try:
+            # First try exact matches in token_addresses (both symbol and address)
+            upper_asset = asset.upper()
+            for symbol, address in self.token_addresses.items():
+                if upper_asset == symbol or asset == address:
+                    return {
+                        'symbol': symbol,
+                        'address': address,
+                        'verified': True,
+                        'decimals': 9,
+                        'source': 'internal'
+                    }
+
+            # For addresses, try getting direct token data
+            if len(asset) == 44:
+                try:
+                    token_data = await self.get_token_data(asset)
+                    if token_data and token_data.get('success'):
+                        return {
+                            'symbol': token_data.get('symbol', asset[:8]),
+                            'address': asset,
+                            'verified': True,
+                            'decimals': token_data.get('decimals', 9),
+                            'source': 'api'
+                        }
+                except Exception as api_error:
+                    logging.warning(f"API token verification failed, proceeding with unverified token: {str(api_error)}")
+                    return {
+                        'symbol': asset[:8],
+                        'address': asset,
+                        'verified': False,
+                        'decimals': 9,
+                        'source': 'address'
+                    }
+
+            # Try Jupiter API for symbol lookup as last resort
+            try:
+                token_info = await self.get_token_info(asset)
+                if token_info and token_info.get('address'):
+                    return {
+                        **token_info,
+                        'source': 'jupiter'
+                    }
+            except Exception as jup_error:
+                logging.warning(f"Jupiter token lookup failed: {str(jup_error)}")
+
+            raise ValueError(f"Could not verify token: {asset}")
+
+        except Exception as e:
+            logging.error(f"Token verification error: {str(e)}")
             raise
 
     async def _call_agent_kit(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -119,73 +239,27 @@ class SolanaService:
             logging.error(f"Agent-kit API call error: {str(e)}")
             raise
 
-        
     async def execute_swap(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # Check for session signature first
+            # Verify session first if wallet info is provided
             if wallet_info := params.get('wallet'):
-                # First try the new location
-                session_proof = wallet_info.get('signature')
-                if not session_proof:
-                    # Try the legacy location
-                    session_proof = wallet_info.get('credentials', {}).get('sessionProof')
-                    
-                if not session_proof:
-                    # Initialize new session
-                    try:
-                        session_result = await self.init_trading_session(wallet_info)
-                        if not session_result.get('success'):
-                            if session_result.get('error') == 'session_signature_required':
-                                return {
-                                    'success': False,
-                                    'error': 'session_required',
-                                    'session_message': session_result.get('session_message'),
-                                    'user_message': 'Please sign the message to start your trading session'
-                                }
-                            raise ValueError(f"Failed to initialize session: {session_result.get('error')}")
-                            
-                        # Update wallet credentials with session info    
-                        if session_token := session_result.get('sessionId'):
-                            wallet_info['signature'] = session_token  # Store directly in wallet_info
-                            if isinstance(wallet_info.get('credentials'), dict):
-                                wallet_info['credentials']['signature'] = session_token  # Also store in credentials for backwards compatibility
-                            logging.info("Added session token to wallet info")
-                    except Exception as e:
-                        logging.error(f"Failed to initialize session: {str(e)}")
-                        raise ValueError(f"Session initialization failed: {str(e)}")
+                session_result = await self._verify_session(wallet_info)
+                if not session_result['success']:
+                    return session_result
+                params['wallet'] = session_result['wallet_info']
 
-            # Get token info and validate
+            # Verify token using the dedicated method
             try:
-                token_info = await self.get_token_info(params['asset'])
-                params['token_data'] = token_info  # Add token data to params
-                token_address = token_info.get('address')
-                
-                if not token_address:
-                    if len(params['asset']) == 44:
-                        token_address = params['asset']
-                    else:
-                        raise ValueError(f"Unknown token: {params['asset']}")
-                        
+                token_info = await self._verify_token(params['asset'])
+                params['token_data'] = token_info
+                token_address = token_info['address']  # _verify_token always returns address
             except Exception as token_error:
-                logging.error(f"Error getting token info: {str(token_error)}")
-                logging.info("Proceeding with unverified token")
-                
-                # Fallback to direct address or lookup
-                symbol = params['asset'].upper()
-                token_address = self.token_addresses.get(symbol)
-                
-                if not token_address:
-                    if len(params['asset']) == 44:
-                        token_address = params['asset']
-                    else:
-                        raise ValueError(f"Unknown token: {params['asset']}")
-                        
-                # Set basic token data
-                params['token_data'] = {
-                    'symbol': symbol,
-                    'address': token_address,
-                    'verified': False,
-                    'decimals': 9  # Default decimals
+                logging.error(f"Token verification failed: {str(token_error)}")
+                return {
+                    'success': False,
+                    'error': 'token_verification_failed',
+                    'details': str(token_error),
+                    'user_message': 'Could not verify token. Please check the symbol/address.'
                 }
 
             # Format parameters for agent-kit trade
@@ -196,7 +270,7 @@ class SolanaService:
                 'tokenIn': self.token_addresses['SOL'],
                 'tokenOut': token_address,
                 'slippageBps': params.get('slippage', 100),
-                'token_data': params.get('token_data')  # Include token data
+                'token_data': token_info  # Use verified token info
             }
             
             # Pass through wallet info without modification
@@ -205,20 +279,34 @@ class SolanaService:
 
             logging.info(f"Executing trade with params: {swap_params}")
             result = await self._call_agent_kit('trade', swap_params)
+
+            # Add this check here
+            if not result.get('success'):
+                return {
+                    'success': False,
+                    'error': result.get('error', 'Trade execution failed'),
+                    'details': result,
+                    'user_message': result.get('user_message', 'Failed to execute trade')
+                }
             
+            # Return successful response with complete trade info
             return {
                 'success': True,
                 'signature': result.get('signature'),
                 'params': params,
                 'result': result,
                 'token_address': token_address,
-                'token_data': params.get('token_data'),  # Include token data in response
+                'token_data': token_info,  # Use verified token info consistently
                 'timestamp': datetime.now().isoformat()
             }
 
         except Exception as e:
             logging.error(f"Swap execution error: {str(e)}")
-            raise
+            return {
+                'success': False,
+                'error': str(e),
+                'user_message': 'Failed to execute swap. Please try again.'
+            }
 
     async def get_token_data(self, token_address: str) -> Dict[str, Any]:
         """Get token data through agent-kit"""
@@ -234,13 +322,23 @@ class SolanaService:
     async def get_token_info(self, symbol_or_address: str) -> Dict[str, Any]:
         """Dynamically get token info from Jupiter API or on-chain"""
         try:
-            # Check if it's a known token first
-            if symbol := symbol_or_address.upper():
-                if address := self.token_addresses.get(symbol):
+            # Check known tokens first (IMPORTANT: Check before doing any uppercase)
+            if symbol_or_address.upper() in self.token_addresses:
+                return {
+                    'symbol': symbol_or_address.upper(),
+                    'address': self.token_addresses[symbol_or_address.upper()],
+                    'verified': True,
+                    'decimals': 9  # Default decimals for known tokens
+                }
+
+            # If it's an exact address match in token_addresses values
+            for symbol, address in self.token_addresses.items():
+                if symbol_or_address == address:
                     return {
                         'symbol': symbol,
                         'address': address,
-                        'verified': True
+                        'verified': True,
+                        'decimals': 9
                     }
 
             # Try Jupiter token list

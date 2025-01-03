@@ -375,7 +375,13 @@ class TradingChat:
                     
                     try:
                         execution_data = {
-                            "type": "trade_attempt",
+                            "type": "trade_execution",  # Changed from trade_attempt
+                            "tokenIn": trade_params.get('receive_asset'),
+                            "tokenOut": trade_params.get('asset'),
+                            "amountIn": str(trade_params.get('amount')),
+                            "amountOut": "0",  # Will be updated by actual execution
+                            "status": "pending",
+                            "txHash": None,
                             "data": {
                                 **trade_params,
                                 "original_amount": params['amount'],
