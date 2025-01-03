@@ -1,60 +1,98 @@
-// app/trading/admin/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { AITradingDashboard } from './components/AITradingDashboard';
-import { AdminTradingChat } from './components/AdminTradingChat';
+import { HolderDashboard } from '../holders/components/HolderDashboard';
+import { HolderTradingChat } from '../holders/components/HolderTradingChat';
+import { TokenChecker } from '../../lib/blockchain/token-checker';
 
-export default function AdminTradingPage() {
+export default function HolderTradingPage() {
   const supabase = createClientComponentClient();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAccess = async () => {
       try {
+        // Check if user is logged in
         const { data: { session } } = await supabase.auth.getSession();
-        
         if (!session) {
-          router.push('/admin/login');
+          router.push('/login');
           return;
         }
 
-        // Check if user is admin
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
+        // Check if token gating is enabled
+        const { data: settings } = await supabase
+          .from('admin_settings')
+          .select('*')
+          .eq('key', 'token_gate_enabled')
           .single();
 
-        if (roleData?.role !== 'admin') {
-          router.push('/');
-          return;
+        if (settings?.value) {
+          // Get user's wallet address from Supabase
+          const { data: userData } = await supabase
+            .from('users')
+            .select('wallet_address')
+            .eq('id', session.user.id)
+            .single();
+
+          if (!userData?.wallet_address) {
+            router.push('/insufficient-tokens');
+            return;
+          }
+
+          // Create token checker instance
+          const tokenChecker = new TokenChecker();
+          
+          // Check actual token holdings on-chain
+          const { isEligible, value } = await tokenChecker.checkEligibility(userData.wallet_address);
+
+          if (!isEligible) {
+            await supabase
+              .from('token_holders')
+              .upsert({
+                user_id: session.user.id,
+                wallet_address: userData.wallet_address,
+                dollar_value: value,
+                last_checked: new Date().toISOString()
+              }, {
+                onConflict: 'user_id'
+              });
+
+            router.push('/insufficient-tokens');
+            return;
+          }
+
+          setWalletAddress(userData.wallet_address);
         }
 
         setIsLoading(false);
       } catch (error) {
-        console.error('Error checking auth:', error);
-        router.push('/admin/login');
+        console.error('Error checking access:', error);
+        router.push('/login');
       }
     };
 
-    checkAuth();
+    checkAccess();
   }, [supabase, router]);
 
   if (isLoading) {
     return <div>Loading...</div>;
   }
 
+  if (!walletAddress) {
+    return null;
+  }
+
   return (
     <div className="container mx-auto p-6">
-        <div className="lg:col-span-2 mb-14">
-          <AdminTradingChat />
-        </div>
-      <h1 className="text-2xl font-bold mb-6">AI Trading Management</h1>
-      <AITradingDashboard />
+      <div className="lg:col-span-2 mb-14">
+        <HolderTradingChat userAddress={walletAddress} />
+      </div>
+      <h1 className="text-2xl font-bold mb-6">Trading Dashboard</h1>
+      <HolderDashboard userAddress={walletAddress} />
     </div>
   );
 }

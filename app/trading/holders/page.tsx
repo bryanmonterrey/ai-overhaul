@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { HolderDashboard } from './components/HolderDashboard';
+import { TokenBalance } from './components/TokenBalance';
+import { TradeSettings } from './components/TradeSettings';
+import { HolderTradingChat } from './components/HolderTradingChat';
 import { TokenChecker } from '../../lib/blockchain/token-checker';
 
 export default function HolderTradingPage() {
@@ -65,18 +68,6 @@ export default function HolderTradingPage() {
             return;
           }
 
-          // Update token holdings for eligible users
-          await supabase
-            .from('token_holders')
-            .upsert({
-              user_id: session.user.id,
-              wallet_address: userData.wallet_address,
-              dollar_value: value,
-              last_checked: new Date().toISOString()
-            }, {
-              onConflict: 'user_id'
-            });
-
           setWalletAddress(userData.wallet_address);
         }
 
@@ -98,10 +89,13 @@ export default function HolderTradingPage() {
     return null;
   }
 
-  return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Holder Trading Dashboard</h1>
-      <HolderDashboard userAddress={walletAddress} />
-    </div>
-  );
+    return (
+      <div className="container mx-auto p-6">
+        <div className="lg:col-span-2 mb-14">
+          <HolderTradingChat userAddress={walletAddress} />
+        </div>
+        <h1 className="text-2xl font-bold mb-6">Trading Dashboard</h1>
+        <HolderDashboard userAddress={walletAddress} />
+      </div>
+    );
 }
