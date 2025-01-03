@@ -12,8 +12,9 @@ import {
 } from '../types/agent-kit';
 
 export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAgentKit {
+    private readonly isReadonly: boolean;
 
-      constructor(
+    constructor(
         key: string,
         rpcUrl: string,
         openaiApiKey: string
@@ -24,15 +25,14 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
             : key;
             
         super(baseKey, rpcUrl, openaiApiKey);
-        
-        // Store the original key type
         this.isReadonly = key === 'readonly';
     }
 
-    private isReadonly: boolean;
-
     // Session management
     async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {
+      if (this.isReadonly && !params.wallet.sessionProof) {
+        throw new Error('Session proof required in readonly mode');
+      }
       return {
         success: true,
         sessionId: Math.random().toString(),
@@ -41,7 +41,7 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
     }
   
     async validateSession(sessionId: string): Promise<boolean> {
-      return true;
+      return !this.isReadonly;
     }
     
     // Token operations
@@ -75,129 +75,156 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
         decimals?: number,
         initialSupply?: number
       ): Promise<TokenDeploymentResponse> {
+        if (this.isReadonly) {
+          throw new Error('Cannot deploy tokens in readonly mode');
+        }
         const result = await super.deployToken(name, uri, symbol, decimals, initialSupply);
         return {
           success: true,
           mint: result.mint,
           timestamp: new Date().toISOString()
         };
-      }
+    }
     
-      async mintNFT(
+    async mintNFT(
         collectionMint: PublicKey,
         metadata: any,
         recipient?: PublicKey
-      ): Promise<NFTMintResponse> {
+    ): Promise<NFTMintResponse> {
+        if (this.isReadonly) {
+          throw new Error('Cannot mint NFTs in readonly mode');
+        }
         const result = await super.mintNFT(collectionMint, metadata, recipient);
         return {
           success: true,
           mint: result.mint,
           metadata: result.metadata,
           edition: result.mint,
-          signature: 'pending', // Since base doesn't provide signature
+          signature: 'pending',
           timestamp: new Date().toISOString()
         };
-      }
+    }
 
-      async pythFetchPrice(priceFeedID: string): Promise<string> {
+    async pythFetchPrice(priceFeedID: string): Promise<string> {
         return super.pythFetchPrice(priceFeedID);
-      }
+    }
 
-  // Pass through methods
-  async fetchTokenPrice(mint: string): Promise<string> {
-    return super.fetchTokenPrice(mint);
-  }
+    // Pass through methods with readonly checks
+    async fetchTokenPrice(mint: string): Promise<string> {
+        return super.fetchTokenPrice(mint);
+    }
 
-  async getTPS(): Promise<number> {
-    return super.getTPS();
-  }
+    async getTPS(): Promise<number> {
+        return super.getTPS();
+    }
 
-  async trade(outputMint: PublicKey, amount: number, inputMint: PublicKey, slippageBps: number): Promise<string> {
-    return super.trade(outputMint, amount, inputMint, slippageBps);
-  }
+    async trade(outputMint: PublicKey, amount: number, inputMint: PublicKey, slippageBps: number): Promise<string> {
+        if (this.isReadonly) {
+          throw new Error('Cannot execute trades in readonly mode');
+        }
+        return super.trade(outputMint, amount, inputMint, slippageBps);
+    }
 
-  async transfer(to: PublicKey, amount: number, mint?: PublicKey): Promise<string> {
-    return super.transfer(to, amount, mint);
-  }
+    async transfer(to: PublicKey, amount: number, mint?: PublicKey): Promise<string> {
+        if (this.isReadonly) {
+          throw new Error('Cannot execute transfers in readonly mode');
+        }
+        return super.transfer(to, amount, mint);
+    }
 
-  async getBalance(tokenAddress?: PublicKey): Promise<number> {
-    return super.getBalance(tokenAddress);
-  }
+    async getBalance(tokenAddress?: PublicKey): Promise<number> {
+        return super.getBalance(tokenAddress);
+    }
 
-  async lendAssets(amount: number): Promise<string> {
-    return super.lendAssets(amount);
-  }
+    async lendAssets(amount: number): Promise<string> {
+        if (this.isReadonly) {
+          throw new Error('Cannot lend assets in readonly mode');
+        }
+        return super.lendAssets(amount);
+    }
 
-  async stake(amount: number): Promise<string> {
-    return super.stake(amount);
-  }
+    async stake(amount: number): Promise<string> {
+        if (this.isReadonly) {
+          throw new Error('Cannot stake in readonly mode');
+        }
+        return super.stake(amount);
+    }
 
-  // Domain operations
-  async resolveAllDomains(domain: string): Promise<PublicKey | undefined> {
-    return super.resolveAllDomains(domain);
-  }
+    // Domain operations with readonly checks
+    async resolveAllDomains(domain: string): Promise<PublicKey | undefined> {
+        return super.resolveAllDomains(domain);
+    }
 
-  async getOwnedAllDomains(owner: PublicKey): Promise<string[]> {
-    return super.getOwnedAllDomains(owner);
-  }
+    async getOwnedAllDomains(owner: PublicKey): Promise<string[]> {
+        return super.getOwnedAllDomains(owner);
+    }
 
-  async getOwnedDomainsForTLD(tld: string): Promise<string[]> {
-    return super.getOwnedDomainsForTLD(tld);
-  }
+    async getOwnedDomainsForTLD(tld: string): Promise<string[]> {
+        return super.getOwnedDomainsForTLD(tld);
+    }
 
-  async getAllDomainsTLDs(): Promise<string[]> {
-    return super.getAllDomainsTLDs();
-  }
+    async getAllDomainsTLDs(): Promise<string[]> {
+        return super.getAllDomainsTLDs();
+    }
 
-  async getAllRegisteredAllDomains(): Promise<string[]> {
-    return super.getAllRegisteredAllDomains();
-  }
+    async getAllRegisteredAllDomains(): Promise<string[]> {
+        return super.getAllRegisteredAllDomains();
+    }
 
-  async getMainAllDomainsDomain(owner: PublicKey): Promise<string | null> {
-    return super.getMainAllDomainsDomain(owner);
-  }
+    async getMainAllDomainsDomain(owner: PublicKey): Promise<string | null> {
+        return super.getMainAllDomainsDomain(owner);
+    }
 
-  async getPrimaryDomain(account: PublicKey): Promise<string> {
-    return super.getPrimaryDomain(account);
-  }
+    async getPrimaryDomain(account: PublicKey): Promise<string> {
+        return super.getPrimaryDomain(account);
+    }
 
-  async registerDomain(name: string, spaceKB?: number): Promise<string> {
-    return super.registerDomain(name, spaceKB);
-  }
+    async registerDomain(name: string, spaceKB?: number): Promise<string> {
+        if (this.isReadonly) {
+          throw new Error('Cannot register domains in readonly mode');
+        }
+        return super.registerDomain(name, spaceKB);
+    }
 
-  async resolveSolDomain(domain: string): Promise<PublicKey> {
-    return super.resolveSolDomain(domain);
-  }
+    async resolveSolDomain(domain: string): Promise<PublicKey> {
+        return super.resolveSolDomain(domain);
+    }
 
-  async createOrcaSingleSidedWhirlpool(
-    depositTokenAmount: BN,
-    depositTokenMint: PublicKey,
-    otherTokenMint: PublicKey,
-    initialPrice: Decimal,
-    maxPrice: Decimal,
-    feeTier: 0.01 | 0.02 | 0.04 | 0.05 | 0.16 | 0.3 | 0.65
-  ): Promise<string> {
-    return super.createOrcaSingleSidedWhirlpool(
-      depositTokenAmount,
-      depositTokenMint,
-      otherTokenMint,
-      initialPrice,
-      maxPrice,
-      feeTier
-    );
-  }
+    async createOrcaSingleSidedWhirlpool(
+        depositTokenAmount: BN,
+        depositTokenMint: PublicKey,
+        otherTokenMint: PublicKey,
+        initialPrice: Decimal,
+        maxPrice: Decimal,
+        feeTier: 0.01 | 0.02 | 0.04 | 0.05 | 0.16 | 0.3 | 0.65
+    ): Promise<string> {
+        if (this.isReadonly) {
+          throw new Error('Cannot create whirlpools in readonly mode');
+        }
+        return super.createOrcaSingleSidedWhirlpool(
+          depositTokenAmount,
+          depositTokenMint,
+          otherTokenMint,
+          initialPrice,
+          maxPrice,
+          feeTier
+        );
+    }
 
-  async createGibworkTask(
-    title: string,
-    content: string,
-    requirements: string,
-    tags: string[],
-    tokenMintAddress: string,
-    tokenAmount: number,
-    payer?: string
-  ): Promise<{ taskId: string }> {
-    return {
-      taskId: Math.random().toString()
-    };
-  }
+    async createGibworkTask(
+        title: string,
+        content: string,
+        requirements: string,
+        tags: string[],
+        tokenMintAddress: string,
+        tokenAmount: number,
+        payer?: string
+    ): Promise<{ taskId: string }> {
+        if (this.isReadonly) {
+          throw new Error('Cannot create tasks in readonly mode');
+        }
+        return {
+          taskId: Math.random().toString()
+        };
+    }
 }
