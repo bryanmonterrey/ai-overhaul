@@ -15,18 +15,18 @@ export class ExtendedSolanaAgentKit extends SolanaAgentKit implements ISolanaAge
     private readonly isReadonly: boolean;
 
     constructor(
-        key: string | 'readonly',
-        rpcUrl: string,
-        openaiApiKey: string
-    ) {
-        // If key is 'readonly', use a valid base58 public key
-        const baseKey = key === 'readonly' 
-            ? '11111111111111111111111111111111' // System Program address
-            : key;
-            
-        super(baseKey, rpcUrl, openaiApiKey);
-        this.isReadonly = key === 'readonly';
-    }
+      key: string | 'readonly',
+      rpcUrl: string,
+      openaiApiKey: string
+  ) {
+      // Use a valid 32-byte base58 encoded private key for readonly mode
+      const baseKey = key === 'readonly' 
+          ? '11111111111111111111111111111111111111111111111111111111111111' 
+          : key;
+          
+      super(baseKey, rpcUrl, openaiApiKey);
+      this.isReadonly = key === 'readonly';
+  }
 
     // Session management
     async initSession(params: { wallet: { publicKey: string; sessionProof?: string; } }): Promise<SessionResponse> {
