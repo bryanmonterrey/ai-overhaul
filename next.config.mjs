@@ -68,7 +68,6 @@ const nextConfig = {
         serverActions: {
             bodySizeLimit: '2mb'
         },
-        esmExternals: 'loose'  // Changed from true to 'loose' for better compatibility
     },
     serverExternalPackages: ['twitter-api-v2'],
     typescript: {
