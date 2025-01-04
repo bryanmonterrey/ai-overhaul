@@ -41,11 +41,18 @@ export async function POST(req: Request) {
       );
     }
 
+    // Fix cookie initialization
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies: () => cookieStore,
+    }, {
+      options: { global: { headers: { 'cache-control': 'no-store' } } }
+    });
+
     console.log('2. Supabase client created');
 
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
     console.log('3. Session check result:', { 
       hasSession: !!sessionData?.session, 
       sessionError: sessionError?.message,
