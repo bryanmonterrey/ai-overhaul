@@ -32,14 +32,15 @@ async function checkTokenGating(supabase: any, session: any, req: NextRequest): 
       return { isValid: true, redirect: '' };
     }
 
-    // Check if token gating is enabled - handle jsonb value
+    // Check if token gating is enabled - handle direct boolean value
     const { data: settings } = await supabase
       .from('admin_settings')
       .select('*')
       .eq('key', 'token_gate_enabled')
       .single();
 
-    if (!settings?.value?.enabled) {
+    // Changed from settings?.value?.enabled to just settings?.value
+    if (!settings?.value) {
       return { isValid: true, redirect: '' };
     }
 
