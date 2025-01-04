@@ -138,7 +138,7 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 mx-auto w-full flex justify-center items-center">
           <WalletConnection />
         </div>
 
