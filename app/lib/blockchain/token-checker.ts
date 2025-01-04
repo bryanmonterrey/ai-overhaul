@@ -89,40 +89,35 @@ export class TokenChecker {
     if (cachedBalance !== null) {
       return parseFloat(cachedBalance);
     }
-
+  
     try {
-      const response = await fetch(this.HELIUS_RPC_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 'token-checker',
-          method: 'searchAssets',
-          params: {
-            ownerAddress: walletAddress,
-            grouping: ["collection", this.tokenAddress],
-            page: 1,
-            limit: 10
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Helius API error: ${response.status}`);
-      }
-
-      const { result } = await response.json();
-      if (!result || !Array.isArray(result.items)) {
-        throw new Error('Invalid response format from Helius API');
-      }
-
-      const balance = result.items.length;
+      console.log('Fetching balance for wallet:', walletAddress);
+      
+      // Get all token accounts owned by this wallet
+      const tokenAccounts = await this.connection.getParsedTokenAccountsByOwner(
+        new PublicKey(walletAddress),
+        {
+          mint: new PublicKey(this.tokenAddress)
+        }
+      );
+  
+      // Calculate total balance across all accounts
+      const balance = tokenAccounts.value.reduce((total, account) => {
+        const tokenAmount = account.account.data.parsed.info.tokenAmount;
+        return total + (tokenAmount.uiAmount || 0);
+      }, 0);
+  
+      console.log('Raw token accounts:', tokenAccounts.value);
+      console.log('Calculated balance:', balance);
+      
       await this.setCache(cacheKey, balance.toString());
       return balance;
     } catch (error) {
-      console.error('Error getting token balance:', error);
+      console.error('Error getting token balance:', {
+        error,
+        wallet: walletAddress,
+        token: this.tokenAddress
+      });
       return 0;
     }
   }
