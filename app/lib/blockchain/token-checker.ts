@@ -1,4 +1,3 @@
-// app/lib/blockchain/token-checker.ts
 import { Connection, PublicKey } from '@solana/web3.js';
 import Decimal from 'decimal.js';
 import { Redis } from '@upstash/redis';
@@ -134,34 +133,23 @@ export class TokenChecker {
       return parseFloat(cachedPrice);
     }
 
-    const price = 1; // Replace with actual price fetching logic if needed
-    await this.setCache(cacheKey, price.toString());
-    return price;
-  }
-
-  async checkPriceImpact(balance: number): Promise<boolean> {
-    const cacheKey = `price_impact:${balance}`;
-    const cachedImpact = await this.getFromCache(cacheKey);
-    if (cachedImpact !== null) {
-      return cachedImpact === 'true';
-    }
-
     try {
-      const poolInfo = await this.connection.getAccountInfo(
-        new PublicKey(this.tokenAddress)
-      );
-
-      if (!poolInfo) {
-        await this.setCache(cacheKey, 'false');
-        return false;
+      const response = await fetch(`https://api.jup.ag/price/v2?ids=${this.tokenAddress}`);
+      if (!response.ok) {
+        throw new Error(`Jupiter API error: ${response.status}`);
       }
 
-      const impact = balance > 0;
-      await this.setCache(cacheKey, impact.toString());
-      return impact;
+      const data = await response.json();
+      if (!data.data || !data.data[this.tokenAddress]) {
+        throw new Error('Invalid price data from Jupiter');
+      }
+
+      const price = parseFloat(data.data[this.tokenAddress].price);
+      await this.setCache(cacheKey, price.toString());
+      return price;
     } catch (error) {
-      console.error('Error checking price impact:', error);
-      return false;
+      console.error('Error fetching price from Jupiter:', error);
+      return 0;
     }
   }
 
@@ -171,16 +159,13 @@ export class TokenChecker {
     price: number;
     value: number;
   }> {
-    // Throttle checks
     if (this.shouldThrottle(walletAddress)) {
       const lastResult = this.checkInProgress.get(walletAddress);
       if (lastResult) return lastResult;
     }
 
-    // Update last check time
     this.lastCheckTime.set(walletAddress, Date.now());
 
-    // Return existing check if one is in progress
     if (this.checkInProgress.has(walletAddress)) {
       return this.checkInProgress.get(walletAddress)!;
     }
@@ -199,30 +184,30 @@ export class TokenChecker {
           this.getTokenPrice()
         ]);
 
-        const value = balance * price;
-        const isEligible = value >= this.REQUIRED_USD_VALUE;
+        const numericBalance = new Decimal(balance);
+        const numericPrice = new Decimal(price);
+        const value = numericBalance.times(numericPrice);
+        
+        const isEligible = value.greaterThanOrEqualTo(this.REQUIRED_USD_VALUE);
 
         const result = {
           isEligible,
-          balance,
-          price,
-          value
+          balance: numericBalance.toNumber(),
+          price: numericPrice.toNumber(),
+          value: value.toNumber()
         };
 
-        // Cache the result with a longer TTL to prevent rate limiting
-        await this.setCache(cacheKey, JSON.stringify(result), 300); // Cache for 5 minutes
-        
+        await this.setCache(cacheKey, JSON.stringify(result), 300);
         return result;
       } catch (error) {
         console.error('Error checking eligibility:', error);
-        // Cache errors briefly to prevent hammering
         await this.setCache(cacheKey, JSON.stringify({
           isEligible: false,
           balance: 0,
           price: 0,
           value: 0,
           error: true
-        }), 30); // Cache errors for 30 seconds
+        }), 30);
         throw error;
       } finally {
         this.checkInProgress.delete(walletAddress);
@@ -234,5 +219,4 @@ export class TokenChecker {
   }
 }
 
-// Export singleton instance
 export const tokenChecker = TokenChecker.getInstance();

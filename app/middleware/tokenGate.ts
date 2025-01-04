@@ -3,101 +3,102 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { TokenChecker } from '../lib/blockchain/token-checker';
 
+const PROTECTED_PATHS = [
+  '/chat',
+  '/conversation',
+  '/conversations',
+  '/trading/holders'
+];
+
+const PUBLIC_PATHS = [
+  '/login',
+  '/insufficient-tokens'
+];
+
+const isProtectedPath = (pathname: string): boolean => {
+  return PROTECTED_PATHS.some(path => pathname.startsWith(path));
+};
+
+const isPublicPath = (pathname: string): boolean => {
+  return PUBLIC_PATHS.some(path => pathname.startsWith(path));
+};
+
+async function checkTokenGating(supabase: any, session: any, req: NextRequest): Promise<{ 
+  isValid: boolean; 
+  redirect: string;
+}> {
+  try {
+    if (isPublicPath(req.nextUrl.pathname)) {
+      return { isValid: true, redirect: '' };
+    }
+
+    // Check if token gating is enabled - handle jsonb value
+    const { data: settings } = await supabase
+      .from('admin_settings')
+      .select('*')
+      .eq('key', 'token_gate_enabled')
+      .single();
+
+    if (!settings?.value?.enabled) {
+      return { isValid: true, redirect: '' };
+    }
+
+    const walletAddress = session.user.user_metadata.wallet_address;
+    const checker = TokenChecker.getInstance();
+    const { isEligible, balance, value } = await checker.checkEligibility(walletAddress);
+
+    // Update token holdings
+    await supabase
+      .from('token_holders')
+      .upsert({
+        user_id: session.user.id,
+        wallet_address: walletAddress,
+        token_balance: balance,
+        dollar_value: value,
+        last_checked_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (!isEligible) {
+      return { isValid: false, redirect: '/insufficient-tokens' };
+    }
+
+    return { isValid: true, redirect: '' };
+
+  } catch (error) {
+    console.error('Token check error:', error);
+    return { isValid: false, redirect: '/login' };
+  }
+}
+
 export async function middleware(req: NextRequest) {
   try {
-    // Only apply middleware to chat routes
-    if (!req.nextUrl.pathname.startsWith('/chat')) {
+    if (isPublicPath(req.nextUrl.pathname)) {
+      return NextResponse.next();
+    }
+
+    if (!isProtectedPath(req.nextUrl.pathname)) {
       return NextResponse.next();
     }
 
     const res = NextResponse.next();
     const supabase = createMiddlewareClient({ req, res });
 
-    // Check session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    if (sessionError) {
-      console.error('Session error:', sessionError);
+    if (sessionError || !session) {
+      console.error('Session error or no session:', sessionError);
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    if (!session) {
-      return NextResponse.redirect(new URL('/login', req.url));
+    const { isValid, redirect } = await checkTokenGating(supabase, session, req);
+    
+    if (!isValid) {
+      return NextResponse.redirect(new URL(redirect, req.url));
     }
 
-    try {
-      // Check if token gating is enabled
-      const { data: settings, error: settingsError } = await supabase
-        .from('admin_settings')
-        .select('*')
-        .eq('key', 'token_gate_enabled')
-        .single();
+    return res;
 
-      if (settingsError) {
-        console.error('Error fetching token gate settings:', settingsError);
-        // If we can't verify settings, err on the side of caution
-        return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
-      }
-
-      if (settings?.value) {
-        // Get user's wallet address
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('wallet_address')
-          .eq('id', session.user.id)
-          .single();
-
-        if (userError || !userData?.wallet_address) {
-          console.error('Error fetching user wallet:', userError);
-          // Clear the invalid session
-          await supabase.auth.signOut();
-          return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
-        }
-
-        // Check token eligibility
-        const tokenChecker = new TokenChecker();
-        const { isEligible, value } = await tokenChecker.checkEligibility(userData.wallet_address);
-
-        if (!isEligible) {
-          console.log('User not eligible:', { 
-            wallet: userData.wallet_address, 
-            value,
-            userId: session.user.id 
-          });
-          
-          // Update token holdings in database
-          await supabase
-            .from('token_holders')
-            .upsert({
-              user_id: session.user.id,
-              wallet_address: userData.wallet_address,
-              dollar_value: value,
-              last_checked: new Date().toISOString()
-            });
-
-          // Clear session for ineligible users
-          await supabase.auth.signOut();
-          return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
-        }
-
-        // Update token holdings for eligible users
-        await supabase
-          .from('token_holders')
-          .upsert({
-            user_id: session.user.id,
-            wallet_address: userData.wallet_address,
-            dollar_value: value,
-            last_checked: new Date().toISOString()
-          });
-      }
-
-      return res;
-    } catch (error) {
-      console.error('Token check error:', error);
-      // On any error, redirect to login
-      await supabase.auth.signOut();
-      return NextResponse.redirect(new URL('/login', req.url));
-    }
   } catch (error) {
     console.error('Middleware error:', error);
     return NextResponse.redirect(new URL('/login', req.url));
@@ -105,5 +106,10 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/chat/:path*']
+  matcher: [
+    '/chat/:path*',
+    '/conversation/:path*',
+    '/conversations/:path*',
+    '/trading/holders/:path*'
+  ]
 };
