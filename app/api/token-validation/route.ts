@@ -1,4 +1,3 @@
-// app/api/token-validation/route.ts
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -6,7 +5,6 @@ import { tokenChecker } from '../../lib/blockchain/token-checker';
 import { Database } from '@/supabase/functions/supabase.types';
 import { tokenValidationRateLimiter } from '../../lib/middleware/rate-limiter';
 
-// Add interface for eligibility check result
 interface EligibilityCheckResult {
   isEligible: boolean;
   balance: number;
@@ -16,7 +14,6 @@ interface EligibilityCheckResult {
 
 export async function POST(req: Request) {
   try {
-    // Rate limiting check
     const ip = req.headers.get("x-forwarded-for") ?? "127.0.0.1"
     const { success, limit, reset, remaining } = await tokenValidationRateLimiter.limit(ip)
     
@@ -34,11 +31,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Parse request body
     const { walletAddress } = await req.json();
     console.log('1. Request received for wallet:', walletAddress);
     
-    // Validate wallet address
     if (!walletAddress || typeof walletAddress !== 'string' || walletAddress.length !== 44) {
       return NextResponse.json(
         { error: 'Invalid wallet address format' },
@@ -46,11 +41,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // Initialize Supabase client with proper cookie handling
-    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
     console.log('2. Supabase client created');
 
-    // Verify session
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     console.log('3. Session check result:', { 
       hasSession: !!sessionData?.session, 
@@ -83,7 +77,6 @@ export async function POST(req: Request) {
 
       console.log('5. Eligibility check results:', eligibilityCheck);
 
-      // Update token holdings with error handling
       const { error: upsertError } = await supabase
         .from('token_holders')
         .upsert({
@@ -91,7 +84,8 @@ export async function POST(req: Request) {
           wallet_address: walletAddress,
           token_balance: eligibilityCheck.balance,
           dollar_value: eligibilityCheck.value,
-          last_checked_at: new Date().toISOString()
+          last_checked_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
 
       if (upsertError) {
@@ -100,10 +94,11 @@ export async function POST(req: Request) {
         console.log('6. Token holdings updated successfully');
       }
 
-      // Get admin settings for eligibility
       const { data: settings, error: settingsError } = await supabase
         .from('admin_settings')
-        .select('*');
+        .select('*')
+        .eq('key', 'required_token_value')
+        .single();
 
       console.log('7. Admin settings fetched:', { settings, error: settingsError });
 
@@ -111,16 +106,15 @@ export async function POST(req: Request) {
         console.error('Error fetching admin settings:', settingsError);
       }
 
-      const requiredValue = settings?.find(s => s.key === 'required_token_value')?.value || 0;
+      const requiredValue = Number(settings?.value || 0);
       const isEligible = eligibilityCheck.value >= requiredValue;
 
       console.log('8. Final eligibility check:', {
-        value: eligibilityCheck.value,
+        currentValue: eligibilityCheck.value,
         requiredValue,
         isEligible
       });
 
-      // Return success response with all relevant data
       return NextResponse.json({
         success: true,
         isEligible,
@@ -140,7 +134,6 @@ export async function POST(req: Request) {
         );
       }
       
-      // Log and rethrow other errors
       console.error('Token check error:', error);
       throw error;
     }

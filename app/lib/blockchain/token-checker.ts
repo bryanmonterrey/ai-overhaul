@@ -67,10 +67,11 @@ export class TokenChecker {
     }
   }
 
-  private async setCache(key: string, value: string, ttl: number = this.CACHE_TTL): Promise<void> {
+  private async setCache(key: string, value: string | object, ttl: number = this.CACHE_TTL): Promise<void> {
     if (!this.redis) return;
     try {
-      await this.redis.set(key, value, { ex: ttl });
+      const valueToStore = typeof value === 'string' ? value : JSON.stringify(value);
+      await this.redis.set(key, valueToStore, { ex: ttl });
     } catch (error) {
       console.error('Cache set error:', error);
     }
@@ -174,7 +175,14 @@ export class TokenChecker {
     const cachedEligibility = await this.getFromCache(cacheKey);
     
     if (cachedEligibility !== null) {
-      return JSON.parse(cachedEligibility);
+      try {
+        return typeof cachedEligibility === 'string' 
+          ? JSON.parse(cachedEligibility)
+          : cachedEligibility;
+      } catch (error) {
+        console.error('Cache parse error:', error);
+        // Continue to fetch fresh data
+      }
     }
 
     const checkPromise = (async () => {
@@ -197,17 +205,18 @@ export class TokenChecker {
           value: value.toNumber()
         };
 
-        await this.setCache(cacheKey, JSON.stringify(result), 300);
+        await this.setCache(cacheKey, result, 300);
         return result;
       } catch (error) {
         console.error('Error checking eligibility:', error);
-        await this.setCache(cacheKey, JSON.stringify({
+        const errorResult = {
           isEligible: false,
           balance: 0,
           price: 0,
           value: 0,
           error: true
-        }), 30);
+        };
+        await this.setCache(cacheKey, errorResult, 30);
         throw error;
       } finally {
         this.checkInProgress.delete(walletAddress);
