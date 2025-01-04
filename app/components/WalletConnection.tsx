@@ -121,7 +121,7 @@ export function WalletConnection() {
         },
         body: JSON.stringify({ walletAddress }),
       });
-
+  
       console.log('API Response status:', response.status);
       const data = await response.json();
       console.log('Validation response:', data);
@@ -134,13 +134,16 @@ export function WalletConnection() {
         }
         throw new Error(data.error || 'Validation failed');
       }
-
-      if (data.isEligible) {
+  
+      // Change this part
+      if (data.success && data.isEligible) {  // Add check for data.success
         console.log('Token validation successful. Redirecting to chat...');
         window.location.href = '/chat';
-      } else {
+      } else if (!data.isEligible) {  // Only redirect if explicitly not eligible
         console.log('Insufficient tokens. Redirecting...');
         window.location.href = '/insufficient-tokens';
+      } else {
+        throw new Error('Validation response missing required fields');
       }
     } catch (error: any) {
       console.error('Error in token validation:', error);
