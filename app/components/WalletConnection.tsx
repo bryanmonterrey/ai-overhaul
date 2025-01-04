@@ -69,16 +69,29 @@ export function WalletConnection() {
 
   const handleWalletAuth = async () => {
     if (!publicKey) return;
-
+  
     try {
       setAuthError(null);
+      
+      // Update user data with wallet address first
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ wallet_address: publicKey.toString() })
+        .eq('id', session.user.id);
+  
+      if (updateError) {
+        console.error('Error updating user wallet:', updateError);
+        setAuthError('Failed to update wallet address');
+        return;
+      }
+  
       const result = await walletAuthManager.authenticateWallet(publicKey.toString());
       
       if (!result.success) {
         setAuthError(result.error || 'Authentication failed');
         return;
       }
-
+  
       // If authentication is successful, proceed with token validation
       await handleValidateTokens();
     } catch (error: any) {

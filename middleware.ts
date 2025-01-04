@@ -120,48 +120,81 @@ export async function middleware(req: NextRequest) {
         .select('*');
 
       const tokenGateEnabled = settings?.find(s => s.key === 'token_gate_enabled')?.value;
+      const requiredTokenValue = Number(settings?.find(s => s.key === 'required_token_value')?.value || 0);
+      
+      console.log('Token gate settings:', {
+        tokenGateEnabled,
+        requiredTokenValue
+      });
       
       if (tokenGateEnabled) {
-        // Get user's wallet address
-        const { data: userData } = await supabase
-          .from('users')
-          .select('wallet_address')
-          .eq('id', session.user.id)
-          .single();
+        // Get user's wallet address with fallback checks
+        let walletAddress: string | null = null;
 
-        if (!userData?.wallet_address) {
-          return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
-        }
+// Check 1: Get from users table
+const { data: userData } = await supabase
+  .from('users')
+  .select('wallet_address')
+  .eq('id', session.user.id)
+  .maybeSingle();
+
+console.log('User data from db:', { userData });
+
+if (userData?.wallet_address) {
+  walletAddress = userData.wallet_address;
+} else {
+  console.log('No wallet address in DB, checking metadata');
+  // Check 2: Try user_metadata
+  const metadataWalletAddress = session.user.user_metadata?.wallet_address;
+  
+  if (metadataWalletAddress) {
+    // Update the users table with the wallet address
+    await supabase
+      .from('users')
+      .update({ wallet_address: metadataWalletAddress })
+      .eq('id', session.user.id);
+    
+    walletAddress = metadataWalletAddress;
+    console.log('Found wallet in metadata:', metadataWalletAddress);
+  }
+}
+
+// If we still don't have a wallet address after all checks
+if (!walletAddress) {
+  console.log('No wallet address found anywhere');
+  return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
+}
 
         // Check actual token holdings
         const tokenChecker = new TokenChecker();
-        const { isEligible, value } = await tokenChecker.checkEligibility(userData.wallet_address);
+        const { isEligible, value, balance } = await tokenChecker.checkEligibility(walletAddress);
 
-        if (!isEligible) {
-          // Update token holdings in database
-          await supabase
-            .from('token_holders')
-            .upsert({
-              user_id: session.user.id,
-              wallet_address: userData.wallet_address,
-              dollar_value: value,
-              last_checked: new Date().toISOString()
-            });
+        console.log('Token check results:', {
+          walletAddress,
+          value,
+          balance,
+          isEligible,
+          requiredValue: requiredTokenValue
+        });
 
-          // Clear session for ineligible users
-          await supabase.auth.signOut();
-          return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
-        }
-
-        // Update token holdings for eligible users
+        // Update token holdings
         await supabase
           .from('token_holders')
           .upsert({
             user_id: session.user.id,
-            wallet_address: userData.wallet_address,
+            wallet_address: walletAddress,
+            token_balance: balance,
             dollar_value: value,
-            last_checked: new Date().toISOString()
+            last_checked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
+
+        if (!isEligible) {
+          console.log('User not eligible, redirecting to insufficient tokens');
+          return NextResponse.redirect(new URL('/insufficient-tokens', req.url));
+        }
+
+        console.log('User eligible, allowing access');
       }
     } catch (error) {
       console.error('Token check error:', error);
@@ -193,15 +226,14 @@ export const config = {
     '/api/chat/:path*',
     '/api/ai/:path*',
     '/api/agent-kit/:path*',
-    '/api/trading/admin/chat',  // Changed to exact match
+    '/api/trading/admin/chat',
     '/twitter/:path*',
     '/telegram/:path*',
     '/trading/admin/:path*',
     '/trading/holders/:path*',
     '/api/trading/admin/:path*',
     '/api/trading/holders/:path*',
-    '/((?!insufficient-tokens|login|api/auth).*)',
-    '/api/memory/:path*',
+    '/api/memory/:path*'
   ],
   runtime: 'nodejs',
   unstable_allowDynamic: [
