@@ -151,7 +151,7 @@ export async function POST(req: Request) {
         error: 'Internal server error',
         details: error.message,
         timestamp: new Date().toISOString()
-      },
+      }, 
       { status: 500 }
     );
   }
