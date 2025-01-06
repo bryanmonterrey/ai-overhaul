@@ -169,7 +169,7 @@ useEffect(() => {
           />
         </div>
       </div>
-      
+        
       {isRightPanelVisible && (
       <div className="space-y-4">
         <EmotionalStateDisplay

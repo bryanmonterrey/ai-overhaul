@@ -14,5 +14,3 @@ solana
 solana-sdk
 solders
 base58
-jup-ag
-python-pyth
